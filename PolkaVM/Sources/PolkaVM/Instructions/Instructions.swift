@@ -323,20 +323,13 @@ extension CppHelper.Instructions.StoreU32: Instruction {
 
 extension CppHelper.Instructions.StoreU64: Instruction {
     public init(data: Data) throws {
-        print("[StoreU64.init] data.count: \(data.count)")
         let register = try Registers.Index(r1: data.at(relative: 0))
-        print("[StoreU64.init] register: \(register)")
         let address: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
-        print("[StoreU64.init] address: \(address)")
-        print("[StoreU64.init] About to call self.init")
         self.init(reg: register, address: address)
-        print("[StoreU64.init] self.init succeeded")
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        print("[StoreU64.execute] reg: \(reg), address: \(address)")
         let value: UInt64 = context.state.readRegister(reg)
-        print("[StoreU64.execute] value: \(value)")
         try context.state.writeMemory(address: address, values: value.encode())
         return .continued
     }
@@ -345,8 +338,10 @@ extension CppHelper.Instructions.StoreU64: Instruction {
 extension CppHelper.Instructions.StoreImmIndU8: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        let (address, value): (UInt32, UInt8) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        self.init(reg: register, address: address, value: value)
+        // StoreImmIndU8: [opcode][reg_index][varint_address][varint_value]
+        let (addressValue, addressBytes) = try Instructions.decodeVarintSingle(data, offset: 1)
+        let (value, _) = try Instructions.decodeVarintSingle(data, offset: 1 + addressBytes)
+        self.init(reg: register, address: UInt32(truncatingIfNeeded: addressValue), value: UInt8(truncatingIfNeeded: value))
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -358,8 +353,9 @@ extension CppHelper.Instructions.StoreImmIndU8: Instruction {
 extension CppHelper.Instructions.StoreImmIndU16: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        let (address, value): (UInt32, UInt16) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        self.init(reg: register, address: address, value: value)
+        let (addressValue, addressBytes) = try Instructions.decodeVarintSingle(data, offset: 1)
+        let (value, _) = try Instructions.decodeVarintSingle(data, offset: 1 + addressBytes)
+        self.init(reg: register, address: UInt32(truncatingIfNeeded: addressValue), value: UInt16(truncatingIfNeeded: value))
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -374,8 +370,9 @@ extension CppHelper.Instructions.StoreImmIndU16: Instruction {
 extension CppHelper.Instructions.StoreImmIndU32: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        let (address, value): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        self.init(reg: register, address: address, value: value)
+        let (addressValue, addressBytes) = try Instructions.decodeVarintSingle(data, offset: 1)
+        let (value, _) = try Instructions.decodeVarintSingle(data, offset: 1 + addressBytes)
+        self.init(reg: register, address: UInt32(truncatingIfNeeded: addressValue), value: UInt32(truncatingIfNeeded: value))
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -390,8 +387,9 @@ extension CppHelper.Instructions.StoreImmIndU32: Instruction {
 extension CppHelper.Instructions.StoreImmIndU64: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        let (address, value): (UInt32, UInt64) = try Instructions.decodeImmediate2(data, divideBy: 16)
-        self.init(reg: register, address: address, value: value)
+        let (addressValue, addressBytes) = try Instructions.decodeVarintSingle(data, offset: 1)
+        let (value, _) = try Instructions.decodeVarintSingle(data, offset: 1 + addressBytes)
+        self.init(reg: register, address: UInt32(truncatingIfNeeded: addressValue), value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -1636,22 +1634,14 @@ extension CppHelper.Instructions.Add64: Instruction {
 
 extension CppHelper.Instructions.Sub64: Instruction {
     public init(data: Data) throws {
-        print("[Sub64.init] data.count: \(data.count)")
         let (ra, rb, rd) = try Instructions.decodeRegisters(data)
-        print("[Sub64.init] ra: \(ra), rb: \(rb), rd: \(rd)")
         self.init(ra: ra, rb: rb, rd: rd)
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        print("[Sub64.execute] ra: \(ra), rb: \(rb), rd: \(rd)")
-        print("[Sub64.execute] ra.value: \(ra.value) type: \(type(of: ra.value))")
         let (raVal, rbVal): (UInt64, UInt64) = context.state.readRegister(ra, rb)
-        print("[Sub64.execute] raVal: \(raVal), rbVal: \(rbVal)")
         let result = raVal &- rbVal
-        print("[Sub64.execute] result: \(result)")
-        print("[Sub64.execute] About to write result to register \(rd.value)")
         context.state.writeRegister(rd, result)
-        print("[Sub64.execute] Write succeeded!")
         return .continued
     }
 }
