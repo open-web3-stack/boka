@@ -31,6 +31,7 @@ extension Instructions {
         var result: UInt64 = 0
         var shift = 0
         var index = 0
+        var foundTerminator = false
 
         while index < data.count {
             let byte = data[index]
@@ -38,6 +39,7 @@ extension Instructions {
             index += 1
 
             if (byte & 0x80) == 0 {
+                foundTerminator = true
                 break
             }
 
@@ -46,6 +48,12 @@ extension Instructions {
                 logger.error("Varint overflow - value too large")
                 return 0
             }
+        }
+
+        // Ensure we found a proper terminator before running out of data
+        if !foundTerminator {
+            logger.error("Varint underflow - data ended without terminator")
+            return 0
         }
 
         return result
@@ -172,6 +180,7 @@ extension Instructions {
         // Decode first varint
         var firstValue: UInt64 = 0
         var shift = 0
+        var foundTerminator = false
         while currentOffset < data.count {
             let byte = data[currentOffset]
             firstValue |= UInt64(byte & 0x7F) << shift
@@ -179,6 +188,7 @@ extension Instructions {
             currentOffset += 1
 
             if (byte & 0x80) == 0 {
+                foundTerminator = true
                 break
             }
 
@@ -188,9 +198,14 @@ extension Instructions {
             }
         }
 
+        guard foundTerminator else {
+            throw InstructionDecodingError.insufficientData
+        }
+
         // Decode second varint
         var secondValue: UInt64 = 0
         shift = 0
+        foundTerminator = false
         while currentOffset < data.count {
             let byte = data[currentOffset]
             secondValue |= UInt64(byte & 0x7F) << shift
@@ -198,6 +213,7 @@ extension Instructions {
             currentOffset += 1
 
             if (byte & 0x80) == 0 {
+                foundTerminator = true
                 break
             }
 
@@ -205,6 +221,10 @@ extension Instructions {
             if shift >= 64 {
                 throw InstructionDecodingError.varintOverflow
             }
+        }
+
+        guard foundTerminator else {
+            throw InstructionDecodingError.insufficientData
         }
 
         return (UInt32(truncatingIfNeeded: firstValue), UInt32(truncatingIfNeeded: secondValue), bytesConsumed)
@@ -221,6 +241,7 @@ extension Instructions {
         var bytesConsumed = 0
         var value: UInt64 = 0
         var shift = 0
+        var foundTerminator = false
 
         while currentOffset < data.count {
             let byte = data[currentOffset]
@@ -229,6 +250,7 @@ extension Instructions {
             currentOffset += 1
 
             if (byte & 0x80) == 0 {
+                foundTerminator = true
                 break
             }
 
@@ -236,6 +258,10 @@ extension Instructions {
             if shift >= 64 {
                 throw InstructionDecodingError.varintOverflow
             }
+        }
+
+        guard foundTerminator else {
+            throw InstructionDecodingError.insufficientData
         }
 
         return (value, bytesConsumed)
