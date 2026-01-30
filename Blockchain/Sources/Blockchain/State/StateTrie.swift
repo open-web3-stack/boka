@@ -441,8 +441,10 @@ public actor StateTrie {
                     cache.remove(id)
                 } else {
                     // Try to load from backend to get node data for ref counting
-                    if let nodeData = try? await backend.read(key: id), nodeData.count == 65 {
-                        // Reconstruct the full 32-byte hash by prefixing a zero byte
+                    // Accept any data size >= 65 bytes to handle potential future encoding changes
+                    if let nodeData = try? await backend.read(key: id), nodeData.count >= 65 {
+                        // Reconstruct a temporary hash for parsing (TrieNode doesn't validate hash)
+                        // The actual hash value doesn't matter here since we only need node.type and children
                         var hashBytes = Data(repeating: 0, count: 1)
                         hashBytes.append(id)
                         let node = TrieNode(hash: Data32(hashBytes)!, data: nodeData)
