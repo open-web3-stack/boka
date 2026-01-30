@@ -85,7 +85,10 @@ public actor InMemoryBackend: StateBackendProtocol {
                     }
                 }
             } else {
+                // Key is in refCounts but not in store - this is a zombie entry
+                // Clean it up to prevent unbounded growth and repeated warnings
                 logger.warning("GC: Key in refCounts but not in store: \(key.toHexString())")
+                keysToRemove.append(key)
             }
         }
 
