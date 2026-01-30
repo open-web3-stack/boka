@@ -166,7 +166,7 @@ extension CppHelper.Instructions.JumpInd: Instruction {
 extension CppHelper.Instructions.LoadImm: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(reg: register, value: value)
     }
 
@@ -338,10 +338,8 @@ extension CppHelper.Instructions.StoreU64: Instruction {
 extension CppHelper.Instructions.StoreImmIndU8: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        // StoreImmIndU8: [opcode][reg_index][varint_address][varint_value]
-        let (addressValue, addressBytes) = try Instructions.decodeVarintSingle(data, offset: 1)
-        let (value, _) = try Instructions.decodeVarintSingle(data, offset: 1 + addressBytes)
-        self.init(reg: register, address: UInt32(truncatingIfNeeded: addressValue), value: UInt8(truncatingIfNeeded: value))
+        let (address, value): (UInt32, UInt8) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        self.init(reg: register, address: address, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -353,9 +351,8 @@ extension CppHelper.Instructions.StoreImmIndU8: Instruction {
 extension CppHelper.Instructions.StoreImmIndU16: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        let (addressValue, addressBytes) = try Instructions.decodeVarintSingle(data, offset: 1)
-        let (value, _) = try Instructions.decodeVarintSingle(data, offset: 1 + addressBytes)
-        self.init(reg: register, address: UInt32(truncatingIfNeeded: addressValue), value: UInt16(truncatingIfNeeded: value))
+        let (address, value): (UInt32, UInt16) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        self.init(reg: register, address: address, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -370,9 +367,8 @@ extension CppHelper.Instructions.StoreImmIndU16: Instruction {
 extension CppHelper.Instructions.StoreImmIndU32: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        let (addressValue, addressBytes) = try Instructions.decodeVarintSingle(data, offset: 1)
-        let (value, _) = try Instructions.decodeVarintSingle(data, offset: 1 + addressBytes)
-        self.init(reg: register, address: UInt32(truncatingIfNeeded: addressValue), value: UInt32(truncatingIfNeeded: value))
+        let (address, value): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        self.init(reg: register, address: address, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -387,9 +383,8 @@ extension CppHelper.Instructions.StoreImmIndU32: Instruction {
 extension CppHelper.Instructions.StoreImmIndU64: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        let (addressValue, addressBytes) = try Instructions.decodeVarintSingle(data, offset: 1)
-        let (value, _) = try Instructions.decodeVarintSingle(data, offset: 1 + addressBytes)
-        self.init(reg: register, address: UInt32(truncatingIfNeeded: addressValue), value: value)
+        let (address, value): (UInt32, UInt64) = try Instructions.decodeImmediate2(data, divideBy: 16)
+        self.init(reg: register, address: address, value: value)
     }
 
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
@@ -404,8 +399,7 @@ extension CppHelper.Instructions.StoreImmIndU64: Instruction {
 extension CppHelper.Instructions.LoadImmJump: Instruction {
     public init(data: Data) throws {
         let register = try Registers.Index(r1: data.at(relative: 0))
-        // LoadImmJump format: [opcode][reg_index][varint_value][varint_offset]
-        let (value, offset, _) = try Instructions.decodeVarintPair(data, offset: 1)
+        let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, divideBy: 16)
         self.init(reg: register, value: value, offset: offset)
     }
 
@@ -884,7 +878,7 @@ extension CppHelper.Instructions.LoadIndU64: Instruction {
 extension CppHelper.Instructions.AddImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -898,7 +892,7 @@ extension CppHelper.Instructions.AddImm32: Instruction {
 extension CppHelper.Instructions.AndImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -912,7 +906,7 @@ extension CppHelper.Instructions.AndImm: Instruction {
 extension CppHelper.Instructions.XorImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -926,7 +920,7 @@ extension CppHelper.Instructions.XorImm: Instruction {
 extension CppHelper.Instructions.OrImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -940,7 +934,7 @@ extension CppHelper.Instructions.OrImm: Instruction {
 extension CppHelper.Instructions.MulImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -954,7 +948,7 @@ extension CppHelper.Instructions.MulImm32: Instruction {
 extension CppHelper.Instructions.SetLtUImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -968,7 +962,7 @@ extension CppHelper.Instructions.SetLtUImm: Instruction {
 extension CppHelper.Instructions.SetLtSImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -982,7 +976,7 @@ extension CppHelper.Instructions.SetLtSImm: Instruction {
 extension CppHelper.Instructions.ShloLImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -997,7 +991,7 @@ extension CppHelper.Instructions.ShloLImm32: Instruction {
 extension CppHelper.Instructions.ShloRImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1012,7 +1006,7 @@ extension CppHelper.Instructions.ShloRImm32: Instruction {
 extension CppHelper.Instructions.SharRImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1027,7 +1021,7 @@ extension CppHelper.Instructions.SharRImm32: Instruction {
 extension CppHelper.Instructions.NegAddImm32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1041,7 +1035,7 @@ extension CppHelper.Instructions.NegAddImm32: Instruction {
 extension CppHelper.Instructions.SetGtUImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1055,7 +1049,7 @@ extension CppHelper.Instructions.SetGtUImm: Instruction {
 extension CppHelper.Instructions.SetGtSImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1069,7 +1063,7 @@ extension CppHelper.Instructions.SetGtSImm: Instruction {
 extension CppHelper.Instructions.ShloLImmAlt32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1084,7 +1078,7 @@ extension CppHelper.Instructions.ShloLImmAlt32: Instruction {
 extension CppHelper.Instructions.ShloRImmAlt32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1099,7 +1093,7 @@ extension CppHelper.Instructions.ShloRImmAlt32: Instruction {
 extension CppHelper.Instructions.SharRImmAlt32: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1114,7 +1108,7 @@ extension CppHelper.Instructions.SharRImmAlt32: Instruction {
 extension CppHelper.Instructions.CmovIzImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1130,7 +1124,7 @@ extension CppHelper.Instructions.CmovIzImm: Instruction {
 extension CppHelper.Instructions.CmovNzImm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1146,7 +1140,7 @@ extension CppHelper.Instructions.CmovNzImm: Instruction {
 extension CppHelper.Instructions.AddImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1160,7 +1154,7 @@ extension CppHelper.Instructions.AddImm64: Instruction {
 extension CppHelper.Instructions.MulImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1174,7 +1168,7 @@ extension CppHelper.Instructions.MulImm64: Instruction {
 extension CppHelper.Instructions.ShloLImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1189,7 +1183,7 @@ extension CppHelper.Instructions.ShloLImm64: Instruction {
 extension CppHelper.Instructions.ShloRImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1204,7 +1198,7 @@ extension CppHelper.Instructions.ShloRImm64: Instruction {
 extension CppHelper.Instructions.SharRImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1219,7 +1213,7 @@ extension CppHelper.Instructions.SharRImm64: Instruction {
 extension CppHelper.Instructions.NegAddImm64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1233,7 +1227,7 @@ extension CppHelper.Instructions.NegAddImm64: Instruction {
 extension CppHelper.Instructions.ShloLImmAlt64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1248,7 +1242,7 @@ extension CppHelper.Instructions.ShloLImmAlt64: Instruction {
 extension CppHelper.Instructions.ShloRImmAlt64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1263,7 +1257,7 @@ extension CppHelper.Instructions.ShloRImmAlt64: Instruction {
 extension CppHelper.Instructions.SharRImmAlt64: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1278,7 +1272,7 @@ extension CppHelper.Instructions.SharRImmAlt64: Instruction {
 extension CppHelper.Instructions.RotR64Imm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1292,7 +1286,7 @@ extension CppHelper.Instructions.RotR64Imm: Instruction {
 extension CppHelper.Instructions.RotR64ImmAlt: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value: UInt64 = Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
+        let value: UInt64 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1306,7 +1300,7 @@ extension CppHelper.Instructions.RotR64ImmAlt: Instruction {
 extension CppHelper.Instructions.RotR32Imm: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1320,7 +1314,7 @@ extension CppHelper.Instructions.RotR32Imm: Instruction {
 extension CppHelper.Instructions.RotR32ImmAlt: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let value = UInt32(truncatingIfNeeded: Instructions.decodeVarint(data.subdata(in: data.startIndex + 1 ..< data.endIndex)))
+        let value: UInt32 = Instructions.decodeImmediate(data.subdata(in: data.startIndex + 1 ..< data.endIndex))
         self.init(ra: ra, rb: rb, value: value)
     }
 
@@ -1442,8 +1436,7 @@ extension CppHelper.Instructions.BranchGeS: BranchInstructionBase2 {
 extension CppHelper.Instructions.LoadImmJumpInd: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        // LoadImmJumpInd format: [opcode][packed_ra_rb][varint_value][varint_offset]
-        let (value, offset, _) = try Instructions.decodeVarintPair(data, offset: 1)
+        let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, minus: 2, startIdx: 1)
         self.init(ra: ra, rb: rb, value: value, offset: offset)
     }
 

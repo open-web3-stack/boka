@@ -89,6 +89,11 @@ enum TraceTest {
                 )
             }
 
+            // Log ref counts for debugging extra keys
+            if extraKeyCount > 0 {
+                logger.error("Found \(extraKeyCount) extra keys - ref count info not available through StateBackendProtocol")
+            }
+
             let stateRoot = await stateRef.value.stateRoot
             #expect(stateRoot == testcase.postState.root)
         case .failure:
