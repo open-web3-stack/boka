@@ -84,6 +84,7 @@ public final class StateBackend: Sendable {
 
         try await trie.update(updates)
         try await trie.save()
+        try await gc()
     }
 
     public func readRaw(_ key: Data31) async throws -> Data? {
@@ -93,6 +94,7 @@ public final class StateBackend: Sendable {
     public func writeRaw(_ values: [(key: Data31, value: Data?)]) async throws {
         try await trie.update(values)
         try await trie.save()
+        try await gc()
     }
 
     public func gc() async throws {
