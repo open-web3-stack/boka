@@ -230,42 +230,21 @@ struct JITControlFlowTests {
         var code = Data()
 
         // LoadImmJump r1, 0x12345678, jump_forward by 1 instruction
-        code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump opcode
-        code.append(0x01) // r1
-        // Immediate 0x12345678 (varint encoded)
-        var imm = UInt64(0x1234_5678)
-        while imm > 0 {
-            var byte = UInt8(imm & 0x7F)
-            imm >>= 7
-            if imm > 0 {
-                byte |= 0x80
-            }
-            code.append(byte)
-        }
-        // Jump offset = 11 (skip LoadImm r2 to execute LoadImm r3)
-        // LoadImmJump is 8 bytes (PC 0-7), LoadImm r2 is 3 bytes (PC 8-10), so target is PC 11
-        var jumpOffset = UInt64(11)
-        while jumpOffset > 0 {
-            var byte = UInt8(jumpOffset & 0x7F)
-            jumpOffset >>= 7
-            if jumpOffset > 0 {
-                byte |= 0x80
-            }
-            code.append(byte)
-        }
+        // Per spec pvm.tex section 5.10: [opcode][r_A | l_X][immed_X][immed_Y]
+        code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump opcode (80/0x50)
+        code.append(0x01 | (4 << 4)) // r1=1, l_X=4 (4-byte immediate)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }) // immed_X
+        code.append(11) // immed_Y (jump offset: skip to r3)
 
         // LoadImm r2, 0x42 (should be skipped)
-        // LoadImm uses varint encoding for immediate value
-        // IMPORTANT: Values >= 128 require multi-byte varint encoding, which complicates testing
-        // Using value < 128 for single-byte varint encoding
-        code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode (varint immediate)
+        code.append(PVMOpcodes.loadImm.rawValue)
         code.append(0x02) // r2
-        code.append(0x42) // immediate 0x42 (66, single-byte varint)
+        code.append(0x42)
 
         // LoadImm r3, 0x53 (should execute)
-        code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode (varint immediate)
+        code.append(PVMOpcodes.loadImm.rawValue)
         code.append(0x03) // r3
-        code.append(0x53) // immediate 0x53 (83, single-byte varint)
+        code.append(0x53)
 
         // Halt
         code.append(PVMOpcodes.halt.rawValue)
@@ -283,39 +262,27 @@ struct JITControlFlowTests {
 
     @Test("JIT vs Interpreter: LoadImmJump parity")
     func jitLoadImmJumpParity() async throws {
-        // Use same construction as jitLoadImmJump
+        // Per spec pvm.tex section 5.10:
+        // Format: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+        // where l_X = min(4, floor(byte[1]/16) mod 8), l_Y = min(4, max(0, ℓ - l_X - 1))
+        // LoadImmJump loads immed_X into r_A and jumps by offset immed_Y
+
         var code = Data()
 
-        code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump
-        code.append(0x01) // r1
-        var imm = UInt64(0x1234_5678)
-        while imm > 0 {
-            var byte = UInt8(imm & 0x7F)
-            imm >>= 7
-            if imm > 0 {
-                byte |= 0x80
-            }
-            code.append(byte)
-        }
-        // Jump offset = 11 (skip LoadImm r2 to execute LoadImm r3)
-        // LoadImmJump is 8 bytes (PC 0-7), LoadImm r2 is 3 bytes (PC 8-10), so target is PC 11
-        var jumpOffset = UInt64(11)
-        while jumpOffset > 0 {
-            var byte = UInt8(jumpOffset & 0x7F)
-            jumpOffset >>= 7
-            if jumpOffset > 0 {
-                byte |= 0x80
-            }
-            code.append(byte)
-        }
+        // LoadImmJump r1, 0x12345678, jump_offset=11
+        // r1=1, l_X=4 (for 4-byte immediate), l_Y=1 (for 1-byte offset)
+        code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump opcode (80/0x50)
+        code.append(0x01 | (4 << 4)) // r1=1 (lower 4 bits), l_X=4 (bits 4-6)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }) // immed_X
+        code.append(11) // immed_Y (jump offset)
 
         code.append(PVMOpcodes.loadImm.rawValue) // Skipped: LoadImm r2, 0x42
         code.append(0x02)
-        code.append(0x42) // immediate 0x42 (varint: single byte)
+        code.append(0x42)
 
         code.append(PVMOpcodes.loadImm.rawValue) // Execute: LoadImm r3, 0x53
         code.append(0x03)
-        code.append(0x53) // immediate 0x53 (varint: single byte)
+        code.append(0x53)
 
         code.append(PVMOpcodes.halt.rawValue) // Halt
 
