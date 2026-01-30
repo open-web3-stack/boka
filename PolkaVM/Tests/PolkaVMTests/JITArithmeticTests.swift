@@ -191,16 +191,7 @@ struct JITArithmeticTests {
         // AddImm64 r1, r1, 42
         code.append(PVMOpcodes.addImm64.rawValue) // AddImm64 opcode (149)
         code.append(0x11) // packed: ra=r1, rb=r1
-        // Immediate 42 (varint encoded)
-        var imm = UInt64(42)
-        while imm > 0 {
-            var byte = UInt8(imm & 0x7F)
-            imm >>= 7
-            if imm > 0 {
-                byte |= 0x80
-            }
-            code.append(byte)
-        }
+        code.append(contentsOf: withUnsafeBytes(of: Int32(42).littleEndian) { Array($0) }) // 32-bit sign-extended immediate
 
         code.append(PVMOpcodes.halt.rawValue) // Halt
 
@@ -222,15 +213,7 @@ struct JITArithmeticTests {
         // AddImm64 r1, r1, 500
         code.append(0x95) // AddImm64 (opcode 149)
         code.append(0x11) // packed: ra=r1, rb=r1
-        var imm = UInt64(500)
-        while imm > 0 {
-            var byte = UInt8(imm & 0x7F)
-            imm >>= 7
-            if imm > 0 {
-                byte |= 0x80
-            }
-            code.append(byte)
-        }
+        code.append(contentsOf: withUnsafeBytes(of: Int32(500).littleEndian) { Array($0) }) // 32-bit sign-extended immediate
 
         code.append(PVMOpcodes.halt.rawValue) // Halt
 

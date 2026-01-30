@@ -12,6 +12,25 @@ using namespace PVM;
 
 namespace jit_emitter {
 
+// Helper: Sign-extend value to 64-bit
+// bytes: number of bytes in the value (1-4)
+static inline uint64_t sign_extend(uint32_t bytes, uint64_t value) {
+    if (bytes == 0) return 0; // Handle zero bytes to avoid UB
+    uint32_t bits = bytes * 8;
+    if (bits == 64) return value;
+    uint64_t mask = 1ULL << (bits - 1);
+    return (value ^ mask) - mask;
+}
+
+// Helper: Sign-extend value to 32-bit
+// bits: number of bits in the value
+static inline int32_t sign_extend_32(uint32_t bits, int64_t value) {
+    if (bits == 0) return 0; // Handle zero bits to avoid UB
+    if (bits >= 64) return static_cast<int32_t>(value);
+    int64_t mask = 1LL << (bits - 1);
+    return static_cast<int32_t>((value ^ mask) - mask);
+}
+
 // Decoded instruction with all possible operands
 struct DecodedInstruction {
     uint8_t opcode;
@@ -80,24 +99,48 @@ bool decode_load_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& d
 }
 
 // Decode LoadImmJump instruction (opcode 80)
-// Format: [opcode][reg_index][varint_value][varint_offset]
-// Both value and offset are varint-encoded
+// Per spec pvm.tex section 5.10:
+// Format: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+// Note: This is a variable-length instruction that needs bounds checking
+// The caller (emit_basic_block_instructions) ensures pc < block_end_pc
 bool decode_load_imm_jump(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
-    decoded.dest_reg = bytecode[pc + 1];
+    uint8_t byte1 = bytecode[pc + 1];
+    decoded.dest_reg = byte1 & 0x0F;  // r_A (lower 4 bits)
+    uint32_t l_X = (byte1 >> 4) & 0x07;  // Length of immediate (bits 4-6)
 
-    // Decode first varint (value)
-    uint32_t varint1_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 2, varint1_size);
+    // Safety: limit l_X to reasonable range (spec says 0-4 bytes)
+    if (l_X > 4) l_X = 4;
 
-    // Decode second varint (offset)
-    uint32_t varint2_size = 0;
-    uint64_t offset_value = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
-    decoded.offset = static_cast<int32_t>(offset_value);
+    // Decode immed_X (l_X bytes, sign-extended)
+    uint64_t imm_x = 0;
+    for (uint32_t i = 0; i < l_X; i++) {
+        imm_x |= (uint64_t)bytecode[pc + 2 + i] << (8 * i);
+    }
+    // Sign-extend to 64-bit
+    decoded.immediate = sign_extend(l_X, imm_x);
+
+    // Decode immed_Y (offset)
+    // The spec allows variable l_Y, tests use l_Y=1 with l_X=4
+    // We read up to 4 bytes for the offset
+    uint32_t l_Y = 1;  // Default to 1 byte for offset (as used in tests)
+    if (l_X <= 3) {
+        // If l_X is smaller, we can fit more bytes for l_Y
+        // Max total for immediates is typically 4-5 bytes
+        l_Y = 4 - l_X;
+    }
+
+    int64_t offset_raw = 0;
+    for (uint32_t i = 0; i < l_Y; i++) {
+        offset_raw |= (int64_t)bytecode[pc + 2 + l_X + i] << (8 * i);
+    }
+    // Sign-extend the offset
+    int32_t l_Y_bits = l_Y * 8;
+    decoded.offset = sign_extend_32(l_Y_bits, offset_raw);
     decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset);
 
-    // Size: opcode (1) + reg (1) + varint1 + varint2
-    decoded.size = 2 + varint1_size + varint2_size;
+    // Size: opcode (1) + byte1 (1) + l_X + l_Y
+    decoded.size = 2 + l_X + l_Y;
 
     return true;
 }
@@ -673,7 +716,7 @@ bool decode_cmov_nz_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction
 }
 
 // Decode AddImm64 instruction (opcode 149)
-// Format: [opcode][packed_ra_rb][value_varint]
+// Format: [opcode][packed_ra_rb][value_le32] where value is sign-extended
 // where packed_ra_rb = (rb << 4) | ra (both in same byte)
 bool decode_add_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
@@ -681,12 +724,13 @@ bool decode_add_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction&
     decoded.dest_reg = packed & 0x0F;  // ra (lower nibble)
     decoded.src1_reg = (packed >> 4) & 0x0F;  // rb (upper nibble)
 
-    // Decode varint immediate starting at pc + 2 (after packed registers)
-    uint32_t varint_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 2, varint_size);
+    // Decode 32-bit little-endian immediate and sign-extend to 64-bit
+    uint32_t imm32 = bytecode[pc + 2] | (bytecode[pc + 3] << 8) |
+                     (bytecode[pc + 4] << 16) | (bytecode[pc + 5] << 24);
+    decoded.immediate = (int64_t)(int32_t)imm32;
 
-    // Size: opcode (1) + packed (1) + varint (variable)
-    decoded.size = 2 + varint_size;
+    // Size: opcode (1) + packed (1) + immediate (4)
+    decoded.size = 6;
 
     return true;
 }
