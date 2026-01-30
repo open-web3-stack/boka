@@ -445,6 +445,8 @@ public actor StateTrie {
                     if let nodeData = try? await backend.read(key: id), nodeData.count >= 65 {
                         // Reconstruct a temporary hash for parsing (TrieNode doesn't validate hash)
                         // The actual hash value doesn't matter here since we only need node.type and children
+                        // Safety: id is guaranteed to be 31 bytes (from deleted set keys which are suffix(31))
+                        // Prefixing with 1 zero byte gives us exactly 32 bytes for Data32
                         var hashBytes = Data(repeating: 0, count: 1)
                         hashBytes.append(id)
                         let node = TrieNode(hash: Data32(hashBytes)!, data: nodeData)
@@ -704,15 +706,17 @@ public actor StateTrie {
 
     private func removeNode(node: TrieNode) {
         let id = node.hash.data.suffix(31)
-        deleted.insert(id)
 
         // Only remove from nodes map if it's a new node (never persisted)
         // For persisted nodes, we need to keep them in memory until save() processes
         // their reference counts (decrementing children's ref counts)
         if node.isNew {
+            // New nodes were never persisted, so we don't need to track them for deletion
+            // Just remove from in-memory nodes map
             nodes.removeValue(forKey: id)
         } else {
-            // For persisted nodes, add them to nodes map so save() can process them
+            // For persisted nodes, add them to deleted set and nodes map so save() can process them
+            deleted.insert(id)
             nodes[id] = node
         }
     }
