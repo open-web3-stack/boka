@@ -36,16 +36,7 @@ extension CppHelper.Instructions.Trap: Instruction {
     }
 
     public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
-        // Return .continued so updatePC will be called
-        // We'll panic in updatePC after advancing PC
-        .continued
-    }
-
-    public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
-        // Advance PC first, then panic
-        // This matches test expectations: PC advances even when trapping
-        context.state.increasePC(skip + 1)
-        return .exit(.panic(.trap))
+        .exit(.panic(.trap))
     }
 }
 
