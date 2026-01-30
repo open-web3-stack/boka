@@ -723,8 +723,22 @@ public actor StateTrie {
 
     private func saveNode(node: TrieNode) {
         let id = node.hash.data.suffix(31)
+
+        // If this node was previously persisted and then deleted in the same batch,
+        // we need to keep the old persisted version (isNew=false) instead of overwriting
+        // with the new version (isNew=true). This prevents reference count leaks:
+        // - removeNode added it to deleted set (will decrement children ref counts)
+        // - If we overwrite with isNew=true, save() will increment children ref counts
+        // - Result: Net increment (leak) instead of canceling out
+        if deleted.contains(id) {
+            // Cancel the deletion by removing from deleted set
+            // Keep the existing isNew=false node that's already in nodes map
+            deleted.remove(id)
+            return
+        }
+
+        // Normal case: save the new node
         nodes[id] = node
-        deleted.remove(id)
     }
 
     public func debugPrint() async throws {
