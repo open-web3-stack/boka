@@ -523,23 +523,11 @@ enum ProgramBlobBuilder {
             return size
         }
 
-        // Varint-encoded instructions
-        // LoadImmJump (0x50), LoadImmJumpInd (0xB4), AddImm64 (0x95), MulImm64 (0x96),
-        // ShloLImm64 (0x97), ShloRImm64 (0x98), SharRImm64 (0x99), NegAddImm64 (0x9A)
-        // Format: opcode (1) + packed_ra_rb (1) + varint_immediate (variable)
-        if opcode >= 0x95, opcode <= 0x9A {
-            var size = 2 // opcode + packed registers
-            var offset = pc + 2
-
-            // Decode varint to find its size
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break } // Last varint byte
-            }
-
-            return size
+        // 64-bit Immediate instructions (opcodes 149-161: 0x95-0xA1)
+        // Format: opcode (1) + packed_ra_rb (1) + immediate (4) = 6 bytes
+        // Per spec pvm.tex section 5.9: l_X = min(4, max(0, ℓ - 1)), fixed-width little-endian
+        if opcode >= 0x95 && opcode <= 0xA1 {
+            return 6
         }
 
         // Default: assume minimum valid instruction

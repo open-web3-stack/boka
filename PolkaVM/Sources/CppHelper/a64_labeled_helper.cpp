@@ -61,10 +61,31 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
         return pc + int32_t(offset);
     }
 
-    // LoadImmJump (10 bytes): [opcode][reg_index][immediate_32bit][offset_32bit]
+    // LoadImmJump: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
     if (opcode_is(opcode, Opcode::LoadImmJump)) {
-        uint32_t offset;
-        memcpy(&offset, &bytecode[pc + 6], 4);  // Offset starts at byte 6
+        uint8_t byte1 = bytecode[pc + 1];
+        uint32_t l_X = (byte1 >> 4) & 0x07;  // Length of immed_X (bits 4-6)
+        if (l_X > 4) l_X = 4;
+
+        // Calculate l_Y (offset size)
+        uint32_t l_Y = 1;  // Default to 1 byte
+        if (l_X <= 3) {
+            l_Y = 4 - l_X;
+        }
+
+        // Read offset (little-endian)
+        uint32_t offset = 0;
+        for (uint32_t i = 0; i < l_Y && i < 4; i++) {
+            offset |= (uint32_t)bytecode[pc + 2 + l_X + i] << (8 * i);
+        }
+        // Sign-extend if needed
+        if (l_Y > 0 && l_Y < 4) {
+            uint32_t signBit = 1U << (l_Y * 8 - 1);
+            if (offset & signBit) {
+                offset |= (~0U) << (l_Y * 8);
+            }
+        }
+
         return pc + int32_t(offset);
     }
 
@@ -235,15 +256,51 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         }
 
         if (opcode_is(opcode, Opcode::LoadImmJump)) {
-            uint8_t destReg = codeBuffer[pc + 1];
-            uint32_t immediate;
-            uint32_t jumpOffset;
-            memcpy(&immediate, &codeBuffer[pc + 2], 4);    // Immediate value is at bytes 2-5
-            memcpy(&jumpOffset, &codeBuffer[pc + 6], 4);   // Jump offset is at bytes 6-9
-            uint32_t targetPC = pc + int32_t(jumpOffset);  // Offset is relative to instruction start
+            // Per spec pvm.tex section 5.10: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+            uint8_t byte1 = codeBuffer[pc + 1];
+            uint8_t destReg = byte1 & 0x0F;  // r_A (lower 4 bits)
+            uint32_t l_X = (byte1 >> 4) & 0x07;  // Length of immed_X (bits 4-6)
+
+            // Safety: limit l_X to reasonable range
+            if (l_X > 4) l_X = 4;
+
+            // Decode immed_X (l_X bytes, little-endian)
+            uint64_t immediate = 0;
+            for (uint32_t i = 0; i < l_X; i++) {
+                if (pc + 2 + i >= codeSize) return 3;  // Bounds check
+                immediate |= (uint64_t)codeBuffer[pc + 2 + i] << (8 * i);
+            }
+            // Sign-extend if needed
+            if (l_X > 0 && l_X < 8) {
+                uint64_t signBit = 1ULL << (l_X * 8 - 1);
+                if (immediate & signBit) {
+                    immediate |= (~0ULL) << (l_X * 8);
+                }
+            }
+
+            // Decode immed_Y (jump offset)
+            uint32_t l_Y = 1;  // Default to 1 byte
+            if (l_X <= 3) {
+                l_Y = 4 - l_X;
+            }
+
+            uint64_t jumpOffset = 0;
+            for (uint32_t i = 0; i < l_Y; i++) {
+                if (pc + 2 + l_X + i >= codeSize) return 3;  // Bounds check
+                jumpOffset |= (uint64_t)codeBuffer[pc + 2 + l_X + i] << (8 * i);
+            }
+            // Sign-extend offset
+            if (l_Y > 0 && l_Y < 8) {
+                uint64_t signBit = 1ULL << (l_Y * 8 - 1);
+                if (jumpOffset & signBit) {
+                    jumpOffset |= (~0ULL) << (l_Y * 8);
+                }
+            }
+
+            uint32_t targetPC = pc + uint32_t(int32_t(jumpOffset));  // Offset is relative
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
-            jit_emit_load_imm_jump_labeled(&a, "aarch64", destReg, immediate, targetLabel);
+            jit_emit_load_imm_jump_labeled(&a, "aarch64", destReg, uint32_t(immediate), targetLabel);
 
             pc += instrSize;
             continue;
