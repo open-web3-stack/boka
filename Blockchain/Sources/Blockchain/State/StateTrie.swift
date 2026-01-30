@@ -371,8 +371,6 @@ public actor StateTrie {
             }
         }
 
-        // Don't save loaded nodes to nodes map - they're already persisted
-        // and don't need ref count updates (only new nodes do)
         return node
     }
 
@@ -427,25 +425,65 @@ public actor StateTrie {
         var ops = [StateBackendOperation]()
         var refChanges = [Data: Int]()
 
+        logger.info("StateTrie.save(): lastSavedRootHash=\(lastSavedRootHash.toHexString()), rootHash=\(rootHash.toHexString())")
+        logger.info("StateTrie.save(): deleted set has \(deleted.count) nodes")
+
         // Decrement reference count of old root hash if it changed
         if lastSavedRootHash != rootHash {
-            refChanges[lastSavedRootHash.data.suffix(31), default: 0] -= 1
+            let key = lastSavedRootHash.data.suffix(31)
+            refChanges[key, default: 0] -= 1
+            logger.info("StateTrie.save(): old root changed, decrementing ref count for \(key.toHexString())")
         }
 
         // process deleted nodes
         for id in deleted {
             guard let node = nodes[id] else {
+                // Node not in nodes map - might be a persisted node that was never added
+                // Try to load it from cache or backend to get its children for ref counting
+                if let cache = nodeCache, let cachedNode = cache.get(id) {
+                    logger.info("StateTrie.save(): deleted node \(id.toHexString()) found in cache, isBranch=\(cachedNode.isBranch)")
+                    if cachedNode.isBranch {
+                        let leftKey = cachedNode.left.data.suffix(31)
+                        let rightKey = cachedNode.right.data.suffix(31)
+                        refChanges[leftKey, default: 0] -= 1
+                        refChanges[rightKey, default: 0] -= 1
+                        logger.info("StateTrie.save(): decremented children from cached deleted branch: left=\(leftKey.toHexString()), right=\(rightKey.toHexString())")
+                    }
+                    cache.remove(id)
+                } else {
+                    // Try to load from backend to get node data for ref counting
+                    if let nodeData = try? await backend.read(key: id), nodeData.count == 65 {
+                        // Reconstruct the full 32-byte hash by prefixing a zero byte
+                        var hashBytes = Data(repeating: 0, count: 1)
+                        hashBytes.append(id)
+                        let node = TrieNode(hash: Data32(hashBytes)!, data: nodeData)
+                        logger.info("StateTrie.save(): deleted node \(id.toHexString()) loaded from backend, isBranch=\(node.isBranch)")
+                        if node.isBranch {
+                            let leftKey = node.left.data.suffix(31)
+                            let rightKey = node.right.data.suffix(31)
+                            refChanges[leftKey, default: 0] -= 1
+                            refChanges[rightKey, default: 0] -= 1
+                            logger.info("StateTrie.save(): decremented children from backend loaded deleted branch: left=\(leftKey.toHexString()), right=\(rightKey.toHexString())")
+                        }
+                    } else {
+                        logger.warning("StateTrie.save(): deleted node \(id.toHexString()) not found in nodes map, cache, or backend")
+                    }
+                }
                 continue
             }
+            logger.info("StateTrie.save(): processing deleted node \(id.toHexString()), isBranch=\(node.isBranch), isNew=\(node.isNew)")
             if node.isBranch {
                 // Decrement reference counts for children of deleted branch nodes
-                // Note: We don't decrement the node's own ref count here - that's
-                // handled by its parent when the parent is processed (or when the
-                // root changes). We only decrement the children that this node
-                // was referencing.
+                // Note: We don't decrement the node's own ref count here - ref counts
+                // track how many parents reference a node, not whether the node exists.
+                // The node's own ref count is managed by its parent when the parent
+                // is deleted or replaced.
                 // Use -= to properly accumulate if multiple deleted nodes share children
-                refChanges[node.left.data.suffix(31), default: 0] -= 1
-                refChanges[node.right.data.suffix(31), default: 0] -= 1
+                let leftKey = node.left.data.suffix(31)
+                let rightKey = node.right.data.suffix(31)
+                refChanges[leftKey, default: 0] -= 1
+                refChanges[rightKey, default: 0] -= 1
+                logger.info("StateTrie.save(): decremented children of deleted branch: left=\(leftKey.toHexString()), right=\(rightKey.toHexString())")
             }
             nodes.removeValue(forKey: id)
 
@@ -485,7 +523,12 @@ public actor StateTrie {
             // Emit single refUpdate operation with delta
             // This is much more efficient than unrolling into individual increments/decrements
             ops.append(.refUpdate(key: key.suffix(31), delta: Int64(value)))
+            if value != 0 {
+                logger.info("StateTrie.save(): refUpdate key=\(key.toHexString()), delta=\(value)")
+            }
         }
+
+        logger.info("StateTrie.save(): emitting \(ops.count) operations, \(refChanges.count) ref changes")
 
         try await backend.batchUpdate(ops)
 
@@ -695,7 +738,16 @@ public actor StateTrie {
     private func removeNode(node: TrieNode) {
         let id = node.hash.data.suffix(31)
         deleted.insert(id)
-        nodes.removeValue(forKey: id)
+
+        // Only remove from nodes map if it's a new node (never persisted)
+        // For persisted nodes, we need to keep them in memory until save() processes
+        // their reference counts (decrementing children's ref counts)
+        if node.isNew {
+            nodes.removeValue(forKey: id)
+        } else {
+            // For persisted nodes, add them to nodes map so save() can process them
+            nodes[id] = node
+        }
     }
 
     private func saveNode(node: TrieNode) {

@@ -41,6 +41,7 @@ public actor InMemoryBackend: StateBackendProtocol {
     }
 
     public func batchUpdate(_ updates: [StateBackendOperation]) async throws {
+        logger.info("batchUpdate: Processing \(updates.count) operations")
         for update in updates {
             switch update {
             case let .write(key, value):
@@ -49,7 +50,12 @@ public actor InMemoryBackend: StateBackendProtocol {
                 rawValues[key] = value
                 rawValueRefCounts[key, default: 0] += 1
             case let .refUpdate(key, delta):
+                let oldCount = refCounts[key, default: 0]
                 refCounts[key, default: 0] += Int(delta)
+                let newCount = refCounts[key]!
+                if delta != 0 {
+                    logger.info("refUpdate: key=\(key.toHexString()), delta=\(delta), oldCount=\(oldCount), newCount=\(newCount)")
+                }
             }
         }
     }
@@ -72,22 +78,41 @@ public actor InMemoryBackend: StateBackendProtocol {
     public func gc(callback: @Sendable (Data) -> Data32?) async throws {
         // check ref counts and remove keys with 0 ref count
         var keysToRemove: [Data] = []
+        logger.info("GC: Starting garbage collection, total keys in refCounts: \(refCounts.count), store: \(store.count)")
+
         for (key, count) in refCounts where count == 0 {
             if let value = store[key] {
+                logger.info("GC: Removing zero-ref key: \(key.toHexString())")
                 store.removeValue(forKey: key)
                 keysToRemove.append(key)
                 if let rawValueKey = callback(value) {
                     rawValueRefCounts[rawValueKey, default: 0] -= 1
                     if rawValueRefCounts[rawValueKey] == 0 {
+                        logger.info("GC: Removing zero-ref raw value: \(rawValueKey.toHexString())")
                         rawValues.removeValue(forKey: rawValueKey)
                         rawValueRefCounts.removeValue(forKey: rawValueKey)
                     }
                 }
+            } else {
+                logger.warning("GC: Key in refCounts but not in store: \(key.toHexString())")
             }
         }
+
         // Remove keys from refCounts to prevent unbounded growth
         for key in keysToRemove {
             refCounts.removeValue(forKey: key)
+        }
+
+        logger.info("GC: Removed \(keysToRemove.count) keys, remaining: \(store.count) in store, \(refCounts.count) in refCounts")
+
+        // Log remaining non-zero ref counts for debugging
+        let nonZeroRefs = refCounts.filter { $0.value > 0 }
+        if !nonZeroRefs.isEmpty {
+            logger.info("GC: Remaining non-zero ref counts: \(nonZeroRefs.count) keys")
+            // Log a few sample keys
+            for (key, count) in nonZeroRefs.prefix(5) {
+                logger.info("  key: \(key.toHexString()), ref count: \(count)")
+            }
         }
     }
 
