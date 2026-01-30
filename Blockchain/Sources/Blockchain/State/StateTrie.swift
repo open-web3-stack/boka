@@ -90,6 +90,13 @@ private struct TrieNode {
         }
         // For embedded leaves: length is stored in first byte
         let len = left.data[relative: 0]
+
+        // Validate len to prevent crash on corrupted data
+        // Embedded leaves can only store up to 32 bytes (see leaf() constructor)
+        guard len <= 32 else {
+            return nil // Corrupted data, treat as missing value
+        }
+
         return right.data[relative: 0 ..< Int(len)]
     }
 
