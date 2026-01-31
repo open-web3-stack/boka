@@ -445,14 +445,16 @@ struct JITControlFlowTests {
         )
     }
 
-    @Test("JIT: Large jump offset", .disabled("Varint decoder bug in ProgramCode - pre-existing issue"))
+    @Test("JIT: Large jump offset")
     func jitJumpLargeOffset() async throws {
         // Test jumping with a large offset value
         var code = Data()
 
-        // Jump forward by 100 bytes
-        // Jump instruction format: [opcode][offset_32bit]
-        var jumpOffset = Int32(100)
+        // Jump forward over 100 LoadImm instructions to the Halt instruction
+        // Jump offset is relative to current PC (at start of Jump instruction)
+        // Jump instruction is at PC=0, Halt is at PC=5 + 100*3 = 305
+        // So offset should be 305
+        var jumpOffset = Int32(305)  // Target PC = 0 + 305 = 305 (Halt instruction)
         code.append(PVMOpcodes.jump.rawValue) // Jump opcode
         code.append(contentsOf: withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) })
 

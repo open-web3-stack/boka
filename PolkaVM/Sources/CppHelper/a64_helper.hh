@@ -40,6 +40,8 @@
 // NEW: skipTable provides instruction sizes from Swift's ProgramCode.skip(pc)
 // This is required for variable-length encoded instructions (LoadImmJump, BranchImm, etc.)
 // skipTable[pc] = number of additional bytes after opcode (instruction size = skip + 1)
+// NEW: bitmask provides instruction boundary markers for branch validation
+// bitmask[pc/8] has bit 0 set if pc is an instruction boundary (per spec pvm.tex)
 extern "C" int32_t compilePolkaVMCode_a64_labeled(
     const uint8_t* _Nonnull codeBuffer,
     size_t codeSize,
@@ -47,5 +49,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     uint32_t jitMemorySize,
     const uint32_t* _Nullable skipTable,   // NEW: instruction skip values
     size_t skipTableSize,                   // NEW: skip table size
+    const uint8_t* _Nullable bitmask,      // NEW: bitmask for instruction boundaries
+    size_t bitmaskSize,                    // NEW: bitmask size
     void* _Nullable * _Nonnull funcOut);
 
