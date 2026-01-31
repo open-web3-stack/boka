@@ -16,6 +16,7 @@ enum JITError: Error, CustomStringConvertible {
     case invalidFunctionPointer
     case executionFailed(Int32)
     case compilationFailed(Int32)
+    case invalidBranchTarget
     case unsupportedArchitecture
     case memoryAllocationFailed
     case outOfGas
@@ -31,6 +32,8 @@ enum JITError: Error, CustomStringConvertible {
             "JIT execution failed with code: \(code)"
         case let .compilationFailed(code):
             "JIT compilation failed with code: \(code)"
+        case .invalidBranchTarget:
+            "JIT compilation failed: branch target is not at an instruction boundary"
         case .unsupportedArchitecture:
             "Unsupported architecture for JIT compilation"
         case .memoryAllocationFailed:
@@ -52,6 +55,8 @@ enum JITError: Error, CustomStringConvertible {
             .outOfGas
         case let .pageFault(address):
             .pageFault(address)
+        case .invalidBranchTarget:
+            .panic(.invalidBranch)
         case .hostFunctionError:
             .panic(.trap) // Using trap instead of hostFunctionThrewError which doesn't exist
         default:

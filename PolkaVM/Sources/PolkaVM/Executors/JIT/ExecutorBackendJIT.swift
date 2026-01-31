@@ -526,7 +526,11 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
                 // Extract skip table from programCode for variable-length instruction encoding
                 // This is CRITICAL for instructions like LoadImmJump, BranchImm, etc.
-                let skipTable = programCode.skipValues // NEW: get skip values
+                let skipTable = programCode.skipValues
+
+                // Extract bitmask for branch validation
+                // This ensures JIT only jumps to valid instruction boundaries
+                let bitmask = programCode.bitmask
 
                 compiledFuncPtr = try jitCompiler.compile(
                     blob: bytecode,
@@ -534,7 +538,8 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     config: config,
                     targetArchitecture: targetArchitecture,
                     jitMemorySize: totalMemorySize,
-                    skipTable: skipTable // NEW: pass skip table
+                    skipTable: skipTable,
+                    bitmask: bitmask
                 )
 
                 // Retrieve dispatcher jump table for this compiled function
@@ -848,8 +853,21 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
         } catch let error as JITCompiler.CompilationError {
             logger.error("JIT compilation failed: \(error)")
+            // Convert compilation errors to appropriate JIT errors
+            let jitError: JITError
+            if case .compilationFailed(4) = error {
+                // Error code 4 = invalid branch target (not at instruction boundary)
+                jitError = .invalidBranchTarget
+            } else {
+                // For other compilation errors, extract the error code if available
+                var errorCode: Int32 = -1
+                if case let .compilationFailed(code) = error {
+                    errorCode = code
+                }
+                jitError = .compilationFailed(errorCode)
+            }
             return VMExecutionResult(
-                exitReason: .panic(.trap),
+                exitReason: jitError.toExitReason(),
                 gasUsed: gas,
                 outputData: nil,
                 finalRegisters: Registers(),

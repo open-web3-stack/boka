@@ -41,25 +41,11 @@ struct JITTestResult {
 
 /// Helper to build PolkaVM program blobs from raw instructions
 enum ProgramBlobBuilder {
-    /// Encode a value as varint
+    /// Encode a value as varint using the Codec library's variableWidth encoding
     /// - Parameter value: Value to encode
     /// - Returns: Varint-encoded data
     static func encodeVarint(_ value: UInt64) -> Data {
-        var data = Data()
-        var v = value
-        if v == 0 {
-            data.append(0)
-        } else {
-            while v > 0 {
-                var byte = UInt8(v & 0x7F)
-                v >>= 7
-                if v > 0 {
-                    byte |= 0x80
-                }
-                data.append(byte)
-            }
-        }
-        return data
+        Data(value.encode(method: .variableWidth))
     }
 
     /// Create a StandardProgram blob with ProgramCode
@@ -294,23 +280,40 @@ enum ProgramBlobBuilder {
     /// Per spec/pvm.tex lines 220-229: Instructions with k[n] = 0 behave as TRAP
     /// Therefore EVERY instruction opcode byte MUST have its bitmask bit set to 1
     ///
+    /// The bitmask encoding uses trailingZeroBitCount in ProgramCode.skip():
+    /// - Read 32 bits from bitmask[start/8]
+    /// - Shift right by (start % 8) bits
+    /// - Count trailing zeros to get skip value
+    ///
+    /// This means: for instruction at PC=i with size S (next instruction at PC=i+S),
+    /// we need skip(i) = S-1, which means we need (S-1) zeros after bit i, then bit (i+S) = 1.
+    ///
     /// - Parameter instructionBytes: Raw instruction bytes
-    /// - Returns: Bitmask data (bit 1 = opcode byte, bit 0 = immediate/operand byte)
+    /// - Returns: Bitmask data with proper skip encoding
     static func generateBitmask(_ instructionBytes: [UInt8]) -> Data {
-        var bitmask = Data(repeating: 0, count: (instructionBytes.count + 7) / 8)
+        var instructionBoundaries: [UInt32] = []
         var pc = 0
 
+        // First pass: find all instruction boundaries
         while pc < instructionBytes.count {
+            instructionBoundaries.append(UInt32(pc))
+
             let opcode = instructionBytes[pc]
-
-            // Mark current byte as opcode (bit = 1) per spec requirement
-            setBit(bitmask: &bitmask, at: pc, value: 1)
-
-            // Calculate instruction size based on opcode
             let size = calculateInstructionSize(opcode, instructionBytes: instructionBytes, pc: pc)
-
-            // Advance to next instruction
             pc += size
+        }
+
+        // Add a final boundary past the end (for the last instruction's skip calculation)
+        instructionBoundaries.append(UInt32(pc))
+
+        // Allocate bitmask
+        var bitmask = Data(repeating: 0, count: (instructionBytes.count + 7) / 8)
+
+        // Set bits at each instruction boundary
+        for boundary in instructionBoundaries {
+            if boundary < UInt32(bitmask.count * 8) {
+                setBit(bitmask: &bitmask, at: Int(boundary), value: 1)
+            }
         }
 
         return bitmask
