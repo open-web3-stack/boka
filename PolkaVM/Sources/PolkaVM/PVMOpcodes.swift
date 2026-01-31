@@ -11,7 +11,7 @@ import Foundation
 enum PVMOpcodes: UInt8 {
     // Control Flow Instructions
     case trap = 0
-    case halt = 1
+    case halt = 1  // Per spec called "fallthrough" - continues execution (not a true halt)
     case jump = 40
     case jumpInd = 50
     case loadImmJump = 80

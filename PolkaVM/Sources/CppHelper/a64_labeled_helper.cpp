@@ -651,12 +651,8 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             continue;
         }
 
-        if (opcode_is(opcode, Opcode::Halt)) {
-            // Jump to exit
-            a.b(exitLabel);
-            pc += instrSize;
-            continue;
-        }
+        // Opcode 1 (Halt/Fallthrough) is handled as normal instruction - just continues execution
+        // Per spec, executing past program end will hit implicit Trap instructions
 
         // === Division Instructions with Zero-Check ===
         // Division by zero causes undefined behavior - must check explicitly
