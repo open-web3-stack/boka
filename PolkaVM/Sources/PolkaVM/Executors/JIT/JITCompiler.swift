@@ -10,6 +10,12 @@ import Utils
 final class JITCompiler {
     private let logger = Logger(label: "JITCompiler")
 
+    // CRITICAL: GLOBAL lock to protect C++ compiler calls
+    // AsmJit's JitRuntime is a global static variable in C++ that is NOT thread-safe
+    // Multiple JITCompiler instances share the same C++ runtime, so we need a global lock
+    // This lock serializes ALL JIT compilations across all instances
+    private static let compilationLock = Utils.ReadWriteLock()
+
     // Errors that can occur during JIT compilation
     enum CompilationError: Error, Equatable {
         case invalidBlob
@@ -84,6 +90,7 @@ final class JITCompiler {
         // Compile based on architecture
         // Using label-based compilation for maximum performance
         // This enables proper control flow (branches, loops) with direct jumps
+        // CRITICAL: C++ compiler is not thread-safe - serialize all compilation
         switch targetArchitecture {
         case .x86_64:
             logger.debug("Compiling for x86_64 architecture (labeled compilation)")
@@ -91,16 +98,18 @@ final class JITCompiler {
                 guard let bitmaskBytes = bitmaskPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
                     throw CompilationError.invalidBlob
                 }
-                resultCode = compilePolkaVMCode_x64_labeled(
-                    basePointer,
-                    blob.count,
-                    initialPC,
-                    jitMemorySize,
-                    skipTable,
-                    skipTable.count,
-                    bitmaskBytes, bitmask.count,
-                    &compiledFuncPtr
-                )
+                resultCode = Self.compilationLock.withWriteLock {
+                    compilePolkaVMCode_x64_labeled(
+                        basePointer,
+                        blob.count,
+                        initialPC,
+                        jitMemorySize,
+                        skipTable,
+                        skipTable.count,
+                        bitmaskBytes, bitmask.count,
+                        &compiledFuncPtr
+                    )
+                }
             }
 
         case .arm64:
@@ -109,16 +118,18 @@ final class JITCompiler {
                 guard let bitmaskBytes = bitmaskPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
                     throw CompilationError.invalidBlob
                 }
-                resultCode = compilePolkaVMCode_a64_labeled(
-                    basePointer,
-                    blob.count,
-                    initialPC,
-                    jitMemorySize,
-                    skipTable,
-                    skipTable.count,
-                    bitmaskBytes, bitmask.count,
-                    &compiledFuncPtr
-                )
+                resultCode = Self.compilationLock.withWriteLock {
+                    compilePolkaVMCode_a64_labeled(
+                        basePointer,
+                        blob.count,
+                        initialPC,
+                        jitMemorySize,
+                        skipTable,
+                        skipTable.count,
+                        bitmaskBytes, bitmask.count,
+                        &compiledFuncPtr
+                    )
+                }
             }
         }
 
