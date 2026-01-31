@@ -24,7 +24,7 @@ public class ProgramCode {
     public let jumpTableEntrySize: UInt8
     public let jumpTable: Data
     public let code: Data
-    private let bitmaskArray: [UInt8]
+    internal let bitmask: Data
 
     // parsed stuff
     public private(set) var basicBlockIndices: Set<UInt32> = []
@@ -98,10 +98,15 @@ public class ProgramCode {
         }
 
         // mark bitmask bits longer than codeLength as 1
-        // Note: The blob bitmask should already have this applied correctly
-        // Store as Array to avoid Data lifetime issues
-        let bitmaskSlice = blob[codeEndIndex ..< slice.endIndex]
-        bitmaskArray = Array(bitmaskSlice)
+        // Create a mutable copy to modify
+        var bitmaskData = Data(blob[codeEndIndex ..< slice.endIndex])
+        let fullBytes = Int(codeLength) / 8
+        let remainingBits = Int(codeLength) % 8
+        if remainingBits > 0 {
+            let mask: UInt8 = ~0 << remainingBits
+            bitmaskData[fullBytes] |= mask
+        }
+        bitmask = bitmaskData
 
         try buildMetadata()
 
@@ -115,7 +120,7 @@ public class ProgramCode {
         var currentBlockGasCost = Gas(0)
 
         while i < code.count {
-            let skip = ProgramCode.skip(start: i, bitmask: Data(bitmaskArray))
+            let skip = ProgramCode.skip(start: i, bitmask: bitmask)
 
             let opcode = code[relative: Int(i)]
             currentBlockGasCost += gasFromOpcode(opcode)
@@ -182,7 +187,7 @@ public class ProgramCode {
     }
 
     public func skip(_ pc: UInt32) -> UInt32 {
-        ProgramCode.skip(start: pc, bitmask: Data(bitmaskArray))
+        ProgramCode.skip(start: pc, bitmask: bitmask)
     }
 
     /// Extract all skip values as an array for JIT compilation
