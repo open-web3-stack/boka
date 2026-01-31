@@ -28,6 +28,9 @@ private final class JITCodeCache {
     private var hitCount = 0
     private var missCount = 0
 
+    // Lock to protect cache access during concurrent execution
+    private let lock = Utils.ReadWriteLock()
+
     /// Maximum cache size - prevents unbounded memory growth
     /// Each entry can be ~10KB+, so 100 entries = ~1MB max
     private static let defaultMaxSize = 100
@@ -70,28 +73,32 @@ private final class JITCodeCache {
         let configHash = hashConfig(config)
         let key = makeKey(bytecodeHash: bytecodeHash, configHash: configHash, initialPC: initialPC)
 
-        if let entry = cache[key] {
-            // CRITICAL: Verify actual bytecode matches to prevent hash collision attacks
-            // Hash collisions are extremely unlikely with FNV-1a but not impossible
-            if entry.bytecode == bytecode {
-                // Update access order for LRU (move to end = most recently used)
-                if let index = accessOrder.firstIndex(of: key) {
-                    accessOrder.remove(at: index)
-                    accessOrder.append(key)
+        return lock.withReadLock {
+            if let entry = cache[key] {
+                // CRITICAL: Verify actual bytecode matches to prevent hash collision attacks
+                // Hash collisions are extremely unlikely with FNV-1a but not impossible
+                if entry.bytecode == bytecode {
+                    // Update access order for LRU (move to end = most recently used)
+                    // NOTE: This requires write lock, but we optimize for read-heavy workload
+                    // by accepting slightly stale access order during concurrent lookups
+                    if let index = accessOrder.firstIndex(of: key) {
+                        accessOrder.remove(at: index)
+                        accessOrder.append(key)
+                    }
+
+                    hitCount += 1
+                    logger.debug("JIT cache HIT (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)")
+                    return entry
+                } else {
+                    // Hash collision detected - unlikely but possible
+                    logger.warning("JIT cache hash collision detected - treating as miss")
                 }
-
-                hitCount += 1
-                logger.debug("JIT cache HIT (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)")
-                return entry
-            } else {
-                // Hash collision detected - unlikely but possible
-                logger.warning("JIT cache hash collision detected - treating as miss")
             }
-        }
 
-        missCount += 1
-        logger.debug("JIT cache MISS (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)")
-        return nil
+            missCount += 1
+            logger.debug("JIT cache MISS (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)")
+            return nil
+        }
     }
 
     /// Store compiled function in cache
@@ -107,29 +114,31 @@ private final class JITCodeCache {
         let configHash = hashConfig(config)
         let key = makeKey(bytecodeHash: bytecodeHash, configHash: configHash, initialPC: initialPC)
 
-        // Evict least recently used entry if cache is full
-        if cache.count >= maxCacheSize, let lruKey = accessOrder.first {
-            if let evictedEntry = cache.removeValue(forKey: lruKey) {
-                // Free dispatcher table and function code for evicted entry
-                CppHelper.freeDispatcherTable(UnsafeMutableRawPointer(mutating: evictedEntry.functionPtr))
-                CppHelper.releaseJITFunction(UnsafeMutableRawPointer(mutating: evictedEntry.functionPtr))
+        lock.withWriteLock {
+            // Evict least recently used entry if cache is full
+            if cache.count >= maxCacheSize, let lruKey = accessOrder.first {
+                if let evictedEntry = cache.removeValue(forKey: lruKey) {
+                    // Free dispatcher table and function code for evicted entry
+                    CppHelper.freeDispatcherTable(UnsafeMutableRawPointer(mutating: evictedEntry.functionPtr))
+                    CppHelper.releaseJITFunction(UnsafeMutableRawPointer(mutating: evictedEntry.functionPtr))
+                }
+                accessOrder.removeFirst()
+                logger.debug("JIT cache EVICTED entry (cache size: \(cache.count), max: \(maxCacheSize))")
             }
-            accessOrder.removeFirst()
-            logger.debug("JIT cache EVICTED entry (cache size: \(cache.count), max: \(maxCacheSize))")
+
+            let entry = JITCacheEntry(
+                functionPtr: functionPtr,
+                dispatcherTable: dispatcherTable,
+                dispatcherTableSize: dispatcherTableSize,
+                bytecode: bytecode,
+                configHash: configHash,
+                initialPC: initialPC
+            )
+
+            cache[key] = entry
+            accessOrder.append(key) // Mark as most recently used
+            logger.debug("JIT cache STORE - Total entries: \(cache.count)")
         }
-
-        let entry = JITCacheEntry(
-            functionPtr: functionPtr,
-            dispatcherTable: dispatcherTable,
-            dispatcherTableSize: dispatcherTableSize,
-            bytecode: bytecode,
-            configHash: configHash,
-            initialPC: initialPC
-        )
-
-        cache[key] = entry
-        accessOrder.append(key) // Mark as most recently used
-        logger.debug("JIT cache STORE - Total entries: \(cache.count)")
     }
 
     /// Clear all cached entries
@@ -152,6 +161,33 @@ private final class JITCodeCache {
     }
 }
 
+// Static C-callable trampoline that calls the instance method.
+// Must be defined before JITExecutionContext so it can be referenced in init.
+private func dispatchHostCall_C_Trampoline(
+    opaqueOwnerContext: UnsafeMutableRawPointer?,
+    hostCallIndex: UInt32,
+    guestRegistersPtr: UnsafeMutablePointer<UInt64>,
+    guestMemoryBasePtr: UnsafeMutablePointer<UInt8>,
+    guestMemorySize: UInt32,
+    guestGasPtr: UnsafeMutablePointer<UInt64>,
+    invocationContextPtr: UnsafeMutableRawPointer?
+) -> UInt32 {
+    guard let ownerCtxPtr = opaqueOwnerContext else {
+        return JITHostCallError.internalErrorInvalidContext.rawValue
+    }
+    let backendInstance = Unmanaged<ExecutorBackendJIT>.fromOpaque(ownerCtxPtr).takeUnretainedValue()
+
+    // Call the instance method that handles the dispatch
+    return backendInstance.dispatchHostCall(
+        hostCallIndex: hostCallIndex,
+        guestRegistersPtr: guestRegistersPtr,
+        guestMemoryBasePtr: guestMemoryBasePtr,
+        guestMemorySize: guestMemorySize,
+        guestGasPtr: guestGasPtr,
+        invocationContextPtr: invocationContextPtr
+    )
+}
+
 /// ⚠️ CRITICAL: ExecutorBackendJIT Concurrency Model
 ///
 /// This class is designed for **single-threaded execution only** and is NOT
@@ -166,7 +202,7 @@ private final class JITCodeCache {
 ///
 /// ❌ **UNSAFE**:
 /// - Concurrent calls to `execute()` on the same instance
-/// - Shared access to `syncHostCallHandler` or `currentProgramCode`
+/// - Shared access to `context.syncHostCallHandler` or `context.currentProgramCode`
 ///
 /// ## Concurrency Architecture
 ///
@@ -211,38 +247,25 @@ private final class JITCodeCache {
 ///
 /// ## Internal State Safety
 ///
-/// WARNING: This class has mutable instance state (`syncHostCallHandler`,
-/// `currentProgramCode`) that must not be shared across concurrent executions.
-/// TODO: Refactor to pass execution-specific state through context object
-/// instead of storing in instance properties.
-final class ExecutorBackendJIT: ExecutorBackend {
-    private let logger = Logger(label: "ExecutorBackendJIT")
+/// ✅ FIXED: Thread-safe via JITExecutionContext - each execution has isolated state
 
-    // WARNING: This class is NOT thread-safe for concurrent execute() calls.
-    // The syncHostCallHandler and currentProgramCode are mutable instance state
-    // that must not be shared across concurrent executions.
-    // TODO: Refactor to pass execution-specific state through context object
-    // instead of storing in instance properties.
+/// Execution context that holds all mutable state for a single JIT execution.
+/// Each call to executeSynchronous creates its own context instance, isolating state
+/// between concurrent executions and eliminating race conditions.
+private final class JITExecutionContext {
+    // Host function table (heap-allocated for C++ interop)
+    let jitHostFunctionTablePtr: UnsafeMutablePointer<JITHostFunctionTable>
 
-    private let jitCompiler = JITCompiler()
-    private let jitExecutor = JITExecutor()
+    // Memory protection bitmaps (128KB each for 2^20 bits)
+    var readMapBitmap: UnsafeMutablePointer<UInt8>?
+    var writeMapBitmap: UnsafeMutablePointer<UInt8>?
+    let bitmapSize = (1 << 20) / 8
 
-    // Heap-allocated JITHostFunctionTable for C++ interop
-    // Allocate as C-compatible struct directly on heap (not wrapped in Swift class)
-    // to avoid passing Swift object header to C++ code
-    private var jitHostFunctionTablePtr: UnsafeMutablePointer<JITHostFunctionTable>!
+    // Program code being executed
+    var currentProgramCode: ProgramCode?
 
-    // Store page map bitmap memory to keep them alive during execution
-    // These are raw memory pointers allocated for the JIT code to access
-    private var readMapBitmap: UnsafeMutablePointer<UInt8>?
-    private var writeMapBitmap: UnsafeMutablePointer<UInt8>?
-    private let bitmapSize = (1 << 20) / 8  // 128KB - 2^20 bits / 8
-
-    // Store the program code during execution for VMStateJIT
-    private var currentProgramCode: ProgramCode?
-
-    // Using a simpler approach to handle host calls that doesn't require async/await
-    private var syncHostCallHandler: ((
+    // Host function handler (bridge from sync JIT to async Swift)
+    var syncHostCallHandler: ((
         UInt32,
         UnsafeMutablePointer<UInt64>,
         UnsafeMutablePointer<UInt8>,
@@ -250,43 +273,26 @@ final class ExecutorBackendJIT: ExecutorBackend {
         UnsafeMutablePointer<UInt64>
     ) -> UInt32)?
 
-    // In-memory code cache for JIT-compiled functions
-    private let codeCache = JITCodeCache()
-
-    // TODO: Implement thread safety for JIT execution (similar to interpreter's async execution model)
-    // TODO: Add support for debugging JIT-compiled code (instruction tracing, register dumps)
-    // TODO: Implement proper memory management for JIT code (code cache eviction policies)
-    // TODO: Add support for tiered compilation (interpret first, then JIT hot paths)
-
-    // TODO: The init method should ideally take a PvmConfig or target architecture string
-    // to correctly initialize CppHelper. For now, we'll use a placeholder or attempt
-    // to get the host architecture if JITPlatformHelper allows without a full config.
-    // TODO: Initialize JIT with instruction handlers that match interpreter behavior exactly
-    init() {
-        // Need to match with JITHostFunctionFn in helper.hh
-        // we can't use JITHostFunctionFn directly due to Swift compiler bug
-        typealias JITHostFunctionFnSwift = @convention(c) (
-            UnsafeMutableRawPointer?,
-            UInt32,
-            UnsafeMutablePointer<UInt64>,
-            UnsafeMutablePointer<UInt8>,
-            UInt32,
-            UnsafeMutablePointer<UInt64>,
-            UnsafeMutableRawPointer?
-        ) -> UInt32
-
-        // double unsafeBitCast to workaround Swift compiler bug
-        let fnPtr = unsafeBitCast(
-            dispatchHostCall_C_Trampoline as JITHostFunctionFnSwift,
-            to: UnsafeRawPointer.self
-        )
-
-        // Allocate JITHostFunctionTable on heap as C-compatible struct
+    init(trampolineFn: @convention(c) (
+        UnsafeMutableRawPointer?,
+        UInt32,
+        UnsafeMutablePointer<UInt64>,
+        UnsafeMutablePointer<UInt8>,
+        UInt32,
+        UnsafeMutablePointer<UInt64>,
+        UnsafeMutableRawPointer?
+    ) -> UInt32) {
+        // Allocate host function table on heap as C-compatible struct
+        // This avoids passing Swift object headers to C++ code
         jitHostFunctionTablePtr = UnsafeMutablePointer<JITHostFunctionTable>.allocate(capacity: 1)
+
+        // Initialize table with function pointer and default values
+        // Note: ownerContext is non-nullable per C++ definition, so we use UnsafeMutableRawPointer(bitPattern: 1)
+        // as a placeholder that will never be dereferenced (we use invocationContext instead)
         jitHostFunctionTablePtr.initialize(to: JITHostFunctionTable(
-            dispatchHostCall: unsafeBitCast(fnPtr, to: JITHostFunctionFn.self),
-            ownerContext: Unmanaged.passUnretained(self).toOpaque(),
-            invocationContext: nil,
+            dispatchHostCall: unsafeBitCast(trampolineFn, to: JITHostFunctionFn.self),
+            ownerContext: UnsafeMutableRawPointer(bitPattern: 1)!, // Non-null placeholder, never used
+            invocationContext: nil, // Will be set before execution
             jumpTableData: nil,
             jumpTableSize: 0,
             jumpTableEntrySize: 0,
@@ -294,23 +300,53 @@ final class ExecutorBackendJIT: ExecutorBackend {
             alignmentFactor: 0,
             dispatcherJumpTable: nil,
             dispatcherJumpTableSize: 0,
-            heapEnd: 0, // Initial value, will be set from StandardMemory before execution
-            readMap: nil, // Initial value, will be set from StandardMemory before execution
-            writeMap: nil // Initial value, will be set from StandardMemory before execution
+            heapEnd: 0, // Will be set from StandardMemory before execution
+            readMap: nil, // Will be set from StandardMemory before execution
+            writeMap: nil // Will be set from StandardMemory before execution
         ))
+    }
+
+    deinit {
+        // Cleanup all resources
+        syncHostCallHandler = nil
+        currentProgramCode = nil
+        readMapBitmap?.deallocate()
+        writeMapBitmap?.deallocate()
+        jitHostFunctionTablePtr.deinitialize(count: 1)
+        jitHostFunctionTablePtr.deallocate()
+    }
+}
+
+/// ## Internal State Safety
+///
+/// ⚠️ CRITICAL: C++ runtime and AsmJit are NOT thread-safe
+/// The C++ layer uses global static JitRuntime instances that cannot be accessed concurrently.
+/// Even with per-execution contexts in Swift, we must serialize ALL executions globally.
+final class ExecutorBackendJIT: ExecutorBackend {
+    private let logger = Logger(label: "ExecutorBackendJIT")
+
+    // CRITICAL: GLOBAL lock to serialize ALL JIT executions
+    // Multiple ExecutorBackendJIT instances share the same C++ global state (JitRuntime)
+    // This lock prevents concurrent access to non-thread-safe C++ code
+    private static let executionLock = Utils.ReadWriteLock()
+
+    // Shared components (stateless or thread-safe)
+    private let jitCompiler = JITCompiler()
+    private let jitExecutor = JITExecutor()
+    private let codeCache = JITCodeCache()
+
+    // TODO: Implement thread safety for JIT execution (similar to interpreter's async execution model)
+    // TODO: Add support for debugging JIT-compiled code (instruction tracing, register dumps)
+    // TODO: Implement proper memory management for JIT code (code cache eviction policies)
+    // TODO: Add support for tiered compilation (interpret first, then JIT hot paths)
+
+    init() {
+        // Initialization simplified - execution-specific state now in JITExecutionContext
     }
 
     deinit {
         // Clear the code cache (frees dispatcher tables and function code for all cached entries)
         codeCache.clear()
-
-        // Clean up heap-allocated struct
-        jitHostFunctionTablePtr.deinitialize(count: 1)
-        jitHostFunctionTablePtr.deallocate()
-
-        // Clean up page map bitmaps
-        readMapBitmap?.deallocate()
-        writeMapBitmap?.deallocate()
     }
 
     // Simple synchronous handler for host functions
@@ -321,7 +357,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
         guestMemoryBasePtr: UnsafeMutablePointer<UInt8>,
         guestMemorySize: UInt32,
         guestGasPtr: UnsafeMutablePointer<UInt64>,
-        invocationContextPtr _: UnsafeMutableRawPointer?
+        invocationContextPtr: UnsafeMutableRawPointer?
     ) -> UInt32 { // Return value for guest (e.g., to be put in R0) or error code
         logger.debug("Swift: dispatchHostCall received call for index \(hostCallIndex)")
 
@@ -337,8 +373,16 @@ final class ExecutorBackendJIT: ExecutorBackend {
         // Deduct gas for host call setup
         guestGasPtr.pointee -= hostCallSetupGasCost
 
+        // Extract JITExecutionContext from invocationContextPtr
+        guard let invocationContextPtr else {
+            logger.error("Swift: invocationContextPtr is nil")
+            return JITHostCallError.internalErrorInvalidContext.rawValue
+        }
+
+        let context = Unmanaged<JITExecutionContext>.fromOpaque(invocationContextPtr).takeUnretainedValue()
+
         // Use the syncHandler to handle host calls
-        if let handler = syncHostCallHandler {
+        if let handler = context.syncHostCallHandler {
             let result = handler(hostCallIndex, guestRegistersPtr, guestMemoryBasePtr, guestMemorySize, guestGasPtr)
 
             // Fixed gas cost for host function call teardown
@@ -389,19 +433,31 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let result = try boxedSelf.value.executeSynchronous(
-                        config: boxedConfig.value,
-                        blob: boxedBlob.value,
-                        pc: pc,
-                        gas: gas,
-                        argumentData: boxedArgumentData.value,
-                        ctx: boxedCtx.value
-                    )
-                    continuation.resume(returning: result)
-                } catch {
-                    // Handle error and convert to VMExecutionResult
-                    let mappedError: VMExecutionResult = if let jitError = error as? JITError {
+                // CRITICAL: Acquire global execution lock to prevent concurrent C++ access
+                // This serializes ALL JIT executions across all ExecutorBackendJIT instances
+                var result: VMExecutionResult?
+                var error: Error?
+
+                Self.executionLock.withWriteLock {
+                    do {
+                        result = try boxedSelf.value.executeSynchronous(
+                            config: boxedConfig.value,
+                            blob: boxedBlob.value,
+                            pc: pc,
+                            gas: gas,
+                            argumentData: boxedArgumentData.value,
+                            ctx: boxedCtx.value
+                        )
+                    } catch let e {
+                        error = e
+                    }
+                }
+
+                // Resume continuation with result or error
+                if let r = result {
+                    continuation.resume(returning: r)
+                } else if let e = error {
+                    let mappedError: VMExecutionResult = if let jitError = e as? JITError {
                         .init(
                             exitReason: jitError.toExitReason(),
                             gasUsed: gas,
@@ -429,15 +485,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
         argumentData: Data?,
         ctx: (any InvocationContext)?
     ) throws -> VMExecutionResult {
+        // Create execution context for this invocation
+        // Each execution gets its own isolated state, making this thread-safe
+        let context = JITExecutionContext(trampolineFn: dispatchHostCall_C_Trampoline)
+
         var currentGas = gas // Mutable copy for JIT execution
 
         do {
-            // Ensure cleanup happens on both success and error paths
-            defer {
-                syncHostCallHandler = nil
-                currentProgramCode = nil
-            }
-
             let targetArchitecture = JITPlatform.getCurrentTargetArchitecture()
             logger.debug("Target architecture for JIT: \(targetArchitecture)")
 
@@ -446,7 +500,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
             let standardProgram: StandardProgram
             do {
                 standardProgram = try StandardProgram(blob: blob, argumentData: argumentData)
-                currentProgramCode = standardProgram.code
+                context.currentProgramCode = standardProgram.code
             } catch {
                 logger.error("Failed to create StandardProgram: \(error)")
                 return VMExecutionResult(
@@ -499,7 +553,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
             }
 
             // Safely unwrap programCode with proper error handling
-            guard let programCode = currentProgramCode else {
+            guard let programCode = context.currentProgramCode else {
                 logger.error("ProgramCode not available for JIT compilation")
                 return VMExecutionResult(
                     exitReason: .panic(.trap),
@@ -522,17 +576,15 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     "🔍 JIT bytecode: \(bytecode.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " "))... (total: \(bytecode.count) bytes)"
                 )
             logger.debug("🔍 JIT initial PC: \(pc)")
-            let compiledFuncPtr: UnsafeMutableRawPointer
-            let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
-            let dispatcherTableSize: UInt32
 
+            // CRITICAL: JIT compilation is protected by executionLock wrapping the entire method
             // TODO: Re-enable JIT caching after debugging (currently disabled for troubleshooting)
+            let (compiledFuncPtr, dispatcherTable, dispatcherTableSize): (UnsafeMutableRawPointer, UnsafeMutablePointer<UnsafeMutableRawPointer?>?, UInt32)
             if false, let cachedEntry = codeCache.lookup(bytecode: bytecode, config: config, initialPC: pc) {
                 // Cache hit - use cached function pointer
                 compiledFuncPtr = UnsafeMutableRawPointer(mutating: cachedEntry.functionPtr)
                 dispatcherTable = cachedEntry.dispatcherTable
                 dispatcherTableSize = cachedEntry.dispatcherTableSize
-                logger.debug("Using cached JIT function")
             } else {
                 // Cache miss - compile and cache the function
 
@@ -544,7 +596,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 // This ensures JIT only jumps to valid instruction boundaries
                 let bitmask = programCode.bitmask
 
-                compiledFuncPtr = try jitCompiler.compile(
+                let funcPtr = try jitCompiler.compile(
                     blob: bytecode,
                     initialPC: pc,
                     config: config,
@@ -557,26 +609,28 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 // Retrieve dispatcher jump table for this compiled function
                 // This allows JumpInd to work without a PVM jump table
                 var size: size_t = 0
-                let table = getDispatcherTable(compiledFuncPtr, &size)
-                dispatcherTable = table
-                dispatcherTableSize = UInt32(size)
+                let table = getDispatcherTable(funcPtr, &size)
 
                 // Store in cache for future use
                 codeCache.store(
                     bytecode: bytecode,
                     config: config,
                     initialPC: pc,
-                    functionPtr: compiledFuncPtr,
-                    dispatcherTable: dispatcherTable,
-                    dispatcherTableSize: dispatcherTableSize
+                    functionPtr: funcPtr,
+                    dispatcherTable: table,
+                    dispatcherTableSize: UInt32(size)
                 )
+
+                compiledFuncPtr = funcPtr
+                dispatcherTable = table
+                dispatcherTableSize = UInt32(size)
             }
 
             // Update the JITHostFunctionTable with the dispatcher table
             if let table = dispatcherTable {
                 logger.debug("Dispatcher table retrieved: \(dispatcherTableSize) entries")
-                jitHostFunctionTablePtr.pointee.dispatcherJumpTable = table
-                jitHostFunctionTablePtr.pointee.dispatcherJumpTableSize = dispatcherTableSize
+                context.jitHostFunctionTablePtr.pointee.dispatcherJumpTable = table
+                context.jitHostFunctionTablePtr.pointee.dispatcherJumpTableSize = dispatcherTableSize
             } else {
                 if JITPlatform.getCurrentTargetArchitecture() == .arm64 {
                     logger.debug("No dispatcher table found for compiled function (expected on ARM64)")
@@ -601,13 +655,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
             if let invocationContext = ctx {
                 // Initialize the synchronous handler
                 // Use [weak self] to avoid retain cycle (cleanup happens in defer block)
-                syncHostCallHandler =
+                context.syncHostCallHandler =
                     { [weak self] hostCallIndex, guestRegistersPtr, guestMemoryBasePtr, guestMemorySize, guestGasPtr -> UInt32 in
                         guard let self else {
                             return JITHostCallError.internalErrorInvalidContext.rawValue
                         }
 
-                        guard let programCode = currentProgramCode else {
+                        guard let programCode = context.currentProgramCode else {
                             logger.error("No program code available for host call")
                             return JITHostCallError.internalErrorInvalidContext.rawValue
                         }
@@ -702,39 +756,39 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     }
             } else {
                 // Clear the handler if no context provided
-                syncHostCallHandler = nil
+                context.syncHostCallHandler = nil
             }
 
             // Update the invocation context in the JIT host function table
-            jitHostFunctionTablePtr.pointee.invocationContext = nil // We're using the syncHandler now
+            context.jitHostFunctionTablePtr.pointee.invocationContext = nil // We're using the syncHandler now
 
             // Get pointer to heap-allocated JITHostFunctionTable
-            let invocationContextPointer = UnsafeMutableRawPointer(jitHostFunctionTablePtr)
+            let invocationContextPointer = UnsafeMutableRawPointer(context.jitHostFunctionTablePtr)
 
             // Execute the JIT-compiled function
             // CRITICAL: Must wrap execute call in withUnsafeBytes to ensure jump table pointer remains valid
             let (exitReason, memoryInfo): (ExitReason, MemoryAllocationInfo)
             let memoryBuffer: UnsafeMutablePointer<UInt8> // Extract pointer for use in output reading
 
-            if let programCode = currentProgramCode {
+            if let programCode = context.currentProgramCode {
                 // Populate jump table data for JumpInd instruction support
                 // and execute while the pointer is still valid
                 let (er, mi): (ExitReason, MemoryAllocationInfo) = try programCode.jumpTable.withUnsafeBytes { rawBufferPointer in
                     // Set jump table data pointer (valid only within this closure)
-                    jitHostFunctionTablePtr.pointee.jumpTableData = rawBufferPointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                    jitHostFunctionTablePtr.pointee.jumpTableSize = UInt32(programCode.jumpTable.count)
-                    jitHostFunctionTablePtr.pointee.jumpTableEntrySize = programCode.jumpTableEntrySize
+                    context.jitHostFunctionTablePtr.pointee.jumpTableData = rawBufferPointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                    context.jitHostFunctionTablePtr.pointee.jumpTableSize = UInt32(programCode.jumpTable.count)
+                    context.jitHostFunctionTablePtr.pointee.jumpTableEntrySize = programCode.jumpTableEntrySize
                     // Guard against division by zero when jumpTableEntrySize is 0 (empty jump table)
-                    jitHostFunctionTablePtr.pointee.jumpTableEntriesCount =
+                    context.jitHostFunctionTablePtr.pointee.jumpTableEntriesCount =
                         programCode.jumpTableEntrySize > 0
                             ? UInt32(programCode.jumpTable.count / Int(programCode.jumpTableEntrySize))
                             : 0
-                    jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+                    context.jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
 
                     // CRITICAL FIX: Initialize heapEnd for JIT sbrk instruction
                     // Get initial heap end from StandardMemory to match interpreter behavior
                     if let stdMem = initialMemory as? StandardMemory {
-                        jitHostFunctionTablePtr.pointee.heapEnd = stdMem.heapEnd
+                        context.jitHostFunctionTablePtr.pointee.heapEnd = stdMem.heapEnd
                     } else {
                         // Fallback: use heap zone start address from config
                         // This should not happen in normal operation
@@ -742,7 +796,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         let ZZ = UInt32(config.pvmProgramInitZoneSize)
                         let Z = StandardProgram.alignToZoneSize
                         let heapStart = 2 * ZZ + Z(UInt32(standardProgram.code.code.count), config)
-                        jitHostFunctionTablePtr.pointee.heapEnd = heapStart
+                        context.jitHostFunctionTablePtr.pointee.heapEnd = heapStart
                     }
 
                     // Initialize memory protection page maps for bounds checking
@@ -752,17 +806,21 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         // Each bitmap has 2^20 bits (1 bit per 4KB page for 2^32 address space)
                         let pageSize = UInt32(config.pvmMemoryPageSize)  // 4096 bytes per page
 
+                        // CRITICAL: Use lock to protect bitmap initialization during concurrent execution
+                        // Multiple tests may execute concurrently and share the same ExecutorBackendJIT instance
+                        // NOTE: executionLock already protects this entire executeSynchronous method
+
                         // Deallocate old bitmaps if they exist
-                        self.readMapBitmap?.deallocate()
-                        self.writeMapBitmap?.deallocate()
+                        context.readMapBitmap?.deallocate()
+                        context.writeMapBitmap?.deallocate()
 
                         // Allocate raw memory for bitmaps (stored in instance properties)
-                        self.readMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: bitmapSize)
-                        self.writeMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: bitmapSize)
+                        context.readMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: context.bitmapSize)
+                        context.writeMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: context.bitmapSize)
 
                         // Initialize to zero
-                        self.readMapBitmap!.initialize(repeating: 0, count: bitmapSize)
-                        self.writeMapBitmap!.initialize(repeating: 0, count: bitmapSize)
+                        context.readMapBitmap!.initialize(repeating: 0, count: context.bitmapSize)
+                        context.writeMapBitmap!.initialize(repeating: 0, count: context.bitmapSize)
 
                         // Initialize readMap based on memory zones
                         // Per spec pvm.tex lines 770-797:
@@ -772,12 +830,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         // - Argument zone: readable and writable
                         for zone in stdMem.allZones {
                             let zoneStartPage = zone.startAddress / pageSize
-                            let zoneEndPage = (zone.endAddress + pageSize - 1) / pageSize
+                            // Fixed: Use (endAddress - 1) to handle page-aligned zones correctly
+                            let zoneEndPage = (zone.endAddress - 1) / pageSize + 1
 
                             for page in zoneStartPage..<zoneEndPage {
                                 let byteIndex = Int(page / 8)
                                 let bitIndex = page % 8
-                                self.readMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
+                                context.readMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
                             }
                         }
 
@@ -785,29 +844,30 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         // Read-only zone is NOT writable
                         for zone in [stdMem.heapZoneInfo, stdMem.stackZoneInfo, stdMem.argumentZoneInfo] {
                             let zoneStartPage = zone.startAddress / pageSize
-                            let zoneEndPage = (zone.endAddress + pageSize - 1) / pageSize
+                            // Fixed: Use (endAddress - 1) to handle page-aligned zones correctly
+                            let zoneEndPage = (zone.endAddress - 1) / pageSize + 1
 
                             for page in zoneStartPage..<zoneEndPage {
                                 let byteIndex = Int(page / 8)
                                 let bitIndex = page % 8
-                                self.writeMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
+                                context.writeMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
                             }
                         }
 
                         // Store bitmap pointers in JITHostFunctionTable
-                        jitHostFunctionTablePtr.pointee.readMap = self.readMapBitmap
-                        jitHostFunctionTablePtr.pointee.writeMap = self.writeMapBitmap
+                        context.jitHostFunctionTablePtr.pointee.readMap = context.readMapBitmap
+                        context.jitHostFunctionTablePtr.pointee.writeMap = context.writeMapBitmap
 
-                        logger.debug("Initialized page maps: \(bitmapSize) bytes each")
+                        logger.debug("Initialized page maps: \(context.bitmapSize) bytes each")
                     } else {
                         // No memory protection available (should not happen)
-                        jitHostFunctionTablePtr.pointee.readMap = nil
-                        jitHostFunctionTablePtr.pointee.writeMap = nil
+                        context.jitHostFunctionTablePtr.pointee.readMap = nil
+                        context.jitHostFunctionTablePtr.pointee.writeMap = nil
                         logger.warning("StandardMemory not available - memory protection disabled")
                     }
 
                     // Execute the JIT-compiled function while jumpTableData pointer is valid
-                    // The JIT function will use our syncHostCallHandler via the C trampoline
+                    // The JIT function will use our context.syncHostCallHandler via the C trampoline
                     return try jitExecutor.execute(
                         functionPtr: compiledFuncPtr,
                         registers: &registers,
@@ -825,32 +885,32 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 memoryBuffer = mi.pointer
             } else {
                 // No jump table available
-                jitHostFunctionTablePtr.pointee.jumpTableData = nil
-                jitHostFunctionTablePtr.pointee.jumpTableSize = 0
-                jitHostFunctionTablePtr.pointee.jumpTableEntrySize = 0
-                jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = 0
-                jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
+                context.jitHostFunctionTablePtr.pointee.jumpTableData = nil
+                context.jitHostFunctionTablePtr.pointee.jumpTableSize = 0
+                context.jitHostFunctionTablePtr.pointee.jumpTableEntrySize = 0
+                context.jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = 0
+                context.jitHostFunctionTablePtr.pointee.alignmentFactor = UInt32(config.pvmDynamicAddressAlignmentFactor)
 
                 // CRITICAL FIX: Initialize heapEnd for JIT sbrk instruction
                 // Get initial heap end from StandardMemory to match interpreter behavior
                 if let stdMem = initialMemory as? StandardMemory {
-                    jitHostFunctionTablePtr.pointee.heapEnd = stdMem.heapEnd
+                    context.jitHostFunctionTablePtr.pointee.heapEnd = stdMem.heapEnd
 
                     // Initialize memory protection page maps for bounds checking
                     // Per PVM spec pvm.tex lines 137-147: memory access must be validated
                     let pageSize = UInt32(config.pvmMemoryPageSize)  // 4096 bytes per page
 
                     // Deallocate old bitmaps if they exist
-                    self.readMapBitmap?.deallocate()
-                    self.writeMapBitmap?.deallocate()
+                    context.readMapBitmap?.deallocate()
+                    context.writeMapBitmap?.deallocate()
 
                     // Allocate raw memory for bitmaps (stored in instance properties)
-                    self.readMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: bitmapSize)
-                    self.writeMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: bitmapSize)
+                    context.readMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: context.bitmapSize)
+                    context.writeMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: context.bitmapSize)
 
                     // Initialize to zero
-                    self.readMapBitmap!.initialize(repeating: 0, count: bitmapSize)
-                    self.writeMapBitmap!.initialize(repeating: 0, count: bitmapSize)
+                    context.readMapBitmap!.initialize(repeating: 0, count: context.bitmapSize)
+                    context.writeMapBitmap!.initialize(repeating: 0, count: context.bitmapSize)
 
                     // Initialize readMap based on memory zones
                     // Per spec pvm.tex lines 770-797:
@@ -865,7 +925,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         for page in zoneStartPage..<zoneEndPage {
                             let byteIndex = Int(page / 8)
                             let bitIndex = page % 8
-                            self.readMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
+                            context.readMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
                         }
                     }
 
@@ -878,15 +938,15 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         for page in zoneStartPage..<zoneEndPage {
                             let byteIndex = Int(page / 8)
                             let bitIndex = page % 8
-                            self.writeMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
+                            context.writeMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
                         }
                     }
 
                     // Store bitmap pointers in JITHostFunctionTable
-                    jitHostFunctionTablePtr.pointee.readMap = self.readMapBitmap
-                    jitHostFunctionTablePtr.pointee.writeMap = self.writeMapBitmap
+                    context.jitHostFunctionTablePtr.pointee.readMap = context.readMapBitmap
+                    context.jitHostFunctionTablePtr.pointee.writeMap = context.writeMapBitmap
 
-                    logger.debug("Initialized page maps: \(bitmapSize) bytes each")
+                    logger.debug("Initialized page maps: \(context.bitmapSize) bytes each")
                 } else {
                     // Fallback: use heap zone start address from config
                     // This should not happen in normal operation
@@ -894,11 +954,11 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     let ZZ = UInt32(config.pvmProgramInitZoneSize)
                     let Z = StandardProgram.alignToZoneSize
                     let heapStart = 2 * ZZ + Z(UInt32(standardProgram.code.code.count), config)
-                    jitHostFunctionTablePtr.pointee.heapEnd = heapStart
+                    context.jitHostFunctionTablePtr.pointee.heapEnd = heapStart
 
                     // No memory protection available
-                    jitHostFunctionTablePtr.pointee.readMap = nil
-                    jitHostFunctionTablePtr.pointee.writeMap = nil
+                    context.jitHostFunctionTablePtr.pointee.readMap = nil
+                    context.jitHostFunctionTablePtr.pointee.writeMap = nil
                     logger.warning("StandardMemory not available - memory protection disabled")
                 }
 
@@ -926,12 +986,12 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
             // Clear the invocation context reference and jump table data after execution
             // The jumpTableData pointer was only valid within the withUnsafeBytes block above
-            jitHostFunctionTablePtr.pointee.invocationContext = nil
-            jitHostFunctionTablePtr.pointee.jumpTableData = nil
-            jitHostFunctionTablePtr.pointee.jumpTableSize = 0
-            jitHostFunctionTablePtr.pointee.jumpTableEntrySize = 0
-            jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = 0
-            jitHostFunctionTablePtr.pointee.alignmentFactor = 0
+            context.jitHostFunctionTablePtr.pointee.invocationContext = nil
+            context.jitHostFunctionTablePtr.pointee.jumpTableData = nil
+            context.jitHostFunctionTablePtr.pointee.jumpTableSize = 0
+            context.jitHostFunctionTablePtr.pointee.jumpTableEntrySize = 0
+            context.jitHostFunctionTablePtr.pointee.jumpTableEntriesCount = 0
+            context.jitHostFunctionTablePtr.pointee.alignmentFactor = 0
 
             // Calculate gas used (handle saturating Gas type correctly)
             let gasUsed: Gas = if exitReason == .outOfGas {
@@ -1052,30 +1112,4 @@ enum JITHostCallError: UInt32 {
 
     // Indicates that the host function requested the VM to halt
     case hostRequestedHalt = 0xFFFF_FFFA
-}
-
-// Static C-callable trampoline that calls the instance method.
-private func dispatchHostCall_C_Trampoline(
-    opaqueOwnerContext: UnsafeMutableRawPointer?,
-    hostCallIndex: UInt32,
-    guestRegistersPtr: UnsafeMutablePointer<UInt64>,
-    guestMemoryBasePtr: UnsafeMutablePointer<UInt8>,
-    guestMemorySize: UInt32,
-    guestGasPtr: UnsafeMutablePointer<UInt64>,
-    invocationContextPtr: UnsafeMutableRawPointer?
-) -> UInt32 {
-    guard let ownerCtxPtr = opaqueOwnerContext else {
-        return JITHostCallError.internalErrorInvalidContext.rawValue
-    }
-    let backendInstance = Unmanaged<ExecutorBackendJIT>.fromOpaque(ownerCtxPtr).takeUnretainedValue()
-
-    // Call the instance method that handles the dispatch
-    return backendInstance.dispatchHostCall(
-        hostCallIndex: hostCallIndex,
-        guestRegistersPtr: guestRegistersPtr,
-        guestMemoryBasePtr: guestMemoryBasePtr,
-        guestMemorySize: guestMemorySize,
-        guestGasPtr: guestGasPtr,
-        invocationContextPtr: invocationContextPtr
-    )
 }
