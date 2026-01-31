@@ -67,11 +67,23 @@ extension Instructions {
     ) throws -> (T, U) {
         let lX1 = try Int((data.at(relative: startIdx) / divideBy) & 0b111)
         let lX = min(4, lX1)
-        let lY = min(4, max(0, data.count - Int(lX) - minus))
+
+        // Calculate lY based on remaining bytes after lX
+        let remainingBytes = max(0, data.count - startIdx - 1 - lX)
+        let lY = min(4, remainingBytes)
 
         let start = startIdx + 1
-        let vX: T = decodeImmediate(data.subdata(in: data.startIndex + start ..< data.startIndex + (start + lX)))
-        let vY: U = decodeImmediate(data.subdata(in: data.startIndex + (start + lX) ..< data.startIndex + (start + lX + lY)))
+        let endIdx = start + lX + lY
+
+        // Validate we have enough bytes - trigger bounds check via at()
+        _ = try data.at(relative: endIdx - 1)
+
+        // Use relative indices to avoid issues with data.startIndex
+        let range1 = start..<(start + lX)
+        let range2 = (start + lX)..<(start + lX + lY)
+
+        let vX: T = decodeImmediate(data.subdata(in: range1))
+        let vY: U = decodeImmediate(data.subdata(in: range2))
         return (vX, vY)
     }
 
