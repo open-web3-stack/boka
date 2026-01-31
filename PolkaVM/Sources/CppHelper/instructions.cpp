@@ -517,6 +517,12 @@ static bool emit_bounds_check_x64(
     asmjit::x86::Gp addr_reg,
     bool is_write);
 
+// Forward declaration for bounds checking helper (ARM64)
+static bool emit_bounds_check_aarch64(
+    void* _Nonnull assembler,
+    asmjit::a64::Gp addr_reg,
+    bool is_write);
+
 // ============================================================================
 // MEMORY ACCESS INSTRUCTIONS
 // NOTE: These functions perform DIRECT memory access without bounds checking.
@@ -569,6 +575,9 @@ bool jit_emit_load_u8(
 
         // Calculate address: memBase + ptr
         a->add(ptr, memBase, ptr);
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, ptr, false);  // false = read
 
         // Load unsigned byte from memory with zero-extension
         a->ldrb(dest.w(), a64::ptr(ptr, offset));
@@ -630,6 +639,9 @@ bool jit_emit_load_i8(
         // Calculate address: memBase + ptr
         a->add(ptr, memBase, ptr);
 
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, ptr, false);  // false = read
+
         // Load signed byte from memory with sign-extension
         a->ldrsb(dest.x(), a64::ptr(ptr, offset));
 
@@ -686,6 +698,9 @@ bool jit_emit_load_u16(
 
         // Calculate address: memBase + ptr
         a->add(ptr, memBase, ptr);
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, ptr, false);  // false = read
 
         // Load unsigned halfword from memory with zero-extension
         a->ldrh(dest.w(), a64::ptr(ptr, offset));
@@ -747,6 +762,9 @@ bool jit_emit_load_i16(
         // Calculate address: memBase + ptr
         a->add(ptr, memBase, ptr);
 
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, ptr, false);  // false = read
+
         // Load signed halfword from memory with sign-extension
         a->ldrsh(dest.x(), a64::ptr(ptr, offset));
 
@@ -803,6 +821,9 @@ bool jit_emit_load_u64(
 
         // Calculate address: memBase + ptr
         a->add(ptr, memBase, ptr);
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, ptr, false);  // false = read
 
         // Load qword from memory
         a->ldr(dest, a64::ptr(ptr, offset));
@@ -902,6 +923,113 @@ static bool emit_bounds_check_x64(
     return true;
 }
 
+// Helper: Emit bounds checking for memory access (ARM64)
+// This function generates code to check if a memory access is valid
+// Per PVM spec pvm.tex lines 137-147:
+// - First 64KB (2^16 bytes) must cause immediate panic
+// - Other addresses checked against readMap/writeMap bitmaps
+//
+// On fault: generates trap and returns
+// Preserves: all caller registers except X0, X1, X2, X3, X4
+static bool emit_bounds_check_aarch64(
+    void* _Nonnull assembler,
+    a64::Gp addr_reg,       // Register containing address to check (will be preserved)
+    bool is_write)          // true for write, false for read
+{
+    using namespace asmjit;
+    auto* a = static_cast<a64::Assembler*>(assembler);
+
+    // ARM64 calling convention for JIT:
+    // X19 = VM_REGISTERS_PTR
+    // X20 = VM_MEMORY_PTR
+    // X21 = invocationContext (JITHostFunctionTable*)
+
+    // Temporary registers we can use
+    a64::Gp temp_addr = a64::x0;   // For address calculations
+    a64::Gp temp_map = a64::x1;    // For bitmap pointer
+    a64::Gp temp_byte = a64::x2;   // For byte index
+    a64::Gp temp_bit = a64::x3;    // For bit index
+    a64::Gp temp_bitmap = a64::x4; // For bitmap byte
+
+    // Save original address register if it's not one of our temps
+    bool needs_save = (addr_reg.id() != a64::x0.id() &&
+                       addr_reg.id() != a64::x1.id() &&
+                       addr_reg.id() != a64::x2.id() &&
+                       addr_reg.id() != a64::x3.id() &&
+                       addr_reg.id() != a64::x4.id());
+
+    // Allocate stack space if needed
+    if (needs_save) {
+        a->sub(a64::sp, a64::sp, 16);  // Allocate 16 bytes on stack
+    }
+
+    // Move address to temp register for calculation
+    if (addr_reg.id() != a64::x0.id()) {
+        a->mov(temp_addr, addr_reg);
+        // Save original address to stack
+        a->str(temp_addr, a64::ptr(a64::sp, 0));
+    }
+
+    // Check if address < 64KB (2^16) - immediate panic per spec
+    Label pass_check = a->new_label();
+    a->mov(a64::x1, 0x10000);       // Load 64KB into X1
+    a->cmp(temp_addr, a64::x1);     // Compare with 64KB
+    a->b_ge(pass_check);            // Skip to check if >= 64KB
+
+    // Address < 64KB - immediate panic
+    // Load -1 into W0 (return value) and return
+    a->mov(a64::w0, -1);
+    a->ret(a64::x30);               // Return to dispatcher
+    a->bind(pass_check);
+
+    // Get JITHostFunctionTable* from X21
+    // Get readMap or writeMap offset
+    if (is_write) {
+        a->ldr(temp_map, a64::ptr(a64::x21, offsetof(JITHostFunctionTable, writeMap)));
+    } else {
+        a->ldr(temp_map, a64::ptr(a64::x21, offsetof(JITHostFunctionTable, readMap)));
+    }
+
+    // Check if bitmap is null (no protection - skip check)
+    Label skip_bitmap_check = a->new_label();
+    a->cbz(temp_map, skip_bitmap_check);    // Skip if null
+
+    // Calculate page index: addr / 4096 = addr >> 12
+    a->lsr(temp_byte, temp_addr, 12);  // temp_byte = page number
+
+    // Calculate byte index and bit index
+    // byteIndex = page / 8, bitIndex = page % 8
+    a->mov(temp_bit, temp_byte);       // temp_bit = page number
+    a->lsr(temp_byte, temp_byte, 3);   // temp_byte = byte index
+    a->and_(temp_bit, temp_bit, 0x7);  // temp_bit = bit index
+
+    // Load bitmap byte
+    a->ldrb(temp_bitmap.w(), a64::ptr(temp_map, temp_byte));
+
+    // Test the bit
+    a->lsr(temp_bitmap, temp_bitmap, temp_bit);  // Shift bit to position 0
+    a->tst(temp_bitmap, 1);                     // Test bit 0
+
+    // If bit is set, page is accessible -> continue
+    a->b_ne(pass_check);             // Branch if not equal (bit is set)
+
+    // Page not accessible - trap
+    a->mov(a64::w0, -1);             // Exit reason: trap
+    a->ret(a64::x30);                // Return to dispatcher
+    a->bind(pass_check);
+    a->bind(skip_bitmap_check);
+
+    // Restore original address register if needed
+    if (needs_save) {
+        if (addr_reg.id() != a64::x0.id()) {
+            a->ldr(addr_reg, a64::ptr(a64::sp, 0));
+        }
+        a->add(a64::sp, a64::sp, 16);  // Restore stack pointer
+    }
+
+    return true;
+}
+
 // LoadU8Direct: Load unsigned 8-bit from memory (direct addressing)
 bool jit_emit_load_u8_direct(
     void* _Nonnull assembler,
@@ -937,6 +1065,9 @@ bool jit_emit_load_u8_direct(
         a64::Gp regPtr = a64::x19;
 
         a->mov(addr, address);
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, addr, false);  // false = read
 
         // Load unsigned byte from memory at [memBase + addr]
         a->ldrb(dest.w(), a64::ptr(memBase, addr));
@@ -989,6 +1120,9 @@ bool jit_emit_load_i8_direct(
 
         a->mov(addr, address);
 
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, addr, false);  // false = read
+
         // Load signed byte from memory at [memBase + addr]
         a->ldrsb(dest.x(), a64::ptr(memBase, addr));
 
@@ -1033,6 +1167,9 @@ bool jit_emit_load_u16_direct(
         a64::Gp regPtr = a64::x19;
 
         a->mov(addr, address);
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, addr, false);  // false = read
 
         // Load unsigned halfword from memory at [memBase + addr]
         a->ldrh(dest.w(), a64::ptr(memBase, addr));
@@ -1085,6 +1222,9 @@ bool jit_emit_load_i16_direct(
 
         a->mov(addr, address);
 
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, addr, false);  // false = read
+
         // Load signed halfword from memory at [memBase + addr]
         a->ldrsh(dest.x(), a64::ptr(memBase, addr));
 
@@ -1132,6 +1272,9 @@ bool jit_emit_load_u32_direct(
         a64::Gp regPtr = a64::x19;
 
         a->mov(addr, address);
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, addr, false);  // false = read
 
         // Load word from memory at [memBase + addr]
         a->ldr(dest.w(), a64::ptr(memBase, addr));
@@ -1184,6 +1327,9 @@ bool jit_emit_load_i32_direct(
 
         a->mov(addr, address);
 
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, addr, false);  // false = read
+
         // Load signed word from memory at [memBase + addr]
         a->ldrsw(dest, a64::ptr(memBase, addr));
 
@@ -1231,6 +1377,9 @@ bool jit_emit_load_u64_direct(
         a64::Gp regPtr = a64::x19;
 
         a->mov(addr, address);
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_aarch64(assembler, addr, false);  // false = read
 
         // Load qword from memory at [memBase + addr]
         a->ldr(dest, a64::ptr(memBase, addr));
@@ -1290,6 +1439,9 @@ bool jit_emit_store_u8(
         // Calculate address: memBase + ptr
         a->add(ptr, memBase, ptr);
 
+        // Bounds check: verify address is writable
+        emit_bounds_check_aarch64(assembler, ptr, true);  // true = write
+
         // Store byte to memory
         a->strb(src.w(), a64::ptr(ptr, offset));
 
@@ -1344,6 +1496,9 @@ bool jit_emit_store_u16(
 
         // Calculate address: memBase + ptr
         a->add(ptr, memBase, ptr);
+
+        // Bounds check: verify address is writable
+        emit_bounds_check_aarch64(assembler, ptr, true);  // true = write
 
         // Store halfword to memory
         a->strh(src.w(), a64::ptr(ptr, offset));
@@ -1400,6 +1555,9 @@ bool jit_emit_store_u32(
         // Calculate address: memBase + ptr
         a->add(ptr, memBase, ptr);
 
+        // Bounds check: verify address is writable
+        emit_bounds_check_aarch64(assembler, ptr, true);  // true = write
+
         // Store word to memory
         a->str(src.w(), a64::ptr(ptr, offset));
 
@@ -1455,6 +1613,9 @@ bool jit_emit_store_u64(
         // Calculate address: memBase + ptr
         a->add(ptr, memBase, ptr);
 
+        // Bounds check: verify address is writable
+        emit_bounds_check_aarch64(assembler, ptr, true);  // true = write
+
         // Store qword to memory
         a->str(src, a64::ptr(ptr, offset));
 
@@ -1500,6 +1661,9 @@ bool jit_emit_store_u8_direct(
 
         a->mov(addr, address);
         a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+
+        // Bounds check: verify address is writable
+        emit_bounds_check_aarch64(assembler, addr, true);  // true = write
 
         // Store byte to memory at [memBase + addr]
         a->strb(src.w(), a64::ptr(memBase, addr));
@@ -1547,6 +1711,9 @@ bool jit_emit_store_u16_direct(
         a->mov(addr, address);
         a->ldr(src, a64::ptr(regPtr, src_reg * 8));
 
+        // Bounds check: verify address is writable
+        emit_bounds_check_aarch64(assembler, addr, true);  // true = write
+
         // Store halfword to memory at [memBase + addr]
         a->strh(src.w(), a64::ptr(memBase, addr));
 
@@ -1593,6 +1760,9 @@ bool jit_emit_store_u32_direct(
         a->mov(addr, address);
         a->ldr(src, a64::ptr(regPtr, src_reg * 8));
 
+        // Bounds check: verify address is writable
+        emit_bounds_check_aarch64(assembler, addr, true);  // true = write
+
         // Store word to memory at [memBase + addr]
         a->str(src.w(), a64::ptr(memBase, addr));
 
@@ -1638,6 +1808,9 @@ bool jit_emit_store_u64_direct(
 
         a->mov(addr, address);
         a->ldr(src, a64::ptr(regPtr, src_reg * 8));
+
+        // Bounds check: verify address is writable
+        emit_bounds_check_aarch64(assembler, addr, true);  // true = write
 
         // Store qword to memory at [memBase + addr]
         a->str(src, a64::ptr(memBase, addr));
