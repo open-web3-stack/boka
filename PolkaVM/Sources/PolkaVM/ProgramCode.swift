@@ -98,16 +98,14 @@ public class ProgramCode {
         }
 
         // mark bitmask bits longer than codeLength as 1
+        var bitmaskData = blob[codeEndIndex ..< slice.endIndex]
         let fullBytes = Int(codeLength) / 8
         let remainingBits = Int(codeLength) % 8
-
-        // Create bitmask data directly from blob range to avoid slice issues
-        var mutableBitmask = Data(blob[codeEndIndex ..< slice.endIndex])
         if remainingBits > 0 {
             let mask: UInt8 = ~0 << remainingBits
-            mutableBitmask[fullBytes] |= mask
+            bitmaskData[codeEndIndex + fullBytes] |= mask
         }
-        bitmask = mutableBitmask
+        bitmask = bitmaskData
 
         try buildMetadata()
 
@@ -193,7 +191,7 @@ public class ProgramCode {
 
     /// Check if a PC position is at an instruction boundary
     /// Per spec, instruction boundaries are marked by bit 0 being set in the bitmask
-    public func isInstructionBoundary(_ pc: UInt32) -> Bool {
+    internal func isInstructionBoundary(_ pc: UInt32) -> Bool {
         let byteIndex = Int(pc / 8)
         let bitIndex = Int(pc % 8)
 
