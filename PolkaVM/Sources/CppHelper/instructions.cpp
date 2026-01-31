@@ -873,8 +873,11 @@ static bool emit_bounds_check_x64(
     a->cmp(x86::rax, 0x10000);  // Compare with 64KB
     a->jae(pass_check);         // Skip to check if >= 64KB
 
-    // Address < 64KB - immediate panic
-    a->mov(x86::eax, -1);       // Exit reason: trap
+    // Address < 64KB - page fault with address
+    // ExitReason.pageFault encodes as: 7 + (address << 32)
+    a->mov(x86::eax, 7);       // Exit reason: pageFault (7)
+    a->shl(x86::rax, 32);       // Shift address to high 32 bits
+    a->or_(x86::eax, x86::eax);  // Combine: 7 | (address << 32)
     a->ret();                   // Return to dispatcher
     a->bind(pass_check);
 
@@ -910,9 +913,12 @@ static bool emit_bounds_check_x64(
     // If carry flag set, page is accessible -> continue
     a->jc(skip_bounds_check);
 
-    // Page not accessible - trap
-    a->mov(x86::eax, -1);   // Exit reason: trap
-    a->ret();               // Return to dispatcher
+    // Page not accessible - page fault with address
+    // ExitReason.pageFault encodes as: 7 + (address << 32)
+    a->mov(x86::eax, 7);       // Exit reason: pageFault (7)
+    a->shl(x86::rax, 32);       // Shift address to high 32 bits
+    a->or_(x86::eax, x86::eax);  // Combine: 7 | (address << 32)
+    a->ret();                   // Return to dispatcher
 
     a->bind(skip_bounds_check);
 
@@ -976,9 +982,11 @@ static bool emit_bounds_check_aarch64(
     a->cmp(temp_addr, a64::x1);     // Compare with 64KB
     a->b_ge(pass_check);            // Skip to check if >= 64KB
 
-    // Address < 64KB - immediate panic
-    // Load -1 into W0 (return value) and return
-    a->mov(a64::w0, -1);
+    // Address < 64KB - page fault with address
+    // ExitReason.pageFault encodes as: 7 + (address << 32)
+    a->mov(a64::w0, 7);           // Exit reason: pageFault (7)
+    a->lsl(a64::x0, temp_addr, 32); // Shift address to high 32 bits
+    a->orr(a64::x0, a64::x0, a64::x0); // Combine: 7 | (address << 32)
     a->ret(a64::x30);               // Return to dispatcher
     a->bind(pass_check);
 
@@ -1013,8 +1021,11 @@ static bool emit_bounds_check_aarch64(
     // If bit is set, page is accessible -> continue
     a->b_ne(pass_check);             // Branch if not equal (bit is set)
 
-    // Page not accessible - trap
-    a->mov(a64::w0, -1);             // Exit reason: trap
+    // Page not accessible - page fault with address
+    // ExitReason.pageFault encodes as: 7 + (address << 32)
+    a->mov(a64::w0, 7);           // Exit reason: pageFault (7)
+    a->lsl(a64::x0, temp_addr, 32); // Shift address to high 32 bits
+    a->orr(a64::x0, a64::x0, a64::x0); // Combine: 7 | (address << 32)
     a->ret(a64::x30);                // Return to dispatcher
     a->bind(pass_check);
     a->bind(skip_bitmap_check);

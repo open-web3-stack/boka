@@ -98,14 +98,16 @@ public class ProgramCode {
         }
 
         // mark bitmask bits longer than codeLength as 1
-        var bitmaskData = blob[codeEndIndex ..< slice.endIndex]
         let fullBytes = Int(codeLength) / 8
         let remainingBits = Int(codeLength) % 8
+
+        // Create bitmask data directly from blob range to avoid slice issues
+        var mutableBitmask = Data(blob[codeEndIndex ..< slice.endIndex])
         if remainingBits > 0 {
             let mask: UInt8 = ~0 << remainingBits
-            bitmaskData[codeEndIndex + fullBytes] |= mask
+            mutableBitmask[fullBytes] |= mask
         }
-        bitmask = bitmaskData
+        bitmask = mutableBitmask
 
         try buildMetadata()
 
@@ -195,7 +197,7 @@ public class ProgramCode {
         let byteIndex = Int(pc / 8)
         let bitIndex = Int(pc % 8)
 
-        guard byteIndex < bitmask.count else {
+        guard byteIndex >= 0, byteIndex < bitmask.count else {
             return false
         }
 
