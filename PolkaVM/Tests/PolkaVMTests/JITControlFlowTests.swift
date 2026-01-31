@@ -353,28 +353,25 @@ struct JITControlFlowTests {
         logger.info("LoadImmJumpInd result: \(result.exitReason), r2=\(result.register(Registers.Index(raw: 2)))")
     }
 
-    @Test("JIT vs Interpreter: LoadImmJumpInd parity", .disabled("LoadImmJumpInd not yet implemented in C++ JIT"))
+    @Test("JIT vs Interpreter: LoadImmJumpInd parity")
     func jitLoadImmJumpIndParity() async throws {
-        // Use same construction as jitLoadImmJumpInd
+        // Test LoadImmJumpInd with special encoding
+        // Format: [opcode][ra_rb_packed][value_bytes][offset_bytes]
+        // This is similar to LoadImmJump but uses packed registers instead of r_A|l_X
         var code = Data()
 
+        // First, set r0 = 0 (base register for jump)
+        code.append(PVMOpcodes.loadImm.rawValue) // LoadImm r0, 0
+        code.append(0x00) // r0
+        code.append(contentsOf: [0x00, 0x00, 0x00, 0x00])
+
+        // LoadImmJumpInd: r1 = 0x42, then jump to r0 + offset (8) = PC 8
         code.append(PVMOpcodes.loadImmJumpInd.rawValue) // LoadImmJumpInd
-        code.append(0x01) // r1
-        var target = UInt64(8)
-        while target > 0 {
-            var byte = UInt8(target & 0x7F)
-            target >>= 7
-            if target > 0 {
-                byte |= 0x80
-            }
-            code.append(byte)
-        }
+        code.append(0x01) // ra=1 (dest r1), rb=0 (base r0)
+        code.append(0x42) // value (1 byte)
+        code.append(8)    // offset (1 byte)
 
-        while code.count < 8 {
-            code.append(0x00)
-        }
-
-        code.append(PVMOpcodes.loadImm.rawValue) // Target: LoadImm r2, 0xBB
+        code.append(PVMOpcodes.loadImm.rawValue) // Target at PC 8: LoadImm r2, 0xBB
         code.append(0x02)
         code.append(contentsOf: [0xBB, 0x00, 0x00, 0x00])
 
@@ -407,7 +404,7 @@ struct JITControlFlowTests {
 
     // MARK: - Edge Cases
 
-    @Test("JIT: Jump to invalid target causes panic", .disabled("JIT compile-time validation needed - JIT doesn't validate branch targets, interpreter does"))
+    @Test("JIT: Jump to invalid target causes panic")
     func jitJumpInvalidTarget() async throws {
         // Jump to a non-basic-block location
         var code = Data()

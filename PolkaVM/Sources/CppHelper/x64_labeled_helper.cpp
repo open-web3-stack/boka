@@ -164,6 +164,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     uint32_t jitMemorySize,
     const uint32_t* _Nullable skipTable,   // NEW: instruction skip values
     size_t skipTableSize,                   // NEW: skip table size
+    const uint8_t* _Nullable bitmask,      // NEW: bitmask for instruction boundaries
+    size_t bitmaskSize,                    // NEW: bitmask size
     void* _Nullable * _Nonnull funcOut)
 {
     // Validate inputs
@@ -174,6 +176,20 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     if (!funcOut) {
         return 2; // Invalid output parameter
     }
+
+    // Helper lambda to check if a PC is at an instruction boundary using bitmask
+    // Per spec pvm.tex, instruction boundaries have bitmask bit 0 set
+    auto isInstructionBoundary = [&](uint32_t pc) -> bool {
+        if (!bitmask || pc >= codeSize) {
+            return false;
+        }
+        uint32_t byteIndex = pc / 8;
+        uint32_t bitIndex = pc % 8;
+        if (byteIndex >= bitmaskSize) {
+            return false;
+        }
+        return (bitmask[byteIndex] & (1 << bitIndex)) != 0;
+    };
 
     // Create lambda to get instruction size using skip table
     // This is the authoritative source for variable-length encoded instructions
@@ -262,10 +278,24 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         // Mark jump targets for all control flow instructions
         // This is necessary to handle backward jumps (loops) correctly
-        uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
-        if (targetPC != pc + instrSize) {
-            // This is a branch/jump instruction (not a fallthrough)
-            labelManager.markJumpTarget(targetPC);
+        // Only call getJumpTarget for actual branch/jump opcodes to avoid misinterpreting data
+        bool isBranchInstruction = opcode_is(opcode, Opcode::Jump) ||
+                                   (instrSize == 7) ||  // Branch register instructions
+                                   (instrSize == 14) || // Branch immediate instructions
+                                   opcode_is(opcode, Opcode::LoadImmJump) ||
+                                   opcode_is(opcode, Opcode::LoadImmJumpInd);
+
+        if (isBranchInstruction) {
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
+            if (targetPC != pc + instrSize) {
+                // This is a branch/jump instruction (not a fallthrough)
+                // VALIDATE: Check if target is at an instruction boundary
+                if (bitmask && !isInstructionBoundary(targetPC)) {
+                    fprintf(stderr, "[JIT] Invalid branch target: PC=%u is not at instruction boundary\n", targetPC);
+                    return 4; // Compilation error: invalid branch target
+                }
+                labelManager.markJumpTarget(targetPC);
+            }
         }
 
         pc += instrSize;
@@ -515,23 +545,26 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode_is(opcode, Opcode::LoadImmJumpInd)) {
-            // LoadImmJumpInd: [opcode][ra][rb][value_32bit][offset_32bit] = 11 bytes
-            uint8_t dest_reg = codeBuffer[pc + 1];
-            uint8_t base_reg = codeBuffer[pc + 2];
-            uint32_t immediate_X;
-            uint32_t immediate_Y;
-            memcpy(&immediate_X, &codeBuffer[pc + 3], 4);
-            memcpy(&immediate_Y, &codeBuffer[pc + 7], 4);
+            // LoadImmJumpInd: [opcode][ra_rb_packed][value_byte][offset_byte]
+            // ra = dest register (bits 0-3 of byte 1)
+            // rb = base register (bits 4-7 of byte 1)
+            // Note: This is a simplified format using 1-byte values
+            uint8_t packed_regs = codeBuffer[pc + 1];
+            uint8_t dest_reg = packed_regs & 0x0F;  // bits 0-3
+            uint8_t base_reg = (packed_regs >> 4) & 0x0F;  // bits 4-7
+
+            uint8_t value = codeBuffer[pc + 2];
+            uint8_t offset = codeBuffer[pc + 3];
 
             // Load immediate into destination register (zero-extended)
-            a.mov(x86::rax, immediate_X);
+            a.mov(x86::rax, value);
             a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
             // Load target address from base register
             a.mov(x86::eax, x86::dword_ptr(x86::rbx, base_reg * 8));
 
             // Add offset (zero-extend to 64-bit by loading into register first)
-            a.mov(x86::rcx, immediate_Y);
+            a.mov(x86::rcx, offset);
             a.add(x86::rax, x86::rcx);
 
             // Special case: check for halt address (0xFFFFFFFF)
@@ -627,6 +660,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.bind(dispatcherLoopNoJumpTable2);
             a.mov(x86::r15d, x86::eax);  // Update PC with target address
             a.jmp(dispatcherLoop);
+
+            pc += 4;  // opcode + packed_regs + value + offset
+            continue;
         }
 
         // === Ecalli (Host Call) ===
