@@ -232,6 +232,12 @@ final class ExecutorBackendJIT: ExecutorBackend {
     // to avoid passing Swift object header to C++ code
     private var jitHostFunctionTablePtr: UnsafeMutablePointer<JITHostFunctionTable>!
 
+    // Store page map bitmap memory to keep them alive during execution
+    // These are raw memory pointers allocated for the JIT code to access
+    private var readMapBitmap: UnsafeMutablePointer<UInt8>?
+    private var writeMapBitmap: UnsafeMutablePointer<UInt8>?
+    private let bitmapSize = (1 << 20) / 8  // 128KB - 2^20 bits / 8
+
     // Store the program code during execution for VMStateJIT
     private var currentProgramCode: ProgramCode?
 
@@ -288,7 +294,9 @@ final class ExecutorBackendJIT: ExecutorBackend {
             alignmentFactor: 0,
             dispatcherJumpTable: nil,
             dispatcherJumpTableSize: 0,
-            heapEnd: 0 // Initial value, will be set from StandardMemory before execution
+            heapEnd: 0, // Initial value, will be set from StandardMemory before execution
+            readMap: nil, // Initial value, will be set from StandardMemory before execution
+            writeMap: nil // Initial value, will be set from StandardMemory before execution
         ))
     }
 
@@ -299,6 +307,10 @@ final class ExecutorBackendJIT: ExecutorBackend {
         // Clean up heap-allocated struct
         jitHostFunctionTablePtr.deinitialize(count: 1)
         jitHostFunctionTablePtr.deallocate()
+
+        // Clean up page map bitmaps
+        readMapBitmap?.deallocate()
+        writeMapBitmap?.deallocate()
     }
 
     // Simple synchronous handler for host functions
@@ -733,6 +745,67 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         jitHostFunctionTablePtr.pointee.heapEnd = heapStart
                     }
 
+                    // Initialize memory protection page maps for bounds checking
+                    // Per PVM spec pvm.tex lines 137-147: memory access must be validated
+                    if let stdMem = initialMemory as? StandardMemory {
+                        // Allocate 128KB bitmaps for page-level access control
+                        // Each bitmap has 2^20 bits (1 bit per 4KB page for 2^32 address space)
+                        let pageSize = UInt32(config.pvmMemoryPageSize)  // 4096 bytes per page
+
+                        // Deallocate old bitmaps if they exist
+                        self.readMapBitmap?.deallocate()
+                        self.writeMapBitmap?.deallocate()
+
+                        // Allocate raw memory for bitmaps (stored in instance properties)
+                        self.readMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: bitmapSize)
+                        self.writeMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: bitmapSize)
+
+                        // Initialize to zero
+                        self.readMapBitmap!.initialize(repeating: 0, count: bitmapSize)
+                        self.writeMapBitmap!.initialize(repeating: 0, count: bitmapSize)
+
+                        // Initialize readMap based on memory zones
+                        // Per spec pvm.tex lines 770-797:
+                        // - Read-only zone: readable but not writable
+                        // - Heap zone: readable and writable
+                        // - Stack zone: readable and writable
+                        // - Argument zone: readable and writable
+                        for zone in stdMem.allZones {
+                            let zoneStartPage = zone.startAddress / pageSize
+                            let zoneEndPage = (zone.endAddress + pageSize - 1) / pageSize
+
+                            for page in zoneStartPage..<zoneEndPage {
+                                let byteIndex = Int(page / 8)
+                                let bitIndex = page % 8
+                                self.readMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
+                            }
+                        }
+
+                        // Initialize writeMap - heap, stack, argument zones are writable
+                        // Read-only zone is NOT writable
+                        for zone in [stdMem.heapZoneInfo, stdMem.stackZoneInfo, stdMem.argumentZoneInfo] {
+                            let zoneStartPage = zone.startAddress / pageSize
+                            let zoneEndPage = (zone.endAddress + pageSize - 1) / pageSize
+
+                            for page in zoneStartPage..<zoneEndPage {
+                                let byteIndex = Int(page / 8)
+                                let bitIndex = page % 8
+                                self.writeMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
+                            }
+                        }
+
+                        // Store bitmap pointers in JITHostFunctionTable
+                        jitHostFunctionTablePtr.pointee.readMap = self.readMapBitmap
+                        jitHostFunctionTablePtr.pointee.writeMap = self.writeMapBitmap
+
+                        logger.debug("Initialized page maps: \(bitmapSize) bytes each")
+                    } else {
+                        // No memory protection available (should not happen)
+                        jitHostFunctionTablePtr.pointee.readMap = nil
+                        jitHostFunctionTablePtr.pointee.writeMap = nil
+                        logger.warning("StandardMemory not available - memory protection disabled")
+                    }
+
                     // Execute the JIT-compiled function while jumpTableData pointer is valid
                     // The JIT function will use our syncHostCallHandler via the C trampoline
                     return try jitExecutor.execute(
@@ -762,6 +835,58 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 // Get initial heap end from StandardMemory to match interpreter behavior
                 if let stdMem = initialMemory as? StandardMemory {
                     jitHostFunctionTablePtr.pointee.heapEnd = stdMem.heapEnd
+
+                    // Initialize memory protection page maps for bounds checking
+                    // Per PVM spec pvm.tex lines 137-147: memory access must be validated
+                    let pageSize = UInt32(config.pvmMemoryPageSize)  // 4096 bytes per page
+
+                    // Deallocate old bitmaps if they exist
+                    self.readMapBitmap?.deallocate()
+                    self.writeMapBitmap?.deallocate()
+
+                    // Allocate raw memory for bitmaps (stored in instance properties)
+                    self.readMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: bitmapSize)
+                    self.writeMapBitmap = UnsafeMutablePointer<UInt8>.allocate(capacity: bitmapSize)
+
+                    // Initialize to zero
+                    self.readMapBitmap!.initialize(repeating: 0, count: bitmapSize)
+                    self.writeMapBitmap!.initialize(repeating: 0, count: bitmapSize)
+
+                    // Initialize readMap based on memory zones
+                    // Per spec pvm.tex lines 770-797:
+                    // - Read-only zone: readable but not writable
+                    // - Heap zone: readable and writable
+                    // - Stack zone: readable and writable
+                    // - Argument zone: readable and writable
+                    for zone in stdMem.allZones {
+                        let zoneStartPage = zone.startAddress / pageSize
+                        let zoneEndPage = (zone.endAddress + pageSize - 1) / pageSize
+
+                        for page in zoneStartPage..<zoneEndPage {
+                            let byteIndex = Int(page / 8)
+                            let bitIndex = page % 8
+                            self.readMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
+                        }
+                    }
+
+                    // Initialize writeMap - heap, stack, argument zones are writable
+                    // Read-only zone is NOT writable
+                    for zone in [stdMem.heapZoneInfo, stdMem.stackZoneInfo, stdMem.argumentZoneInfo] {
+                        let zoneStartPage = zone.startAddress / pageSize
+                        let zoneEndPage = (zone.endAddress + pageSize - 1) / pageSize
+
+                        for page in zoneStartPage..<zoneEndPage {
+                            let byteIndex = Int(page / 8)
+                            let bitIndex = page % 8
+                            self.writeMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
+                        }
+                    }
+
+                    // Store bitmap pointers in JITHostFunctionTable
+                    jitHostFunctionTablePtr.pointee.readMap = self.readMapBitmap
+                    jitHostFunctionTablePtr.pointee.writeMap = self.writeMapBitmap
+
+                    logger.debug("Initialized page maps: \(bitmapSize) bytes each")
                 } else {
                     // Fallback: use heap zone start address from config
                     // This should not happen in normal operation
@@ -770,6 +895,11 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     let Z = StandardProgram.alignToZoneSize
                     let heapStart = 2 * ZZ + Z(UInt32(standardProgram.code.code.count), config)
                     jitHostFunctionTablePtr.pointee.heapEnd = heapStart
+
+                    // No memory protection available
+                    jitHostFunctionTablePtr.pointee.readMap = nil
+                    jitHostFunctionTablePtr.pointee.writeMap = nil
+                    logger.warning("StandardMemory not available - memory protection disabled")
                 }
 
                 // Execute without jump table

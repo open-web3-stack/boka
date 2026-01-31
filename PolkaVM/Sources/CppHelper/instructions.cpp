@@ -770,6 +770,92 @@ bool jit_emit_load_u64(
     return false;
 }
 
+// Helper: Emit bounds checking for memory access (x86_64)
+// This function generates code to check if a memory access is valid
+// Per PVM spec pvm.tex lines 137-147:
+// - First 64KB (2^16 bytes) must cause immediate panic
+// - Other addresses checked against readMap/writeMap bitmaps
+//
+// On fault: generates trap and returns
+// Preserves: all caller registers except RAX, RCX, R10, R11
+static bool emit_bounds_check_x64(
+    void* _Nonnull assembler,
+    x86::Gp addr_reg,       // Register containing address to check (will be preserved)
+    bool is_write)          // true for write, false for read
+{
+    using namespace asmjit;
+    auto* a = static_cast<x86::Assembler*>(assembler);
+
+    // Save the address register if it's not one of our scratch registers
+    bool needs_save = (addr_reg.id() != x86::rax.id() &&
+                       addr_reg.id() != x86::rcx.id() &&
+                       addr_reg.id() != x86::r10.id() &&
+                       addr_reg.id() != x86::r11.id());
+
+    if (needs_save) {
+        a->push(x86::rax);  // Save RAX to use as scratch
+    }
+
+    // Move address to RAX for calculation (if not already there)
+    if (addr_reg.id() != x86::rax.id()) {
+        a->mov(x86::rax, addr_reg);
+    }
+
+    // Check if address < 64KB (2^16) - immediate panic per spec
+    Label pass_check = a->new_label();
+    a->cmp(x86::rax, 0x10000);  // Compare with 64KB
+    a->jae(pass_check);         // Skip to check if >= 64KB
+
+    // Address < 64KB - immediate panic
+    a->mov(x86::eax, -1);       // Exit reason: trap
+    a->ret();                   // Return to dispatcher
+    a->bind(pass_check);
+
+    // Get readMap or writeMap from JITHostFunctionTable (R9)
+    a->mov(x86::rcx, x86::qword_ptr(x86::r9, is_write
+        ? offsetof(JITHostFunctionTable, writeMap)
+        : offsetof(JITHostFunctionTable, readMap)));
+
+    // Check if bitmap is null (no protection - skip check)
+    a->test(x86::rcx, x86::rcx);
+    Label bitmap_valid = a->new_label();
+    a->jnz(bitmap_valid);       // Continue if bitmap not null
+    Label skip_bounds_check = a->new_label();
+    a->jmp(skip_bounds_check);  // Skip if no protection
+    a->bind(bitmap_valid);
+
+    // Calculate page index: addr / 4096 = addr >> 12
+    a->mov(x86::r11, x86::rax);  // r11 = address
+    a->shr(x86::r11, 12);         // r11 = page number
+
+    // Calculate byte index and bit index
+    // byteIndex = page / 8, bitIndex = page % 8
+    a->mov(x86::r10, x86::r11);  // r10 = page number
+    a->shr(x86::r10, 3);         // r10 = byte index
+    a->and_(x86::r11, 0x7);      // r11 = bit index
+
+    // Load bitmap byte
+    a->movzx(x86::eax, x86::byte_ptr(x86::rcx, x86::r10));
+
+    // Test the bit
+    a->bt(x86::eax, x86::r11);
+
+    // If carry flag set, page is accessible -> continue
+    a->jc(skip_bounds_check);
+
+    // Page not accessible - trap
+    a->mov(x86::eax, -1);   // Exit reason: trap
+    a->ret();               // Return to dispatcher
+
+    a->bind(skip_bounds_check);
+
+    if (needs_save) {
+        a->pop(x86::rax);  // Restore RAX
+    }
+
+    return true;
+}
+
 // LoadU8Direct: Load unsigned 8-bit from memory (direct addressing)
 bool jit_emit_load_u8_direct(
     void* _Nonnull assembler,
@@ -784,6 +870,9 @@ bool jit_emit_load_u8_direct(
 
         // Load address immediate into temp register
         a->mov(x86::rax, address);
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
 
         // Load unsigned byte from memory at [VM_MEMORY_PTR + address]
         a->movzx(x86::eax, x86::byte_ptr(x86::r12, x86::rax));
@@ -3093,6 +3182,26 @@ bool jit_emit_sbrk(
 
     // Store prevHeapEnd in dest register
     a->mov(x86::qword_ptr(x86::rdi, dest_reg * 8), x86::r11);
+
+    // Update page maps to mark new heap pages as readable and writable
+    // Call: pvm_update_page_map(ctx, prevHeapEnd, size, readable=true, writable=true)
+    // Arguments (System V AMD64 ABI): RDI=ctx, RSI=start, RDX=size, RCX=readable, R8=writable
+
+    // Save temp registers we're about to clobber
+    a->push(x86::r11);  // Save prevHeapEnd
+
+    a->mov(x86::rdi, x86::r9);              // RDI = JITHostFunctionTable* (ctx)
+    a->mov(x86::rsi, x86::r11);             // RSI = prevHeapEnd (start address)
+    a->mov(x86::rdx, x86::r10);             // RDX = size
+    a->mov(x86::rcx, 1);                    // RCX = readable (true)
+    a->mov(x86::r8, 1);                     // R8 = writable (true)
+
+    // Call pvm_update_page_map
+    a->mov(x86::rax, reinterpret_cast<uint64_t>(&pvm_update_page_map));
+    a->call(x86::rax);
+
+    // Restore temp registers
+    a->pop(x86::r11);
 
     return true;
 }
