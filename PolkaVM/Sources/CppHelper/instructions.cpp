@@ -837,31 +837,146 @@ bool jit_emit_load_u64(
     return false;
 }
 
+// ============================================================================
 // Helper: Emit bounds checking for memory access (x86_64)
 // This function generates code to check if a memory access is valid
 // Per PVM spec pvm.tex lines 137-147:
 // - First 64KB (2^16 bytes) must cause immediate panic
-// - Other addresses checked against readMap/writeMap bitmaps
+// - Other addresses checked against memory_size
+// - Access permissions checked via readMap/writeMap bitmaps
 //
-// On fault: generates trap and returns
-// Preserves: all caller registers except RAX, RCX, R10, R11
+// On fault: sets exit code in EAX and returns to dispatcher
+// Preserves: address register (if not RAX), RBX, R12, R13, R14, R15
+// Clobbers: RAX, RCX, R10, R11
+// ============================================================================
+
 static bool emit_bounds_check_x64(
     void* _Nonnull assembler,
     x86::Gp addr_reg,       // Register containing address to check (will be preserved)
     bool is_write)          // true for write, false for read
 {
-    // TEMPORARILY DISABLE ALL BOUNDS CHECKS
+    using namespace asmjit;
+    auto* a = static_cast<x86::Assembler*>(assembler);
+
+    // Save address register if it's not RAX (we need RAX for exit codes)
+    bool needs_save = (addr_reg.id() != x86::rax.id());
+    if (needs_save) {
+        a->push(x86::rax);  // Save RAX
+        a->mov(x86::rax, addr_reg);  // Move address to RAX for checking
+    }
+
+    // ============================================================================
+    // Check 1: Address < 64KB (2^16) -> immediate panic
+    // ============================================================================
+    Label pass_64kb_check = a->new_label();
+    a->mov(x86::r10, 0x10000);      // R10 = 64KB
+    a->cmp(x86::rax, x86::r10);     // Compare address with 64KB
+    a->jae(pass_64kb_check);        // Skip to next check if >= 64KB
+
+    // Address < 64KB -> panic
+    // ExitReason.panic = -1
+    if (needs_save) {
+        a->pop(x86::rcx);  // Restore saved RAX into RCX (we don't need it)
+    }
+    a->mov(x86::eax, -1);  // Exit code: panic (-1)
+    a->ret();              // Return to dispatcher
+
+    a->bind(pass_64kb_check);
+
+    // ============================================================================
+    // Check 2: Address >= memory_size -> page fault
+    // ============================================================================
+    Label pass_size_check = a->new_label();
+    a->cmp(x86::rax, x86::r13);     // Compare address with memory_size (in R13)
+    a->jb(pass_size_check);         // Skip to bitmap check if < memory_size
+
+    // Address >= memory_size -> page fault
+    // Save faulting address to VM register R0, then exit
+    a->mov(x86::qword_ptr(x86::rbx, 0), x86::rax);  // Save address to VM R0
+    if (needs_save) {
+        a->pop(x86::rcx);  // Restore saved RAX into RCX
+    }
+    a->mov(x86::eax, 3);   // Exit code: pageFault (3)
+    a->ret();              // Return to dispatcher
+
+    a->bind(pass_size_check);
+
+    // ============================================================================
+    // Check 3: Bitmap check for access permissions
+    // ============================================================================
+    // Load bitmap pointer from JITHostFunctionTable (RBP)
+    constexpr size_t readMapOffset = offsetof(JITHostFunctionTable, readMap);
+    constexpr size_t writeMapOffset = offsetof(JITHostFunctionTable, writeMap);
+
+    if (is_write) {
+        a->mov(x86::r10, x86::qword_ptr(x86::rbp, writeMapOffset));
+    } else {
+        a->mov(x86::r10, x86::qword_ptr(x86::rbp, readMapOffset));
+    }
+
+    // Check if bitmap is null (no memory zones configured)
+    Label pass_bitmap_check = a->new_label();
+    a->test(x86::r10, x86::r10);
+    a->jz(pass_bitmap_check);  // If null, skip bitmap check (allow access)
+
+    // Calculate page index: address / 4096 = address >> 12
+    a->mov(x86::r11, x86::rax);   // R11 = address
+    a->shr(x86::r11, 12);         // R11 = page number
+
+    // Calculate byte index: page / 8 = page >> 3
+    a->mov(x86::rcx, x86::r11);   // RCX = page number
+    a->shr(x86::rcx, 3);          // RCX = byte index
+
+    // Calculate bit index: page % 8 = page & 0x7
+    a->and_(x86::r11d, 0x7);      // R11D = bit index (0-7)
+
+    // Load bitmap byte
+    a->movzx(x86::r10d, x86::byte_ptr(x86::r10, x86::rcx));
+
+    // Test the bit using BT instruction (tests bit N in R/M)
+    // BT r/m32, r32 -> test bit at offset r11 in r10d
+    a->bt(x86::r10d, x86::r11);   // Test bit at position R11 in R10D
+
+    // If bit is set, page is accessible -> continue
+    Label bitmap_fail = a->new_label();
+    a->jnc(bitmap_fail);          // Jump if carry clear (bit is 0)
+
+    a->bind(pass_bitmap_check);
+    // All checks passed -> restore and continue
+    if (needs_save) {
+        a->pop(x86::rax);  // Restore RAX
+    }
     return true;
+
+    a->bind(bitmap_fail);
+    // Bitmap check failed -> page fault
+    a->mov(x86::qword_ptr(x86::rbx, 0), x86::rax);  // Save address to VM R0
+    if (needs_save) {
+        a->pop(x86::rcx);  // Restore saved RAX into RCX
+    }
+    a->mov(x86::eax, 3);   // Exit code: pageFault (3)
+    a->ret();              // Return to dispatcher
 }
 
+// ============================================================================
 // Helper: Emit bounds checking for memory access (ARM64)
 // This function generates code to check if a memory access is valid
 // Per PVM spec pvm.tex lines 137-147:
 // - First 64KB (2^16 bytes) must cause immediate panic
-// - Other addresses checked against readMap/writeMap bitmaps
+// - Other addresses checked against memory_size
+// - Access permissions checked via readMap/writeMap bitmaps
 //
-// On fault: generates trap and returns
-// Preserves: all caller registers except X0, X1, X2, X3, X4
+// ARM64 register layout:
+// - X19 = VM_REGISTERS_PTR
+// - X20 = VM_MEMORY_PTR
+// - W21 = memory_size
+// - X24 = JITHostFunctionTable*
+//
+// On fault: sets exit code in W0 and returns to dispatcher
+// Preserves: address register (if not X0), X19, X20, X21, X22, X23, X25-X28
+// Clobbers: X0-X5
+// ============================================================================
+
 static bool emit_bounds_check_aarch64(
     void* _Nonnull assembler,
     a64::Gp addr_reg,       // Register containing address to check (will be preserved)
@@ -870,74 +985,95 @@ static bool emit_bounds_check_aarch64(
     using namespace asmjit;
     auto* a = static_cast<a64::Assembler*>(assembler);
 
-    // TEMPORARILY DISABLE ALL BOUNDS CHECKS
-    return true;
-
-    // Check if address < 64KB (2^16) - immediate panic per spec
-    Label pass_check = a->new_label();
-    a->mov(a64::x1, 0x10000);       // Load 64KB into X1
-    a->cmp(temp_addr, a64::x1);     // Compare with 64KB
-    a->b_ge(pass_check);            // Skip to check if >= 64KB
-
-    // Address < 64KB - page fault with address
-    // ExitReason.pageFault encodes as: 7 + (address << 32)
-    a->mov(a64::x5, temp_addr);     // X5 = original address
-    a->mov(a64::w0, 7);             // W0 = 7 (pageFault code)
-    a->lsl(a64::x5, a64::x5, 32);   // X5 = address << 32
-    a->orr(a64::x0, a64::x0, a64::x5); // X0 = 7 | (address << 32)
-    a->ret(a64::x30);               // Return to dispatcher
-    a->bind(pass_check);
-
-    // Get JITHostFunctionTable* from X21
-    // Get readMap or writeMap offset
-    if (is_write) {
-        a->ldr(temp_map, a64::ptr(a64::x21, offsetof(JITHostFunctionTable, writeMap)));
-    } else {
-        a->ldr(temp_map, a64::ptr(a64::x21, offsetof(JITHostFunctionTable, readMap)));
+    // Save address register if it's not X0 (we need X0 for exit codes)
+    bool needs_save = (addr_reg.id() != a64::x0.id());
+    if (needs_save) {
+        a->mov(a64::x5, addr_reg);  // Save original address to X5
     }
 
-    // TODO: Fix bitmap checking - temporarily disabled
-    Label skip_bitmap_check = a->new_label();
-    a->b(skip_bitmap_check);  // Always skip for now
+    // Use X0 as the address register for checking
+    a64::Gp addr = needs_save ? a64::x5 : addr_reg;
 
-    // Calculate page index: addr / 4096 = addr >> 12
-    a->lsr(temp_byte, temp_addr, 12);  // temp_byte = page number
+    // ============================================================================
+    // Check 1: Address < 64KB (2^16) -> immediate panic
+    // ============================================================================
+    Label pass_64kb_check = a->new_label();
+    a->mov(a64::x1, 0x10000);       // X1 = 64KB
+    a->cmp(addr.w(), a64::w1);      // Compare address with 64KB
+    a->b_hs(pass_64kb_check);       // Skip to next check if >= 64KB (unsigned >=)
 
-    // Calculate byte index and bit index
-    // byteIndex = page / 8, bitIndex = page % 8
-    a->mov(temp_bit, temp_byte);       // temp_bit = page number
-    a->lsr(temp_byte, temp_byte, 3);   // temp_byte = byte index
-    a->and_(temp_bit, temp_bit, 0x7);  // temp_bit = bit index
+    // Address < 64KB -> panic
+    // ExitReason.panic = -1
+    a->mov(a64::w0, -1);            // Exit code: panic (-1)
+    a->ret(a64::x30);               // Return to dispatcher
+
+    a->bind(pass_64kb_check);
+
+    // ============================================================================
+    // Check 2: Address >= memory_size -> page fault
+    // ============================================================================
+    Label pass_size_check = a->new_label();
+    a->cmp(addr.w(), a64::w21);     // Compare address with memory_size (in W21)
+    a->b_lo(pass_size_check);       // Skip to bitmap check if < memory_size (unsigned <)
+
+    // Address >= memory_size -> page fault
+    // Save faulting address to VM register R0, then exit
+    a->str(addr, a64::ptr(a64::x19, 0));  // Save address to VM R0
+    a->mov(a64::w0, 3);             // Exit code: pageFault (3)
+    a->ret(a64::x30);               // Return to dispatcher
+
+    a->bind(pass_size_check);
+
+    // ============================================================================
+    // Check 3: Bitmap check for access permissions
+    // ============================================================================
+    // Load bitmap pointer from JITHostFunctionTable (X24)
+    constexpr size_t readMapOffset = offsetof(JITHostFunctionTable, readMap);
+    constexpr size_t writeMapOffset = offsetof(JITHostFunctionTable, writeMap);
+
+    if (is_write) {
+        a->ldr(a64::x1, a64::ptr(a64::x24, writeMapOffset));
+    } else {
+        a->ldr(a64::x1, a64::ptr(a64::x24, readMapOffset));
+    }
+
+    // Check if bitmap is null (no memory zones configured)
+    Label pass_bitmap_check = a->new_label();
+    a->cbz(a64::x1, pass_bitmap_check);  // If null, skip bitmap check (allow access)
+
+    // Calculate page index: address / 4096 = address >> 12
+    a->lsr(a64::x2, addr, 12);        // X2 = page number
+
+    // Calculate byte index: page / 8 = page >> 3
+    a->lsr(a64::x3, a64::x2, 3);      // X3 = byte index
+
+    // Calculate bit index: page % 8 = page & 0x7
+    a->and_(a64::w2, a64::w2, 0x7);   // W2 = bit index (0-7)
 
     // Load bitmap byte
-    a->ldrb(temp_bitmap.w(), a64::ptr(temp_map, temp_byte));
+    a->ldrb(a64::w4, a64::ptr(a64::x1, a64::x3));
 
-    // Test the bit
-    a->lsr(temp_bitmap, temp_bitmap, temp_bit);  // Shift bit to position 0
-    a->tst(temp_bitmap, 1);                     // Test bit 0
+    // Test the bit using LSL + TST (shift left by bit index and test)
+    // We need to test bit at position W2 in W4
+    // ARM64 doesn't have variable-position bit test like x86 BT
+    // So we use: (1 << bit_index) & bitmap_byte
+    a->mov(a64::x3, 1);
+    a->lsl(a64::x3, a64::x3, a64::x2);  // X3 = 1 << bit_index
+    a->tst(a64::x4, a64::x3);            // Test if bit is set
 
     // If bit is set, page is accessible -> continue
-    a->b_ne(pass_check);             // Branch if not equal (bit is set)
+    Label bitmap_fail = a->new_label();
+    a->b_eq(bitmap_fail);             // Branch if equal (bit is 0, not accessible)
 
-    // Page not accessible - page fault with address
-    // ExitReason.pageFault encodes as: 7 + (address << 32)
-    a->mov(a64::w0, 7);             // Exit reason: pageFault (7)
-    a->mov(a64::x5, temp_addr);     // X5 = original address (saved at stack offset 0)
-    a->lsl(a64::x5, a64::x5, 32);   // X5 = address << 32
-    a->orr(a64::x0, a64::x0, a64::x5); // X0 = 7 | (address << 32)
-    a->ret(a64::x30);                // Return to dispatcher
-    a->bind(pass_check);
-    a->bind(skip_bitmap_check);
-
-    // Restore original address register if needed
-    if (needs_save) {
-        if (addr_reg.id() != a64::x0.id()) {
-            a->ldr(addr_reg, a64::ptr(a64::sp, 0));
-        }
-        a->add(a64::sp, a64::sp, 16);  // Restore stack pointer
-    }
-
+    a->bind(pass_bitmap_check);
+    // All checks passed -> continue with memory access
     return true;
+
+    a->bind(bitmap_fail);
+    // Bitmap check failed -> page fault
+    a->str(addr, a64::ptr(a64::x19, 0));  // Save address to VM R0
+    a->mov(a64::w0, 3);             // Exit code: pageFault (3)
+    a->ret(a64::x30);               // Return to dispatcher
 }
 
 // LoadU8Direct: Load unsigned 8-bit from memory (direct addressing)
