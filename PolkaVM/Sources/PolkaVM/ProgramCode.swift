@@ -191,7 +191,7 @@ public class ProgramCode {
 
     /// Check if a PC position is at an instruction boundary
     /// Per spec, instruction boundaries are marked by bit 0 being set in the bitmask
-    internal func isInstructionBoundary(_ pc: UInt32) -> Bool {
+    public func isInstructionBoundary(_ pc: UInt32) -> Bool {
         let byteIndex = Int(pc / 8)
         let bitIndex = Int(pc % 8)
 
