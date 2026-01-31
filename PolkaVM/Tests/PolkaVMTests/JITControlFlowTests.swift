@@ -407,7 +407,7 @@ struct JITControlFlowTests {
 
     // MARK: - Edge Cases
 
-    @Test("JIT: Jump to invalid target causes panic", .disabled("Branch validation bug - isBranchValid doesn't check instruction boundaries"))
+    @Test("JIT: Jump to invalid target causes panic", .disabled("JIT compile-time validation needed - JIT doesn't validate branch targets, interpreter does"))
     func jitJumpInvalidTarget() async throws {
         // Jump to a non-basic-block location
         var code = Data()
@@ -476,5 +476,55 @@ struct JITControlFlowTests {
 
         // Should halt successfully
         JITTestAssertions.assertExitReason(result, equals: .halt)
+    }
+
+    @Test("Interpreter: Branch validation using bitmask")
+    func interpreterBranchValidation() async throws {
+        // Test that interpreter validates branch targets using bitmask
+        // Create: Jump -> LoadImm -> Halt
+        // Jump targets PC=3 (middle of LoadImm, NOT instruction boundary)
+
+        var code = Data()
+
+        // Jump at PC=0: [opcode][offset_32bit] = 5 bytes
+        code.append(PVMOpcodes.jump.rawValue)
+        let jumpOffset = Int32(3) // Jump to PC=3 (invalid)
+        code.append(contentsOf: withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) })
+
+        // LoadImm at PC=5: [opcode][reg][varint] = 3+ bytes
+        code.append(PVMOpcodes.loadImm.rawValue)
+        code.append(0x01) // r1
+        code.append(0x2A) // immediate 42
+
+        // Halt at PC=8
+        code.append(PVMOpcodes.halt.rawValue)
+
+        // Use createProgramCodeBlob which returns just ProgramCode (not StandardProgram)
+        let codeBlob = ProgramBlobBuilder.createProgramCodeBlob(Array(code))
+        let program = try ProgramCode(codeBlob)
+
+        // Verify bitmask correctly identifies instruction boundaries
+        #expect(program.isInstructionBoundary(0), "PC=0 (Jump) should be boundary")
+        #expect(!program.isInstructionBoundary(3), "PC=3 (middle of LoadImm) should NOT be boundary")
+        #expect(program.isInstructionBoundary(5), "PC=5 (LoadImm) should be boundary")
+        #expect(program.isInstructionBoundary(8), "PC=8 (Halt) should be boundary")
+
+        // Execute - Jump to PC=3 should panic
+        let memory = try GeneralMemory(pageMap: [], chunks: [])
+        let vmState = VMStateInterpreter(
+            program: program,
+            pc: 0,
+            registers: Registers([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            gas: Gas(10000),
+            memory: memory
+        )
+        let engine = Engine(config: DefaultPvmConfig())
+        let exitReason = await engine.execute(state: vmState)
+
+        // Should panic due to invalid branch target
+        #expect(
+            exitReason == .panic(.invalidBranch),
+            "Jump to PC=3 (invalid) should panic: got \(exitReason)"
+        )
     }
 }

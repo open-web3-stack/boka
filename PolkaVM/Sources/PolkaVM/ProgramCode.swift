@@ -24,7 +24,7 @@ public class ProgramCode {
     public let jumpTableEntrySize: UInt8
     public let jumpTable: Data
     public let code: Data
-    private let bitmask: Data
+    internal let bitmask: Data
 
     // parsed stuff
     public private(set) var basicBlockIndices: Set<UInt32> = []
@@ -187,6 +187,20 @@ public class ProgramCode {
 
     public func skip(_ pc: UInt32) -> UInt32 {
         ProgramCode.skip(start: pc, bitmask: bitmask)
+    }
+
+    /// Check if a PC position is at an instruction boundary
+    /// Per spec, instruction boundaries are marked by bit 0 being set in the bitmask
+    internal func isInstructionBoundary(_ pc: UInt32) -> Bool {
+        let byteIndex = Int(pc / 8)
+        let bitIndex = Int(pc % 8)
+
+        guard byteIndex < bitmask.count else {
+            return false
+        }
+
+        let byte = bitmask[byteIndex]
+        return (byte & (1 << bitIndex)) != 0
     }
 
     /// Extract all skip values as an array for JIT compilation
