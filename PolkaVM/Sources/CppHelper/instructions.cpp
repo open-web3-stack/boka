@@ -922,6 +922,9 @@ bool jit_emit_load_i8_direct(
         // Load address immediate into temp register
         a->mov(x86::rax, address);
 
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
+
         // Load signed byte from memory at [VM_MEMORY_PTR + address] with sign extension
         a->movsx(x86::rax, x86::byte_ptr(x86::r12, x86::rax));
 
@@ -1015,6 +1018,9 @@ bool jit_emit_load_i16_direct(
         // Load address immediate into temp register
         a->mov(x86::rax, address);
 
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
+
         // Load signed word from memory at [VM_MEMORY_PTR + address] with sign extension
         a->movsx(x86::rax, x86::word_ptr(x86::r12, x86::rax));
 
@@ -1059,6 +1065,9 @@ bool jit_emit_load_u32_direct(
 
         // Load address immediate into temp register
         a->mov(x86::rax, address);
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
 
         // Load unsigned dword from memory at [VM_MEMORY_PTR + address]
         a->mov(x86::eax, x86::dword_ptr(x86::r12, x86::rax));
@@ -1108,6 +1117,9 @@ bool jit_emit_load_i32_direct(
         // Load address immediate into temp register
         a->mov(x86::rax, address);
 
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
+
         // Load signed dword from memory at [VM_MEMORY_PTR + address] with sign extension
         a->movsx(x86::rax, x86::dword_ptr(x86::r12, x86::rax));
 
@@ -1152,6 +1164,9 @@ bool jit_emit_load_u64_direct(
 
         // Load address immediate into temp register
         a->mov(x86::rax, address);
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
 
         // Load qword from memory at [VM_MEMORY_PTR + address]
         a->mov(x86::rax, x86::qword_ptr(x86::r12, x86::rax));
@@ -1386,6 +1401,9 @@ bool jit_emit_store_u8_direct(
         // Load address immediate into temp register
         a->mov(x86::rax, address);
 
+        // Bounds check: verify address is writable
+        emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
+
         // Load source register from VM array
         a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
@@ -1428,6 +1446,9 @@ bool jit_emit_store_u16_direct(
 
         // Load address immediate into temp register
         a->mov(x86::rax, address);
+
+        // Bounds check: verify address is writable
+        emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
 
         // Load source register from VM array
         a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
@@ -1472,6 +1493,9 @@ bool jit_emit_store_u32_direct(
         // Load address immediate into temp register
         a->mov(x86::rax, address);
 
+        // Bounds check: verify address is writable
+        emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
+
         // Load source register from VM array
         a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
@@ -1514,6 +1538,9 @@ bool jit_emit_store_u64_direct(
 
         // Load address immediate into temp register
         a->mov(x86::rax, address);
+
+        // Bounds check: verify address is writable
+        emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
 
         // Load source register from VM array
         a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
