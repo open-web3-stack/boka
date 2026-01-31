@@ -511,6 +511,12 @@ bool jit_emit_mul_32(
     return false;
 }
 
+// Forward declaration for bounds checking helper
+static bool emit_bounds_check_x64(
+    void* _Nonnull assembler,
+    asmjit::x86::Gp addr_reg,
+    bool is_write);
+
 // ============================================================================
 // MEMORY ACCESS INSTRUCTIONS
 // NOTE: These functions perform DIRECT memory access without bounds checking.
@@ -535,8 +541,16 @@ bool jit_emit_load_u8(
         // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
         a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
+        // Add offset to get final address
+        if (offset != 0) {
+            a->add(x86::rax, offset);
+        }
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
+
         // Load unsigned byte from memory at [VM_MEMORY_PTR + ptr + offset]
-        a->movzx(x86::eax, x86::byte_ptr(x86::r12, x86::rax, 1, offset));
+        a->movzx(x86::eax, x86::byte_ptr(x86::r12, x86::rax));
 
         // Zero-extend and store to VM register array
         a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
@@ -587,8 +601,16 @@ bool jit_emit_load_i8(
         // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
         a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
-        // Load signed byte from memory at [VM_MEMORY_PTR + ptr + offset] with sign extension
-        a->movsx(x86::rax, x86::byte_ptr(x86::r12, x86::rax, 1, offset));
+        // Add offset to get final address
+        if (offset != 0) {
+            a->add(x86::rax, offset);
+        }
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
+
+        // Load signed byte from memory at [VM_MEMORY_PTR + ptr] with sign extension
+        a->movsx(x86::rax, x86::byte_ptr(x86::r12, x86::rax));
 
         // Store to VM register array
         a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
@@ -636,8 +658,16 @@ bool jit_emit_load_u16(
         // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
         a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
-        // Load unsigned word from memory at [VM_MEMORY_PTR + ptr + offset]
-        a->movzx(x86::eax, x86::word_ptr(x86::r12, x86::rax, 1, offset));
+        // Add offset to get final address
+        if (offset != 0) {
+            a->add(x86::rax, offset);
+        }
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
+
+        // Load unsigned word from memory at [VM_MEMORY_PTR + ptr]
+        a->movzx(x86::eax, x86::word_ptr(x86::r12, x86::rax));
 
         // Zero-extend and store to VM register array
         a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
@@ -688,8 +718,16 @@ bool jit_emit_load_i16(
         // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
         a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
-        // Load signed word from memory at [VM_MEMORY_PTR + ptr + offset] with sign extension
-        a->movsx(x86::rax, x86::word_ptr(x86::r12, x86::rax, 1, offset));
+        // Add offset to get final address
+        if (offset != 0) {
+            a->add(x86::rax, offset);
+        }
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
+
+        // Load signed word from memory at [VM_MEMORY_PTR + ptr] with sign extension
+        a->movsx(x86::rax, x86::word_ptr(x86::r12, x86::rax));
 
         // Store to VM register array
         a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
@@ -737,8 +775,16 @@ bool jit_emit_load_u64(
         // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
         a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
-        // Load qword from memory at [VM_MEMORY_PTR + ptr + offset]
-        a->mov(x86::rax, x86::qword_ptr(x86::r12, x86::rax, 1, offset));
+        // Add offset to get final address
+        if (offset != 0) {
+            a->add(x86::rax, offset);
+        }
+
+        // Bounds check: verify address is readable
+        emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
+
+        // Load qword from memory at [VM_MEMORY_PTR + ptr]
+        a->mov(x86::rax, x86::qword_ptr(x86::r12, x86::rax));
 
         // Store to VM register array
         a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
@@ -1214,11 +1260,19 @@ bool jit_emit_store_u8(
         // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
         a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
+        // Add offset to get final address
+        if (offset != 0) {
+            a->add(x86::rax, offset);
+        }
+
+        // Bounds check: verify address is writable
+        emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
+
         // Load source register from VM array
         a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
-        // Store byte to memory at [VM_MEMORY_PTR + ptr + offset]
-        a->mov(x86::byte_ptr(x86::r12, x86::rax, 1, offset), x86::dl);
+        // Store byte to memory at [VM_MEMORY_PTR + ptr]
+        a->mov(x86::byte_ptr(x86::r12, x86::rax), x86::dl);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -1261,11 +1315,19 @@ bool jit_emit_store_u16(
         // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
         a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
+        // Add offset to get final address
+        if (offset != 0) {
+            a->add(x86::rax, offset);
+        }
+
+        // Bounds check: verify address is writable
+        emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
+
         // Load source register from VM array
         a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
-        // Store word to memory at [VM_MEMORY_PTR + ptr + offset]
-        a->mov(x86::word_ptr(x86::r12, x86::rax, 1, offset), x86::dx);
+        // Store word to memory at [VM_MEMORY_PTR + ptr]
+        a->mov(x86::word_ptr(x86::r12, x86::rax), x86::dx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -1308,11 +1370,19 @@ bool jit_emit_store_u32(
         // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
         a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
+        // Add offset to get final address
+        if (offset != 0) {
+            a->add(x86::rax, offset);
+        }
+
+        // Bounds check: verify address is writable
+        emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
+
         // Load source register from VM array
         a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
-        // Store dword to memory at [VM_MEMORY_PTR + ptr + offset]
-        a->mov(x86::dword_ptr(x86::r12, x86::rax, 1, offset), x86::edx);
+        // Store dword to memory at [VM_MEMORY_PTR + ptr]
+        a->mov(x86::dword_ptr(x86::r12, x86::rax), x86::edx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -1355,11 +1425,19 @@ bool jit_emit_store_u64(
         // Load pointer register from VM array (VM_REGISTERS_PTR in rbx)
         a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
+        // Add offset to get final address
+        if (offset != 0) {
+            a->add(x86::rax, offset);
+        }
+
+        // Bounds check: verify address is writable
+        emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
+
         // Load source register from VM array
         a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
-        // Store qword to memory at [VM_MEMORY_PTR + ptr + offset]
-        a->mov(x86::qword_ptr(x86::r12, x86::rax, 1, offset), x86::rdx);
+        // Store qword to memory at [VM_MEMORY_PTR + ptr]
+        a->mov(x86::qword_ptr(x86::r12, x86::rax), x86::rdx);
 
         return true;
     } else if (strcmp(target_arch, "aarch64") == 0) {
@@ -4521,8 +4599,16 @@ bool jit_emit_load_u32(
     // Load pointer register from VM array
     a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
-    // Load unsigned dword from memory at [ptr + offset]
-    a->mov(x86::eax, x86::dword_ptr(x86::r12, x86::rax, 1, offset));
+    // Add offset to get final address
+    if (offset != 0) {
+        a->add(x86::rax, offset);
+    }
+
+    // Bounds check: verify address is readable
+    emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
+
+    // Load unsigned dword from memory at [VM_MEMORY_PTR + ptr]
+    a->mov(x86::eax, x86::dword_ptr(x86::r12, x86::rax));
 
     // Zero-extend and store to VM register array
     a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
@@ -4547,8 +4633,16 @@ bool jit_emit_load_i32(
     // Load pointer register from VM array
     a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
-    // Load signed dword from memory at [ptr + offset] with sign extension
-    a->movsx(x86::rax, x86::dword_ptr(x86::r12, x86::rax, 1, offset));
+    // Add offset to get final address
+    if (offset != 0) {
+        a->add(x86::rax, offset);
+    }
+
+    // Bounds check: verify address is readable
+    emit_bounds_check_x64(assembler, x86::rax, false);  // false = read
+
+    // Load signed dword from memory at [VM_MEMORY_PTR + ptr] with sign extension
+    a->movsx(x86::rax, x86::dword_ptr(x86::r12, x86::rax));
 
     // Store to VM register array
     a->mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
@@ -4631,11 +4725,19 @@ bool jit_emit_store_32(
     // Load pointer register from VM array
     a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
+    // Add offset to get final address
+    if (offset != 0) {
+        a->add(x86::rax, offset);
+    }
+
+    // Bounds check: verify address is writable
+    emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
+
     // Load source value from VM array (32-bit)
     a->mov(x86::edx, x86::dword_ptr(x86::rbx, src_reg * 8));
 
-    // Store dword to memory at [ptr + offset]
-    a->mov(x86::dword_ptr(x86::r12, x86::rax, 1, offset), x86::edx);
+    // Store dword to memory at [VM_MEMORY_PTR + ptr]
+    a->mov(x86::dword_ptr(x86::r12, x86::rax), x86::edx);
 
     return true;
 }
@@ -4657,11 +4759,19 @@ bool jit_emit_store_64(
     // Load pointer register from VM array
     a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
+    // Add offset to get final address
+    if (offset != 0) {
+        a->add(x86::rax, offset);
+    }
+
+    // Bounds check: verify address is writable
+    emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
+
     // Load source value from VM array (64-bit)
     a->mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
 
-    // Store qword to memory at [ptr + offset]
-    a->mov(x86::qword_ptr(x86::r12, x86::rax, 1, offset), x86::rdx);
+    // Store qword to memory at [VM_MEMORY_PTR + ptr]
+    a->mov(x86::qword_ptr(x86::r12, x86::rax), x86::rdx);
 
     return true;
 }
@@ -4683,11 +4793,19 @@ bool jit_emit_store_16(
     // Load pointer register from VM array
     a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
+    // Add offset to get final address
+    if (offset != 0) {
+        a->add(x86::rax, offset);
+    }
+
+    // Bounds check: verify address is writable
+    emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
+
     // Load source value from VM array (16-bit)
     a->movzx(x86::edx, x86::word_ptr(x86::rbx, src_reg * 8));
 
-    // Store word to memory at [ptr + offset]
-    a->mov(x86::word_ptr(x86::r12, x86::rax, 1, offset), x86::dx);
+    // Store word to memory at [VM_MEMORY_PTR + ptr]
+    a->mov(x86::word_ptr(x86::r12, x86::rax), x86::dx);
 
     return true;
 }
@@ -4709,11 +4827,19 @@ bool jit_emit_store_8(
     // Load pointer register from VM array
     a->mov(x86::rax, x86::qword_ptr(x86::rbx, ptr_reg * 8));
 
+    // Add offset to get final address
+    if (offset != 0) {
+        a->add(x86::rax, offset);
+    }
+
+    // Bounds check: verify address is writable
+    emit_bounds_check_x64(assembler, x86::rax, true);  // true = write
+
     // Load source value from VM array (8-bit)
     a->movzx(x86::edx, x86::byte_ptr(x86::rbx, src_reg * 8));
 
-    // Store byte to memory at [ptr + offset]
-    a->mov(x86::byte_ptr(x86::r12, x86::rax, 1, offset), x86::dl);
+    // Store byte to memory at [VM_MEMORY_PTR + ptr]
+    a->mov(x86::byte_ptr(x86::r12, x86::rax), x86::dl);
 
     return true;
 }
