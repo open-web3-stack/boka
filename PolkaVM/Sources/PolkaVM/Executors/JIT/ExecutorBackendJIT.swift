@@ -860,7 +860,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     // - Argument zone: readable and writable
                     for zone in stdMem.allZones {
                         let zoneStartPage = zone.startAddress / pageSize
-                        let zoneEndPage = (zone.endAddress + pageSize - 1) / pageSize
+                        let zoneEndPage = (zone.endAddress - 1) / pageSize + 1
 
                         for page in zoneStartPage..<zoneEndPage {
                             let byteIndex = Int(page / 8)
@@ -873,7 +873,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     // Read-only zone is NOT writable
                     for zone in [stdMem.heapZoneInfo, stdMem.stackZoneInfo, stdMem.argumentZoneInfo] {
                         let zoneStartPage = zone.startAddress / pageSize
-                        let zoneEndPage = (zone.endAddress + pageSize - 1) / pageSize
+                        let zoneEndPage = (zone.endAddress - 1) / pageSize + 1
 
                         for page in zoneStartPage..<zoneEndPage {
                             let byteIndex = Int(page / 8)

@@ -35,6 +35,8 @@ public func invokePVM(
             let postGas = state.getGas()
             let gasUsed = postGas >= GasInt(0) ? gas - Gas(postGas) : gas
 
+            logger.debug("invokePVM: exitReason=\(exitReason), gasUsed=\(gasUsed)")
+
             switch exitReason {
             case .outOfGas:
                 return (.outOfGas, gasUsed, nil)
@@ -43,6 +45,7 @@ public func invokePVM(
                 let output = try? state.readMemory(address: addr, length: Int(len))
                 return (.halt, gasUsed, output ?? Data())
             default:
+                logger.error("invokePVM: Unhandled exit reason: \(exitReason)")
                 return (.panic(.trap), gasUsed, nil)
             }
         }

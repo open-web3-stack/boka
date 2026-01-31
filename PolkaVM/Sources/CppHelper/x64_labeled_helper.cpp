@@ -716,12 +716,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             continue;
         }
 
-        if (opcode_is(opcode, Opcode::Halt)) {
-            // Jump to exit
-            a.jmp(exitLabel);
-            pc += instrSize;
-            continue;
-        }
+        // Opcode 1 (Halt/Fallthrough) is handled as normal instruction - just continues execution
+        // Per spec, executing past program end will hit implicit Trap instructions
 
         // === StoreImmInd Instructions ===
         // Format: [opcode][base_reg][offset_varint][value_varint]
@@ -755,16 +751,49 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::ecx, static_cast<uint32_t>(offset));  // Zero-extend to 64-bit in rcx
             a.add(x86::rax, x86::rcx);
 
-            // Read-only protection: address < 0x20000 (131072) → panic
-            // Read-only data zone: 0x10000 - 0x1FFFF
-            // Read-write zone: 0x20000 and above
-            a.cmp(x86::rax, 0x20000);
+            // Per PVM spec pvm.tex lines 137-147: first 64KB (0x10000) must cause panic
+            a.cmp(x86::rax, 0x10000);
             a.jb(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
             a.mov(x86::ecx, x86::r13d); // memory_size
             a.cmp(x86::rax, x86::rcx);
             a.jae(pagefaultLabel);
+
+            // Bitmap check: verify page is writable
+            // Load writeMap from JITHostFunctionTable (RBP)
+            a.mov(x86::r10, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, writeMap)));
+
+            // If writeMap is null, skip bitmap check (allow all writes)
+            a.test(x86::r10, x86::r10);
+            Label skip_bitmap_check = a.new_label();
+            a.jz(skip_bitmap_check);
+
+            // Calculate page index: address / 4096 = address >> 12
+            a.mov(x86::r11, x86::rax);
+            a.shr(x86::r11, 12);
+
+            // Calculate byte index: page / 8 = page >> 3
+            a.mov(x86::rcx, x86::r11);
+            a.shr(x86::rcx, 3);
+
+            // Calculate bit index: page % 8 = page & 0x7
+            a.and_(x86::r11d, 0x7);
+
+            // Load bitmap byte
+            a.movzx(x86::r10d, x86::byte_ptr(x86::r10, x86::rcx));
+
+            // Test the bit using BT instruction
+            a.bt(x86::r10d, x86::r11);
+
+            // If bit is set, page is writable -> continue
+            a.jc(skip_bitmap_check);
+
+            // Page not writable -> page fault
+            a.mov(x86::qword_ptr(x86::rbx, 0), x86::rax);  // Save address to VM R0
+            a.jmp(pagefaultLabel);
+
+            a.bind(skip_bitmap_check);
 
             // Store value
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
@@ -806,17 +835,35 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::r8d, offset);  // Use r8d (32-bit) to ensure zero-extension
             a.add(x86::rax, x86::r8);
 
-            // Read-only protection: address < 0x20000 (131072) → panic
-            // Read-only data zone: 0x10000 - 0x1FFFF
-            // Read-write zone: 0x20000 and above
-            a.cmp(x86::rax, 0x20000);
+            // Per PVM spec pvm.tex lines 137-147: first 64KB (0x10000) must cause panic
+            a.cmp(x86::rax, 0x10000);
             a.jb(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
             a.mov(x86::ecx, x86::r13d); // memory_size
             a.cmp(x86::rax, x86::rcx);
             a.jae(pagefaultLabel);
-            
+
+            // Bitmap check: verify page is writable
+            a.mov(x86::r10, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, writeMap)));
+            a.test(x86::r10, x86::r10);
+            Label skip_bitmap_check2 = a.new_label();
+            a.jz(skip_bitmap_check2);
+
+            a.mov(x86::r11, x86::rax);
+            a.shr(x86::r11, 12);
+            a.mov(x86::rcx, x86::r11);
+            a.shr(x86::rcx, 3);
+            a.and_(x86::r11d, 0x7);
+            a.movzx(x86::r10d, x86::byte_ptr(x86::r10, x86::rcx));
+            a.bt(x86::r10d, x86::r11);
+            a.jc(skip_bitmap_check2);
+
+            a.mov(x86::qword_ptr(x86::rbx, 0), x86::rax);
+            a.jmp(pagefaultLabel);
+
+            a.bind(skip_bitmap_check2);
+
             // Load source value
             a.mov(x86::rdx, x86::qword_ptr(x86::rbx, src_reg * 8));
             
@@ -1123,6 +1170,26 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.cmp(x86::rax, x86::r13);  // Compare with full 64-bit memory_size
             a.jae(pagefaultLabel);
 
+            // Bitmap check: verify page is readable
+            a.mov(x86::r10, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, readMap)));
+            a.test(x86::r10, x86::r10);
+            Label skip_load_bitmap = a.new_label();
+            a.jz(skip_load_bitmap);
+
+            a.mov(x86::r11, x86::rax);
+            a.shr(x86::r11, 12);
+            a.mov(x86::rcx, x86::r11);
+            a.shr(x86::rcx, 3);
+            a.and_(x86::r11d, 0x7);
+            a.movzx(x86::r10d, x86::byte_ptr(x86::r10, x86::rcx));
+            a.bt(x86::r10d, x86::r11);
+            a.jc(skip_load_bitmap);
+
+            a.mov(x86::qword_ptr(x86::rbx, 0), x86::rax);
+            a.jmp(pagefaultLabel);
+
+            a.bind(skip_load_bitmap);
+
             // If we get here, address is valid - inline the load instruction
             // Load from memory into register, then store to VM register
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
@@ -1169,15 +1236,33 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // mov to 64-bit register zero-extends automatically
             a.mov(x86::rax, uint64_t(address));
 
-            // Read-only protection: address < 0x20000 (131072) → panic
-            // Read-only data zone: 0x10000 - 0x1FFFF
-            // Read-write zone: 0x20000 and above
-            a.cmp(x86::rax, 0x20000);
+            // Per PVM spec pvm.tex lines 137-147: first 64KB (0x10000) must cause panic
+            a.cmp(x86::rax, 0x10000);
             a.jb(panicLabel);
 
             // Runtime check: address >= memory_size → page fault
             a.cmp(x86::rax, x86::r13);  // Compare with full 64-bit memory_size
             a.jae(pagefaultLabel);
+
+            // Bitmap check: verify page is writable
+            a.mov(x86::r10, x86::qword_ptr(x86::rbp, offsetof(JITHostFunctionTable, writeMap)));
+            a.test(x86::r10, x86::r10);
+            Label skip_store_bitmap = a.new_label();
+            a.jz(skip_store_bitmap);
+
+            a.mov(x86::r11, x86::rax);
+            a.shr(x86::r11, 12);
+            a.mov(x86::rcx, x86::r11);
+            a.shr(x86::rcx, 3);
+            a.and_(x86::r11d, 0x7);
+            a.movzx(x86::r10d, x86::byte_ptr(x86::r10, x86::rcx));
+            a.bt(x86::r10d, x86::r11);
+            a.jc(skip_store_bitmap);
+
+            a.mov(x86::qword_ptr(x86::rbx, 0), x86::rax);
+            a.jmp(pagefaultLabel);
+
+            a.bind(skip_store_bitmap);
 
             // Load source value from VM register
             a.mov(x86::rdx, x86::qword_ptr(x86::rbx, srcReg * 8));

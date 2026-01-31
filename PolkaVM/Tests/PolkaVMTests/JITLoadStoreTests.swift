@@ -191,7 +191,7 @@ struct JITLoadStoreTests {
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) })
 
-        code.append(0x01) // Halt
+        code.append(0x00) // Trap (proper termination per spec)
 
         // Read-only data with 0xFF (signed -1 as byte)
         let readOnlyData = Data([0xFF])
@@ -220,7 +220,7 @@ struct JITLoadStoreTests {
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) })
 
-        code.append(0x01) // Halt
+        code.append(0x00) // Trap (proper termination per spec)
 
         // Read-only data with 0x1234 (little-endian)
         let readOnlyData = Data([0x34, 0x12])
@@ -246,7 +246,7 @@ struct JITLoadStoreTests {
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) })
 
-        code.append(0x01) // Halt
+        code.append(0x00) // Trap (proper termination per spec)
 
         let readOnlyData = Data([0xAB, 0xCD])
         let blob = ProgramBlobBuilder.createStandardProgram(
@@ -292,7 +292,7 @@ struct JITLoadStoreTests {
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) })
 
-        code.append(0x01) // Halt
+        code.append(0x00) // Trap (proper termination per spec)
 
         // Create program with read-write data (heap)
         let heapData = Data([0x00, 0x00, 0x00, 0x00])
@@ -332,7 +332,7 @@ struct JITLoadStoreTests {
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) })
 
-        code.append(0x01) // Halt
+        code.append(0x00) // Trap (proper termination per spec)
 
         let heapData = Data([0x00, 0x00, 0x00, 0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
@@ -359,7 +359,7 @@ struct JITLoadStoreTests {
         code.append(0x01) // r1 (source)
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) }) // address
 
-        code.append(0x01) // Halt
+        code.append(0x00) // Trap (proper termination per spec)
 
         let heapData = Data([0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
@@ -406,7 +406,7 @@ struct JITLoadStoreTests {
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) })
 
-        code.append(0x01) // Halt
+        code.append(0x00) // Trap (proper termination per spec)
 
         let heapData = Data([0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
@@ -445,7 +445,7 @@ struct JITLoadStoreTests {
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) })
 
-        code.append(0x01) // Halt
+        code.append(0x00) // Trap (proper termination per spec)
 
         let heapData = Data([0x00, 0x00, 0x00, 0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
@@ -473,7 +473,7 @@ struct JITLoadStoreTests {
         code.append(contentsOf: encodeVarint(0)) // offset (varint)
         code.append(contentsOf: encodeVarint(0xCD)) // value (varint)
 
-        code.append(0x01) // Halt
+        code.append(0x00) // Trap (proper termination per spec)
 
         let heapData = Data([0x00])
         let blob = ProgramBlobBuilder.createStandardProgram(
@@ -539,7 +539,7 @@ struct JITLoadStoreTests {
         code.append(0x12) // r2 (src=2) | (r1 (dest=1) << 4) = 0x02 | 0x10 = 0x12
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian) { Array($0) }) // offset
 
-        code.append(0x01) // Halt
+        code.append(0x00) // Trap (proper termination per spec)
 
         let readOnlyData = Data([0xAA])
         let blob = ProgramBlobBuilder.createStandardProgram(
