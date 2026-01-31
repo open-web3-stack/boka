@@ -92,6 +92,40 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
     return pc + instrSize; // Fallthrough
 }
 
+// Varint decoder for variable-length integer encoding
+// Returns the decoded value and updates out_size to include varint bytes
+// CRITICAL: Will return 0 and set out_size to 0 if max_size is exceeded (invalid varint)
+static uint64_t decode_varint(const uint8_t* bytecode, uint32_t offset, uint32_t max_size, uint32_t& out_size) {
+    uint64_t result = 0;
+    uint32_t shift = 0;
+    uint32_t i = 0;
+
+    while (true) {
+        // CRITICAL: Bounds check to prevent out-of-bounds read
+        if (offset + i >= max_size) {
+            // Unterminated varint (e.g., 0x80 at last byte) or malformed
+            out_size = 0;
+            return 0;
+        }
+
+        uint8_t byte = bytecode[offset + i];
+        result |= (uint64_t(byte & 0x7F)) << shift;
+        i++;
+        if ((byte & 0x80) == 0) {
+            break;
+        }
+        shift += 7;
+        if (shift >= 64) {
+            // Varint too large, return 0
+            out_size = 1;
+            return 0;
+        }
+    }
+
+    out_size = i;
+    return result;
+}
+
 // Main compilation function with labels for ARM64
 extern "C" int32_t compilePolkaVMCode_a64_labeled(
     const uint8_t* _Nonnull codeBuffer,
@@ -100,6 +134,8 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     uint32_t jitMemorySize,
     const uint32_t* _Nullable skipTable,   // NEW: instruction skip values
     size_t skipTableSize,                   // NEW: skip table size
+    const uint8_t* _Nullable bitmask,      // NEW: bitmask for instruction boundaries
+    size_t bitmaskSize,                    // NEW: bitmask size
     void* _Nullable * _Nonnull funcOut)
 {
     // Validate inputs
@@ -110,6 +146,20 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     if (!funcOut) {
         return 2; // Invalid output parameter
     }
+
+    // Helper lambda to check if a PC is at an instruction boundary using bitmask
+    // Per spec pvm.tex, instruction boundaries have bitmask bit 0 set
+    auto isInstructionBoundary = [&](uint32_t pc) -> bool {
+        if (!bitmask || pc >= codeSize) {
+            return false;
+        }
+        uint32_t byteIndex = pc / 8;
+        uint32_t bitIndex = pc % 8;
+        if (byteIndex >= bitmaskSize) {
+            return false;
+        }
+        return (bitmask[byteIndex] & (1 << bitIndex)) != 0;
+    };
 
     // Create lambda to get instruction size using skip table
     // This is the authoritative source for variable-length encoded instructions
@@ -177,10 +227,24 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
         // Mark jump targets for all control flow instructions
         // This is necessary to handle backward jumps (loops) correctly
-        uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
-        if (targetPC != pc + instrSize) {
-            // This is a branch/jump instruction (not a fallthrough)
-            labelManager.markJumpTarget(targetPC);
+        // Only call getJumpTarget for actual branch/jump opcodes to avoid misinterpreting data
+        bool isBranchInstruction = opcode_is(opcode, Opcode::Jump) ||
+                                   (instrSize == 7) ||  // Branch register instructions
+                                   (instrSize == 14) || // Branch immediate instructions
+                                   opcode_is(opcode, Opcode::LoadImmJump) ||
+                                   opcode_is(opcode, Opcode::LoadImmJumpInd);
+
+        if (isBranchInstruction) {
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+            if (targetPC != pc + instrSize) {
+                // This is a branch/jump instruction (not a fallthrough)
+                // VALIDATE: Check if target is at an instruction boundary
+                if (bitmask && !isInstructionBoundary(targetPC)) {
+                    fprintf(stderr, "[JIT] Invalid branch target: PC=%u is not at instruction boundary\n", targetPC);
+                    return 4; // Compilation error: invalid branch target
+                }
+                labelManager.markJumpTarget(targetPC);
+            }
         }
 
         pc += instrSize;
@@ -411,6 +475,128 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.b(epilogueLabel);
 
             pc += instrSize;
+            continue;
+        }
+
+        if (opcode_is(opcode, Opcode::LoadImmJumpInd)) {
+            // LoadImmJumpInd: [opcode][ra_rb_packed][value_byte][offset_byte]
+            // ra = dest register (bits 0-3 of byte 1)
+            // rb = base register (bits 4-7 of byte 1)
+            // Note: This is a simplified format using 1-byte values
+            uint8_t packed_regs = codeBuffer[pc + 1];
+            uint8_t dest_reg = packed_regs & 0x0F;  // bits 0-3
+            uint8_t base_reg = (packed_regs >> 4) & 0x0F;  // bits 4-7
+
+            uint8_t value = codeBuffer[pc + 2];
+            uint8_t offset = codeBuffer[pc + 3];
+
+            // Load immediate value into dest register
+            a.mov(a64::w0, value);
+            a.str(a64::w0, a64::ptr(a64::x19, dest_reg * 8));
+
+            // Load base register value
+            a.ldr(a64::w0, a64::ptr(a64::x19, base_reg * 8));
+
+            // Calculate target = base + offset
+            a.add(a64::w0, a64::w0, offset);
+
+            // Check for halt address (0xFFFFFFFF)
+            a.mov(a64::w1, 0xFFFFFFFF);
+            a.cmp(a64::w0, a64::w1);
+            a.b_eq(exitLabel);  // Jump to halt exit
+
+            // Check if jump table is available
+            a.ldr(a64::x1, a64::ptr(a64::x24, offsetof(JITHostFunctionTable, jumpTableData)));
+            a.cbz(a64::x1, unsupportedLabel);  // No jump table, fall back to interpreter
+
+            // Load jump table parameters
+            a.ldr(a64::w2, a64::ptr(a64::x24, offsetof(JITHostFunctionTable, alignmentFactor)));
+            a.ldr(a64::w3, a64::ptr(a64::x24, offsetof(JITHostFunctionTable, jumpTableEntrySize)));
+            a.ldr(a64::w4, a64::ptr(a64::x24, offsetof(JITHostFunctionTable, jumpTableEntriesCount)));
+
+            // Validate target != 0
+            a.cbz(a64::w0, pagefaultLabel);  // Invalid target (0)
+
+            // Validate target alignment
+            // Calculate entry index: (target / alignmentFactor) - 1
+            a.udiv(a64::w5, a64::w0, a64::w2);  // w5 = target / alignmentFactor
+            a.msub(a64::w6, a64::w5, a64::w2, a64::w0);  // w6 = remainder = target - (w5 * w2)
+            a.cbnz(a64::w6, pagefaultLabel);  // Remainder != 0, not aligned, invalid jump
+
+            // Decrement to get entry index
+            a.sub(a64::w5, a64::w5, 1);
+
+            // Check if entry index is within bounds
+            a.cmp(a64::w5, a64::w4);
+            a.b_hs(pagefaultLabel);  // Index >= entriesCount, invalid jump
+
+            // Calculate byte offset: entryIndex * entrySize
+            a.mul(a64::w6, a64::w5, a64::w3);  // w6 = entryIndex * entrySize
+
+            // Load jump table data pointer
+            a.ldr(a64::x7, a64::ptr(a64::x24, offsetof(JITHostFunctionTable, jumpTableData)));
+
+            // Read entry based on entrySize
+            // For now, support entry sizes 1, 2, 3, 4
+            Label entrySize1 = a.new_label();
+            Label entrySize2 = a.new_label();
+            Label entrySize3 = a.new_label();
+            Label entrySize4 = a.new_label();
+            Label readDone = a.new_label();
+
+            a.cmp(a64::w3, 1);
+            a.b_eq(entrySize1);
+            a.cmp(a64::w3, 2);
+            a.b_eq(entrySize2);
+            a.cmp(a64::w3, 3);
+            a.b_eq(entrySize3);
+            a.cmp(a64::w3, 4);
+            a.b_eq(entrySize4);
+            // Invalid entry size, fall back to interpreter
+            a.b(unsupportedLabel);
+
+            // Entry size 1: Read UInt8
+            a.bind(entrySize1);
+            a.add(a64::x8, a64::x7, a64::x6);  // Calculate address: base + offset
+            a.ldrb(a64::w0, a64::ptr(a64::x8));  // Load byte
+            a.b(readDone);
+
+            // Entry size 2: Read UInt16
+            a.bind(entrySize2);
+            a.add(a64::x8, a64::x7, a64::x6);  // Calculate address: base + offset
+            a.ldrh(a64::w0, a64::ptr(a64::x8));  // Load halfword
+            a.b(readDone);
+
+            // Entry size 3: Read UInt24
+            a.bind(entrySize3);
+            a.add(a64::x8, a64::x7, a64::x6);  // Calculate address: base + offset
+            a.ldrb(a64::w0, a64::ptr(a64::x8));  // Load byte at offset 0
+            a.ldrh(a64::w1, a64::ptr(a64::x8, 1));  // Load halfword at offset 1
+            a.bfi(a64::w0, a64::w1, 8, 16);  // Insert w1 into w0 at bit 8
+            a.b(readDone);
+
+            // Entry size 4: Read UInt32
+            a.bind(entrySize4);
+            a.add(a64::x8, a64::x7, a64::x6);  // Calculate address: base + offset
+            a.ldr(a64::w0, a64::ptr(a64::x8));  // Load word
+            a.b(readDone);
+
+            a.bind(readDone);
+
+            // Update PC with the looked-up address
+            a.mov(a64::w23, a64::w0);
+
+            // Jump to the new PC
+            // First, check if the new PC is within valid range
+            a.cmp(a64::w0, codeSize);
+            a.b_hs(pagefaultLabel);  // PC out of bounds
+
+            // For now, fall back to interpreter with the updated PC
+            // This is safe because the jump table lookup validated the target
+            a.mov(a64::w0, 2);  // Exit code 2 = exit to interpreter with updated PC
+            a.b(epilogueLabel);
+
+            pc += 4;  // opcode + packed_regs + value + offset
             continue;
         }
 
