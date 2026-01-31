@@ -100,6 +100,11 @@ struct JITHostFunctionTable {
 
     // Heap tracking for sbrk instruction
     uint32_t heapEnd; // Current end of heap (matches StandardMemory.heapZone.endAddress)
+
+    // Memory protection bitmaps for page-level access control
+    // Each bitmap is 128KB (2^20 bits = 1 bit per 4KB page for 2^32 byte address space)
+    uint8_t* _Nullable readMap;   // Bitmap of readable pages (bit N = page N is readable)
+    uint8_t* _Nullable writeMap;  // Bitmap of writable pages (bit N = page N is writable)
 };
 
 // Trampoline for JIT code to call Swift host functions
@@ -125,6 +130,15 @@ extern "C" void setDispatcherTable(
     void* _Nonnull funcPtr,
     void* _Nullable * _Nullable table,
     size_t size) noexcept;
+
+// Update page map bitmaps to mark a region as readable/writable
+// This is called during initialization and by sbrk to mark heap pages as accessible
+extern "C" void pvm_update_page_map(
+    JITHostFunctionTable* _Nonnull ctx,
+    uint32_t start,
+    uint32_t size,
+    bool readable,
+    bool writable) noexcept;
 
 // ============================================================================
 // MARK: - Export/Import API for Persistent Caching

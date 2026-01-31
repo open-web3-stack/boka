@@ -512,3 +512,50 @@ extern "C" void releaseJITFunction(void* _Nullable funcPtr) noexcept {
     // TODO: Add ARM64 support when needed
     // releaseJITFunction_a64(funcPtr);
 }
+
+// ============================================================================
+// MARK: - Memory Protection
+// ============================================================================
+
+/// Update page map bitmaps to mark a region as readable/writable
+///
+/// This function sets bits in the readMap and/or writeMap bitmaps to mark
+/// pages as accessible. Each bitmap is 128KB (2^20 bits), with 1 bit per 4KB page.
+///
+/// @param ctx JIT host function table containing the bitmap pointers
+/// @param start Start address of the region to mark
+/// @param size Size of the region in bytes
+/// @param readable Whether to mark pages as readable
+/// @param writable Whether to mark pages as writable
+extern "C" void pvm_update_page_map(
+    JITHostFunctionTable* _Nonnull ctx,
+    uint32_t start,
+    uint32_t size,
+    bool readable,
+    bool writable) noexcept {
+
+    // Page size is 4KB (2^12 bytes)
+    constexpr uint32_t PAGE_SIZE = 4096;
+
+    // Calculate page range
+    uint32_t startPage = start / PAGE_SIZE;
+    uint32_t endPage = (start + size + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    // Mark pages as readable
+    if (readable && ctx->readMap) {
+        for (uint32_t page = startPage; page < endPage; ++page) {
+            uint32_t byteIndex = page / 8;
+            uint32_t bitIndex = page % 8;
+            ctx->readMap[byteIndex] |= (1 << bitIndex);
+        }
+    }
+
+    // Mark pages as writable
+    if (writable && ctx->writeMap) {
+        for (uint32_t page = startPage; page < endPage; ++page) {
+            uint32_t byteIndex = page / 8;
+            uint32_t bitIndex = page % 8;
+            ctx->writeMap[byteIndex] |= (1 << bitIndex);
+        }
+    }
+}
