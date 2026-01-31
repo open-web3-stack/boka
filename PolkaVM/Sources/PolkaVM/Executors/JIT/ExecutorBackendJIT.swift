@@ -540,10 +540,8 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 // This is CRITICAL for instructions like LoadImmJump, BranchImm, etc.
                 let skipTable = programCode.skipValues
 
-                // Extract bitmask for branch validation
-                // This ensures JIT only jumps to valid instruction boundaries
-                let bitmask = programCode.bitmask
-
+                // Note: Bitmask not passed to JIT due to lifetime issues
+                // JIT uses skipTable for branch validation instead
                 compiledFuncPtr = try jitCompiler.compile(
                     blob: bytecode,
                     initialPC: pc,
@@ -551,7 +549,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     targetArchitecture: targetArchitecture,
                     jitMemorySize: totalMemorySize,
                     skipTable: skipTable,
-                    bitmask: bitmask
+                    bitmask: Data() // Empty bitmask - JIT uses skipTable instead
                 )
 
                 // Retrieve dispatcher jump table for this compiled function

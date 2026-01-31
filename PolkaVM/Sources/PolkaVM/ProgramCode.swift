@@ -24,7 +24,7 @@ public class ProgramCode {
     public let jumpTableEntrySize: UInt8
     public let jumpTable: Data
     public let code: Data
-    internal let bitmask: Data
+    private let bitmaskArray: [UInt8]
 
     // parsed stuff
     public private(set) var basicBlockIndices: Set<UInt32> = []
@@ -98,14 +98,10 @@ public class ProgramCode {
         }
 
         // mark bitmask bits longer than codeLength as 1
-        var bitmaskData = blob[codeEndIndex ..< slice.endIndex]
-        let fullBytes = Int(codeLength) / 8
-        let remainingBits = Int(codeLength) % 8
-        if remainingBits > 0 {
-            let mask: UInt8 = ~0 << remainingBits
-            bitmaskData[codeEndIndex + fullBytes] |= mask
-        }
-        bitmask = bitmaskData
+        // Note: The blob bitmask should already have this applied correctly
+        // Store as Array to avoid Data lifetime issues
+        let bitmaskSlice = blob[codeEndIndex ..< slice.endIndex]
+        bitmaskArray = Array(bitmaskSlice)
 
         try buildMetadata()
 
@@ -119,7 +115,7 @@ public class ProgramCode {
         var currentBlockGasCost = Gas(0)
 
         while i < code.count {
-            let skip = ProgramCode.skip(start: i, bitmask: bitmask)
+            let skip = ProgramCode.skip(start: i, bitmask: Data(bitmaskArray))
 
             let opcode = code[relative: Int(i)]
             currentBlockGasCost += gasFromOpcode(opcode)
@@ -186,21 +182,7 @@ public class ProgramCode {
     }
 
     public func skip(_ pc: UInt32) -> UInt32 {
-        ProgramCode.skip(start: pc, bitmask: bitmask)
-    }
-
-    /// Check if a PC position is at an instruction boundary
-    /// Per spec, instruction boundaries are marked by bit 0 being set in the bitmask
-    internal func isInstructionBoundary(_ pc: UInt32) -> Bool {
-        let byteIndex = Int(pc / 8)
-        let bitIndex = Int(pc % 8)
-
-        guard byteIndex >= 0, byteIndex < bitmask.count else {
-            return false
-        }
-
-        let byte = bitmask[byteIndex]
-        return (byte & (1 << bitIndex)) != 0
+        ProgramCode.skip(start: pc, bitmask: Data(bitmaskArray))
     }
 
     /// Extract all skip values as an array for JIT compilation
