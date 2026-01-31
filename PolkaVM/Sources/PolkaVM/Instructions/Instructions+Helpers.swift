@@ -83,15 +83,10 @@ extension Instructions {
             return false
         }
 
-        // Check if target points to a valid instruction (has skip value > 0 or within basic blocks)
-        // Due to test vector bitmask issues, we check both conditions
-        let skip = context.state.program.skip(targetPC)
-        if skip > 0 {
-            return true
-        }
-
-        // Fallback: check if target is in basicBlockIndices (for properly formed programs)
-        return context.state.program.basicBlockIndices.contains(targetPC)
+        // Check if target PC is at an instruction boundary using bitmask
+        // Per spec pvm.tex line 124, branch targets must be in basicblocks set
+        // The bitmask has bit 0 set at instruction boundaries
+        return context.state.program.isInstructionBoundary(targetPC)
     }
 
     static func djump(context: ExecutionContext, target: UInt32) -> ExecOutcome {
