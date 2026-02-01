@@ -428,9 +428,9 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // Load target address from register
             a.ldr(a64::w0, a64::ptr(a64::x19, ptr_reg * 8));
 
-            // Special case: check for halt address (0xFFFFFFFF)
-            // This is the djumpHaltAddress constant
-            a.mov(a64::w1, 0xFFFFFFFF);
+            // Special case: check for halt address (0xFFFF0000)
+            // This is the djumpHaltAddress constant from Instructions+Helpers.swift
+            a.mov(a64::w1, 0xFFFF0000);
             a.cmp(a64::w0, a64::w1);
             a.b_eq(exitLabel);  // Jump to halt exit
 
@@ -551,8 +551,9 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // Calculate target = base + offset
             a.add(a64::w0, a64::w0, offset);
 
-            // Check for halt address (0xFFFFFFFF)
-            a.mov(a64::w1, 0xFFFFFFFF);
+            // Check for halt address (0xFFFF0000)
+            // This is the djumpHaltAddress constant from Instructions+Helpers.swift
+            a.mov(a64::w1, 0xFFFF0000);
             a.cmp(a64::w0, a64::w1);
             a.b_eq(exitLabel);  // Jump to halt exit
 
@@ -969,43 +970,68 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         if (opcode_is(opcode, Opcode::LoadImm)) {
             // Per spec pvm.tex lines 327-334:
             // Format: [opcode][reg_index][immed_X (l_X bytes)]
-            // where l_X = min(4, max(0, ℓ - 1)) and immed_X is sign-extended
-            // This is a variable-length encoding!
-            if (pc + 2 > codeSize) {
-                fprintf(stderr, "[JIT] LoadImm instruction truncated at PC %u (need at least 2 bytes, have %zu)\n", pc, codeSize);
+            // where:
+            //   ℓ = instruction length in bytes (from skip table)
+            //   l_X = min(4, ℓ - 1)
+            //   immed_X is sign-extended from l_X bytes to 64 bits
+            //
+            // Examples:
+            //   ℓ=3 → l_X=2 → [opcode][reg][imm16] (3 bytes total)
+            //   ℓ=4 → l_X=3 → [opcode][reg][imm24] (4 bytes total)
+            //   ℓ=5+ → l_X=4 → [opcode][reg][imm32] (5+ bytes total)
+            //
+            // CRITICAL: ℓ comes from skip table, NOT from remaining bytecode length!
+
+            // Get instruction length from skip table
+            uint32_t instrLen = getInstrSize(pc);
+
+            // Validate minimum length (opcode + register byte)
+            if (instrLen < 2) {
+                fprintf(stderr, "[JIT] LoadImm instruction too short at PC %u (length=%u)\n", pc, instrLen);
                 return 3; // Compilation error
             }
+
+            // Validate we have the full instruction in bytecode
+            if (pc + instrLen > codeSize) {
+                fprintf(stderr, "[JIT] LoadImm instruction truncated at PC %u (need %u bytes, have %zu)\n",
+                        pc, instrLen, codeSize);
+                return 3; // Compilation error
+            }
+
             uint8_t destReg = codeBuffer[pc + 1];
 
-            // Calculate l_X (length of immediate in bytes)
-            uint32_t remaining_length = codeSize - (pc + 2);
-            uint32_t l_X = (remaining_length < 4) ? remaining_length : 4;
-            if (l_X == 0) l_X = 1;  // Must have at least 1 byte
+            // Calculate l_X from instruction length per spec
+            uint32_t l_X = (instrLen - 1 > 4) ? 4 : instrLen - 1;
 
-            // Load immediate value with l_X bytes (sign-extend based on l_X)
-            uint64_t immediate = 0;
-            for (uint32_t i = 0; i < l_X; i++) {
-                if (pc + 2 + i < codeSize) {
-                    immediate |= uint64_t(codeBuffer[pc + 2 + i]) << (i * 8);
-                }
+            // Validate we have enough bytes for the immediate
+            if (pc + 2 + l_X > codeSize) {
+                fprintf(stderr, "[JIT] LoadImm immediate truncated at PC %u (l_X=%u)\n", pc, l_X);
+                return 3; // Compilation error
             }
+
+            // Load immediate value with l_X bytes
+            uint32_t immediate = 0;
+            memcpy(&immediate, &codeBuffer[pc + 2], l_X);
 
             // Sign-extend based on l_X
             if (l_X == 1) {
-                immediate = int64_t(int8_t(immediate & 0xFF));
+                immediate = int32_t(int8_t(immediate));
             } else if (l_X == 2) {
-                immediate = int64_t(int16_t(immediate & 0xFFFF));
+                immediate = int32_t(int16_t(immediate));
             } else if (l_X == 3) {
-                immediate = int64_t(int32_t(immediate & 0xFFFFFFFF));
-            } else {
-                // l_X == 4, already 64-bit
-                // Keep as-is (already loaded as 64-bit)
+                // Sign-extend 24-bit to 32-bit
+                if (immediate & 0x800000) {
+                    immediate |= 0xFF000000;
+                }
             }
+            // l_X == 4: no sign-extension needed (already 32-bit)
 
-            a.mov(a64::x8, immediate);
+            // LoadImm loads signed values and sign-extends to 64-bit
+            a.mov(a64::w8, immediate);
+            a.sxtw(a64::x8, a64::w8);  // Sign-extend w8 to x8
             a.str(a64::x8, a64::ptr(a64::x19, destReg * 8));  // Store to VM register array
 
-            pc += 2 + l_X;
+            pc += instrLen;
             continue;
         }
 
