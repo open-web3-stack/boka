@@ -6,9 +6,6 @@
 #include <cstdint>
 #include <cstddef>
 
-// Compiles PolkaVM bytecode to AArch64 machine code
-// 
-// Error codes:
 // - 0: Success
 // - 1: Invalid input (null buffer or zero size)
 // - 2: Invalid output parameter
@@ -43,13 +40,14 @@
 // NEW: bitmask provides instruction boundary markers for branch validation
 // bitmask[pc/8] has bit 0 set if pc is an instruction boundary (per spec pvm.tex)
 extern "C" int32_t compilePolkaVMCode_a64_labeled(
+    void* _Nonnull context,      // NEW: Swift-owned runtime context
     const uint8_t* _Nonnull codeBuffer,
     size_t codeSize,
     uint32_t initialPC,
     uint32_t jitMemorySize,
-    const uint32_t* _Nullable skipTable,   // NEW: instruction skip values
-    size_t skipTableSize,                   // NEW: skip table size
-    const uint8_t* _Nullable bitmask,      // NEW: bitmask for instruction boundaries
-    size_t bitmaskSize,                    // NEW: bitmask size
+    const uint32_t* _Nullable skipTable,   // instruction skip values
+    size_t skipTableSize,                   // skip table size
+    const uint8_t* _Nullable bitmask,      // bitmask for instruction boundaries
+    size_t bitmaskSize,                    // bitmask size
     void* _Nullable * _Nonnull funcOut);
 

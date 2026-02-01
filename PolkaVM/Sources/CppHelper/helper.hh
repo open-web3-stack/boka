@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <unordered_map>
 #include <asmjit/asmjit.h>
 #include "opcodes.hh"
 
@@ -117,16 +118,45 @@ uint32_t pvm_host_call_trampoline(
     uint32_t guest_memory_size,
     uint64_t* _Nonnull guest_gas_ptr) noexcept;
 
+// RuntimeContext holds all per-execution C++ state
+// Owned by Swift, passed to all C++ functions as void*
+// No global state - completely thread-safe through isolation
+struct RuntimeContext {
+    asmjit::JitRuntime* runtime;
+    std::unordered_map<void*, std::pair<void**, size_t>> dispatcherTables;
+
+    RuntimeContext() : runtime(new asmjit::JitRuntime()) {}
+
+    ~RuntimeContext() {
+        // Clean up dispatcher tables
+        for (auto& entry : dispatcherTables) {
+            if (entry.second.first) {
+                free(entry.second.first);
+            }
+        }
+        dispatcherTables.clear();
+        delete runtime;
+    }
+};
+
+// Create a new RuntimeContext (called from Swift)
+extern "C" void* _Nonnull createRuntimeContext() noexcept;
+
+// Destroy a RuntimeContext (called from Swift)
+extern "C" void destroyRuntimeContext(void* _Nonnull context) noexcept;
+
 // Get dispatcher jump table for a compiled function
 // Returns pointer to array of code addresses, or null if not found
 // outSize is set to the number of entries in the table
 extern "C" void* _Nullable * _Nullable getDispatcherTable(
+    void* _Nonnull context,
     void* _Nonnull funcPtr,
     size_t* _Nonnull outSize) noexcept;
 
 // Set dispatcher jump table for a compiled function
 // This is called to register the dispatcher table after compilation
 extern "C" void setDispatcherTable(
+    void* _Nonnull context,
     void* _Nonnull funcPtr,
     void* _Nullable * _Nullable table,
     size_t size) noexcept;
@@ -153,6 +183,7 @@ extern "C" void pvm_update_page_map(
 /// @param hasDispatcherTableOut Output: 1 if has dispatcher table, 0 otherwise
 /// @return 0 on success, error code on failure
 extern "C" int32_t getCompiledCodeInfo(
+    void* _Nonnull context,
     void* _Nonnull funcPtr,
     void* _Nullable * _Nullable * _Nonnull dispatcherTableOut,
     size_t* _Nonnull dispatcherTableSizeOut,
@@ -175,20 +206,26 @@ extern "C" int32_t setCompiledCodeMetadata(
 // ============================================================================
 
 /// Free the dispatcher table associated with a JIT-compiled function
+/// @param context Runtime context owning the dispatcher table
 /// @param funcPtr Function pointer returned by compilePolkaVMCode_x64_labeled
 /// @note Safe to call with nullptr or function pointers that don't have tables
-extern "C" void freeDispatcherTable(void* _Nullable funcPtr) noexcept;
+extern "C" void freeDispatcherTable(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept;
 
 /// Free ALL dispatcher tables
 /// Useful for process cleanup or memory pressure situations
-/// @note This frees all global dispatcher table storage
-extern "C" void freeAllDispatcherTables() noexcept;
+/// @param context Runtime context whose dispatcher tables should be freed
+extern "C" void freeAllDispatcherTables(void* _Nonnull context) noexcept;
 
 /// Release JIT-compiled code memory (frees machine code allocated by AsmJit)
+/// @param context Runtime context owning the JIT runtime
 /// @param funcPtr Function pointer to release
 /// @note Safe to call with nullptr
 /// @warning After calling this, the function pointer becomes invalid and must not be called
-extern "C" void releaseJITFunction(void* _Nullable funcPtr) noexcept;
+extern "C" void releaseJITFunction(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept;
 
 
 // Compile a range of bytecode instructions to machine code
