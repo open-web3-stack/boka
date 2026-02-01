@@ -22,7 +22,7 @@ using namespace JIT;
 using namespace PVM;
 
 // Export function to create a new RuntimeContext (called from Swift)
-extern "C" RuntimeContext* _Nonnull createRuntimeContext() noexcept {
+extern "C" void* _Nonnull createRuntimeContext() noexcept {
     return new RuntimeContext();
 }
 

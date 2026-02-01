@@ -44,9 +44,12 @@ public class ProgramCode {
     private static let logger = Logger(label: "ProgramCode")
 
     public init(_ blob: Data) throws (Error) {
-        self.blob = blob
+        // Make a deep copy to ensure thread-safety - Data uses copy-on-write
+        // and concurrent access could cause data races
+        // Using Array to force a true deep copy with no shared storage
+        self.blob = Data(Array(blob))
 
-        var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
+        var slice = Slice(base: self.blob, bounds: self.blob.startIndex ..< self.blob.endIndex)
         guard let jumpTableEntriesCount = slice.decode(), jumpTableEntriesCount <= Constants.maxJumpTableEntriesCount else {
             throw Error.invalidJumpTableEntriesCount
         }
@@ -73,7 +76,9 @@ public class ProgramCode {
             throw Error.invalidDataLength
         }
 
-        jumpTable = blob[slice.startIndex ..< jumpTableEndIndex]
+        // Force deep copy to ensure thread-safety
+        // Using Array to force a true deep copy with no shared storage
+        jumpTable = Data(Array(self.blob[slice.startIndex ..< jumpTableEndIndex]))
 
         let codeEndIndex = jumpTableEndIndex + Int(codeLength)
         guard codeEndIndex <= slice.endIndex else {
@@ -84,7 +89,8 @@ public class ProgramCode {
             throw Error.invalidDataLength
         }
 
-        code = blob[jumpTableEndIndex ..< codeEndIndex]
+        // Force deep copy to ensure thread-safety
+        code = Data(Array(self.blob[jumpTableEndIndex ..< codeEndIndex]))
 
         let expectedBitmaskSize = (codeLength + 7) / 8
         let actualBitmaskSize = slice.endIndex - codeEndIndex
@@ -92,14 +98,14 @@ public class ProgramCode {
         guard expectedBitmaskSize == actualBitmaskSize else {
             Self.logger
                 .error(
-                    "Bitmask size mismatch: codeLength=\(codeLength), expected=\(expectedBitmaskSize), actual=\(actualBitmaskSize), blob.count=\(blob.count), jumpTableEndIndex=\(jumpTableEndIndex), codeEndIndex=\(codeEndIndex), slice.startIndex=\(slice.startIndex), slice.endIndex=\(slice.endIndex)"
+                    "Bitmask size mismatch: codeLength=\(codeLength), expected=\(expectedBitmaskSize), actual=\(actualBitmaskSize), blob.count=\(self.blob.count), jumpTableEndIndex=\(jumpTableEndIndex), codeEndIndex=\(codeEndIndex), slice.startIndex=\(slice.startIndex), slice.endIndex=\(slice.endIndex)"
                 )
             throw Error.invalidDataLength
         }
 
         // mark bitmask bits longer than codeLength as 1
         // Create a mutable copy to modify
-        var bitmaskData = Data(blob[codeEndIndex ..< slice.endIndex])
+        var bitmaskData = Data(self.blob[codeEndIndex ..< slice.endIndex])
         let fullBytes = Int(codeLength) / 8
         let remainingBits = Int(codeLength) % 8
         if remainingBits > 0 {
