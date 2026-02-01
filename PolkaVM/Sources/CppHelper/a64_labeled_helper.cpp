@@ -34,11 +34,15 @@ static uint32_t getInstructionSize(const uint8_t* bytecode, uint32_t pc, size_t 
 
 // Helper to extract jump target from instruction
 // Returns the target PC for branch instructions, or fallthrough PC for non-branches
-static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t instrSize) {
+static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t instrSize, size_t bytecodeSize) {
     uint8_t opcode = bytecode[pc];
 
     // Jump (5 bytes): [opcode][offset_32bit]
     if (instrSize == 5 && opcode_is(opcode, Opcode::Jump)) {
+        if (pc + 5 > bytecodeSize) {
+            fprintf(stderr, "[JIT] Jump instruction truncated at PC %u (need 5 bytes, have %zu)\n", pc, bytecodeSize);
+            return pc + instrSize;
+        }
         uint32_t offset;
         memcpy(&offset, &bytecode[pc + 1], 4);
         return pc + int32_t(offset);
@@ -47,6 +51,10 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
     // Branch register instructions (7 bytes): [opcode][reg1][reg2][offset_32bit]
     // BranchEq, BranchNe, BranchLtU, BranchLtS, BranchGeU, BranchGeS
     if (instrSize == 7) {
+        if (pc + 7 > bytecodeSize) {
+            fprintf(stderr, "[JIT] Branch instruction truncated at PC %u (need 7 bytes, have %zu)\n", pc, bytecodeSize);
+            return pc + instrSize;
+        }
         uint32_t offset;
         memcpy(&offset, &bytecode[pc + 3], 4);
         return pc + int32_t(offset);
@@ -56,6 +64,10 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
     // BranchEqImm, BranchNeImm, BranchLtUImm, BranchLeUImm, BranchGeUImm, BranchGtUImm,
     // BranchLtSImm, BranchLeSImm, BranchGeSImm, BranchGtSImm
     if (instrSize == 14) {
+        if (pc + 14 > bytecodeSize) {
+            fprintf(stderr, "[JIT] BranchImm instruction truncated at PC %u (need 14 bytes, have %zu)\n", pc, bytecodeSize);
+            return pc + instrSize;
+        }
         uint32_t offset;
         memcpy(&offset, &bytecode[pc + 10], 4);  // Offset starts at byte 10
         return pc + int32_t(offset);
@@ -63,6 +75,8 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
 
     // LoadImmJump: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
     if (opcode_is(opcode, Opcode::LoadImmJump)) {
+        if (pc + 1 >= bytecodeSize) return pc + instrSize;
+
         uint8_t byte1 = bytecode[pc + 1];
         uint32_t l_X = (byte1 >> 4) & 0x07;  // Length of immed_X (bits 4-6)
         if (l_X > 4) l_X = 4;
@@ -73,10 +87,17 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
             l_Y = 4 - l_X;
         }
 
+        // Check bounds before reading offset
+        uint32_t offsetPos = pc + 2 + l_X;
+        if (offsetPos + l_Y > bytecodeSize) {
+            fprintf(stderr, "[JIT] LoadImmJump offset truncated at PC %u\n", pc);
+            return pc + instrSize;
+        }
+
         // Read offset (little-endian)
         uint32_t offset = 0;
         for (uint32_t i = 0; i < l_Y && i < 4; i++) {
-            offset |= (uint32_t)bytecode[pc + 2 + l_X + i] << (8 * i);
+            offset |= (uint32_t)bytecode[offsetPos + i] << (8 * i);
         }
         // Sign-extend if needed
         if (l_Y > 0 && l_Y < 4) {
@@ -258,7 +279,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
                                    opcode_is(opcode, Opcode::LoadImmJumpInd);
 
         if (isBranchInstruction) {
-            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
             if (targetPC != pc + instrSize) {
                 // This is a branch/jump instruction (not a fallthrough)
                 // VALIDATE: Check if target is at an instruction boundary
@@ -311,7 +332,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
         // Handle control flow instructions with labels
         if (opcode_is(opcode, Opcode::Jump)) {
-            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_jump_labeled(&a, "aarch64", targetLabel);
             pc += instrSize;
@@ -321,7 +342,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         if (opcode_is(opcode, Opcode::BranchEq)) {
             uint8_t reg1 = codeBuffer[pc + 1];
             uint8_t reg2 = codeBuffer[pc + 2];
-            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_branch_eq_labeled(&a, "aarch64", reg1, reg2, targetLabel);
@@ -333,7 +354,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         if (opcode_is(opcode, Opcode::BranchNe)) {
             uint8_t reg1 = codeBuffer[pc + 1];
             uint8_t reg2 = codeBuffer[pc + 2];
-            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize);
+            uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_branch_ne_labeled(&a, "aarch64", reg1, reg2, targetLabel);
@@ -946,17 +967,45 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
         // LoadImm: Load 32-bit immediate into register
         if (opcode_is(opcode, Opcode::LoadImm)) {
-            // LoadImm: [opcode][reg_index][value_32bit] = 6 bytes
+            // Per spec pvm.tex lines 327-334:
+            // Format: [opcode][reg_index][immed_X (l_X bytes)]
+            // where l_X = min(4, max(0, ℓ - 1)) and immed_X is sign-extended
+            // This is a variable-length encoding!
+            if (pc + 2 > codeSize) {
+                fprintf(stderr, "[JIT] LoadImm instruction truncated at PC %u (need at least 2 bytes, have %zu)\n", pc, codeSize);
+                return 3; // Compilation error
+            }
             uint8_t destReg = codeBuffer[pc + 1];
-            uint32_t immediate;
-            memcpy(&immediate, &codeBuffer[pc + 2], 4);
 
-            // Load immediate and sign-extend to 64-bit
+            // Calculate l_X (length of immediate in bytes)
+            uint32_t remaining_length = codeSize - (pc + 2);
+            uint32_t l_X = (remaining_length < 4) ? remaining_length : 4;
+            if (l_X == 0) l_X = 1;  // Must have at least 1 byte
+
+            // Load immediate value with l_X bytes (sign-extend based on l_X)
+            uint64_t immediate = 0;
+            for (uint32_t i = 0; i < l_X; i++) {
+                if (pc + 2 + i < codeSize) {
+                    immediate |= uint64_t(codeBuffer[pc + 2 + i]) << (i * 8);
+                }
+            }
+
+            // Sign-extend based on l_X
+            if (l_X == 1) {
+                immediate = int64_t(int8_t(immediate & 0xFF));
+            } else if (l_X == 2) {
+                immediate = int64_t(int16_t(immediate & 0xFFFF));
+            } else if (l_X == 3) {
+                immediate = int64_t(int32_t(immediate & 0xFFFFFFFF));
+            } else {
+                // l_X == 4, already 64-bit
+                // Keep as-is (already loaded as 64-bit)
+            }
+
             a.mov(a64::x8, immediate);
-            a.sxtw(a64::x8, a64::x8);  // Sign-extend w8 to x8
             a.str(a64::x8, a64::ptr(a64::x19, destReg * 8));  // Store to VM register array
 
-            pc += instrSize;
+            pc += 2 + l_X;
             continue;
         }
 
