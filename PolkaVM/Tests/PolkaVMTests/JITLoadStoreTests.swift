@@ -84,12 +84,12 @@ struct JITLoadStoreTests {
     @Test("JIT: LoadImm loads 32-bit immediate with sign extension")
     func jitLoadImm32() async throws {
         // LoadImm r1, 0x12345678 (sign-extended to 64-bit)
-        // LoadImm uses varint encoding for the immediate value
-        let value = UInt64(bitPattern: Int64(Int32(bitPattern: 0x1234_5678)))
+        // LoadImm format: [opcode][reg_index][value_32bit] (6 bytes total)
+        let value = Int32(0x1234_5678)
         let instruction: [UInt8] = [
             0x33, // LoadImm opcode (32-bit immediate, sign-extended)
             0x01, // r1
-        ] + encodeVarint(value)
+        ] + withUnsafeBytes(of: value.littleEndian) { Array($0) }
 
         let result = await JITInstructionExecutor.executeSingleInstruction(instruction)
 
@@ -101,12 +101,13 @@ struct JITLoadStoreTests {
     @Test("JIT: LoadImm sign-extends negative 32-bit values")
     func jitLoadImmNegative() async throws {
         // LoadImm r1, -1 (0xFFFFFFFF as signed 32-bit)
+        // LoadImm format: [opcode][reg_index][value_32bit] (6 bytes total)
         // When sign-extended to 64-bit, this becomes 0xFFFFFFFFFFFFFFFF
-        let value = UInt64(bitPattern: Int64(Int32(bitPattern: 0xFFFF_FFFF)))
+        let value = Int32(-1) // 0xFFFFFFFF
         let instruction: [UInt8] = [
             0x33, // LoadImm opcode (32-bit immediate, sign-extended)
             0x01, // r1
-        ] + encodeVarint(value)
+        ] + withUnsafeBytes(of: value.littleEndian) { Array($0) }
 
         let result = await JITInstructionExecutor.executeSingleInstruction(instruction)
 

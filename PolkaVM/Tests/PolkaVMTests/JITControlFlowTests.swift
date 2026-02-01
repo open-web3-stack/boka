@@ -232,21 +232,22 @@ struct JITControlFlowTests {
 
         // LoadImmJump r1, 0x12345678, jump_forward by 1 instruction
         // Per spec pvm.tex section 5.10: [opcode][r_A | l_X][immed_X][immed_Y]
-        // offset=10 means target PC = 0 + 10 = PC 10 (LoadImm r3)
+        // With 6-byte LoadImm: PC 0=LoadImmJump(7), PC 7=LoadImm r2(6), PC 13=LoadImm r3(6)
+        // offset=13 means target PC = 0 + 13 = PC 13 (LoadImm r3)
         code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump opcode (80/0x50)
         code.append(0x01 | (4 << 4)) // r1=1, l_X=4 (4-byte immediate)
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }) // immed_X
-        code.append(10) // immed_Y (jump offset to PC 10)
+        code.append(13) // immed_Y (jump offset to PC 13)
 
         // LoadImm r2, 0x42 (should be skipped)
         code.append(PVMOpcodes.loadImm.rawValue)
         code.append(0x02) // r2
-        code.append(0x42)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x42).littleEndian) { Array($0) })
 
         // LoadImm r3, 0x53 (should execute)
         code.append(PVMOpcodes.loadImm.rawValue)
         code.append(0x03) // r3
-        code.append(0x53)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x53).littleEndian) { Array($0) })
 
         // Halt
         code.append(PVMOpcodes.halt.rawValue)
@@ -271,21 +272,22 @@ struct JITControlFlowTests {
 
         var code = Data()
 
-        // LoadImmJump r1, 0x12345678, jump_target=PC 10
+        // LoadImmJump r1, 0x12345678, jump_target=PC 13
         // r1=1, l_X=4 (for 4-byte immediate), l_Y=1 (for 1-byte offset)
-        // offset=10 means target PC = 0 + 10 = PC 10 (LoadImm r3)
+        // With 6-byte LoadImm: PC 0=LoadImmJump(7), PC 7=LoadImm r2(6), PC 13=LoadImm r3(6)
+        // offset=13 means target PC = 0 + 13 = PC 13 (LoadImm r3)
         code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump opcode (80/0x50)
         code.append(0x01 | (4 << 4)) // r1=1 (lower 4 bits), l_X=4 (bits 4-6)
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }) // immed_X
-        code.append(10) // immed_Y (jump offset to PC 10)
+        code.append(13) // immed_Y (jump offset to PC 13)
 
         code.append(PVMOpcodes.loadImm.rawValue) // Skipped: LoadImm r2, 0x42
         code.append(0x02)
-        code.append(0x42)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x42).littleEndian) { Array($0) })
 
         code.append(PVMOpcodes.loadImm.rawValue) // Execute: LoadImm r3, 0x53
         code.append(0x03)
-        code.append(0x53)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x53).littleEndian) { Array($0) })
 
         code.append(PVMOpcodes.halt.rawValue) // Halt
 
@@ -309,26 +311,19 @@ struct JITControlFlowTests {
         // LoadImmJumpInd: load jump target into register, then jump through it
         var code = Data()
 
-        // LoadImmJumpInd r1, jump_target=8
+        // First, set r0 = 0 (base register for jump)
+        code.append(PVMOpcodes.loadImm.rawValue) // LoadImm r0, 0
+        code.append(0x00) // r0
+        code.append(contentsOf: [0x00, 0x00, 0x00, 0x00])
+
+        // LoadImmJumpInd: r1 = 0x42, jump to r0 + 10 = PC 10
+        // With 6-byte LoadImm: PC 0-5=LoadImm r0, PC 6-9=LoadImmJumpInd, PC 10=LoadImm r2
         code.append(PVMOpcodes.loadImmJumpInd.rawValue) // LoadImmJumpInd opcode (180)
-        code.append(0x01) // r1
-        // Target offset 8
-        var target = UInt64(8)
-        while target > 0 {
-            var byte = UInt8(target & 0x7F)
-            target >>= 7
-            if target > 0 {
-                byte |= 0x80
-            }
-            code.append(byte)
-        }
+        code.append(0x01) // ra=1 (dest r1), rb=0 (base r0)
+        code.append(0x42) // value (1 byte)
+        code.append(10)   // offset (1 byte)
 
-        // Skipped instructions (padding to reach offset 8)
-        while code.count < 8 {
-            code.append(PVMOpcodes.trap.rawValue) // Trap as padding
-        }
-
-        // Target instruction at offset 8: LoadImm r2, 0xBB
+        // Target instruction at PC 10: LoadImm r2, 0xBB
         code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode (32-bit immediate, sign-extended)
         code.append(0x02) // r2
         code.append(contentsOf: [0xBB, 0x00, 0x00, 0x00]) // immediate
@@ -336,13 +331,14 @@ struct JITControlFlowTests {
         // Halt
         code.append(PVMOpcodes.halt.rawValue)
 
-        // Build blob with jump table (1 entry at offset 0)
+        // Build blob with jump table (0 entries - LoadImmJumpInd is a runtime jump)
         var programCode = Data()
-        programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(1)) // 1 jump table entry
-        programCode.append(0) // encode size (0 = no offset encoding, means 0-byte jump table entries)
+        programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(0)) // 0 jump table entries
+        programCode.append(0) // encode size (0 = no offset encoding)
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
         programCode.append(contentsOf: codeLength)
-        // Jump table: 0 bytes when encode size is 0
+        // No jump table entries needed
+
         programCode.append(contentsOf: code)
         let bitmask = ProgramBlobBuilder.generateBitmask([UInt8](code))
         programCode.append(contentsOf: bitmask)
@@ -351,9 +347,10 @@ struct JITControlFlowTests {
 
         let result = await JITInstructionExecutor.execute(blob: blob)
 
-        // Should jump to offset 8 and execute LoadImm32 r2, 0xBB
-        // Note: This might fail jump table validation
-        logger.info("LoadImmJumpInd result: \(result.exitReason), r2=\(result.register(Registers.Index(raw: 2)))")
+        // Should jump to PC 10 and execute LoadImm r2, 0xBB
+        // r1 should be loaded with 0x42, r2 should be loaded with 0xBB (sign-extended)
+        JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: 0x42)
+        JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: UInt64(bitPattern: Int64(Int32(bitPattern: 0xBB))))
     }
 
     @Test("JIT vs Interpreter: LoadImmJumpInd parity")
@@ -368,25 +365,27 @@ struct JITControlFlowTests {
         code.append(0x00) // r0
         code.append(contentsOf: [0x00, 0x00, 0x00, 0x00])
 
-        // LoadImmJumpInd: r1 = 0x42, then jump to r0 + offset (8) = PC 8
+        // LoadImmJumpInd: r1 = 0x42, then jump to r0 + offset (10) = PC 10
+        // With 6-byte LoadImm: PC 0-5=LoadImm r0, PC 6-9=LoadImmJumpInd, PC 10=LoadImm r2
         code.append(PVMOpcodes.loadImmJumpInd.rawValue) // LoadImmJumpInd
         code.append(0x01) // ra=1 (dest r1), rb=0 (base r0)
         code.append(0x42) // value (1 byte)
-        code.append(8)    // offset (1 byte)
+        code.append(10)   // offset (1 byte)
 
-        code.append(PVMOpcodes.loadImm.rawValue) // Target at PC 8: LoadImm r2, 0xBB
+        code.append(PVMOpcodes.loadImm.rawValue) // Target at PC 10: LoadImm r2, 0xBB
         code.append(0x02)
         code.append(contentsOf: [0xBB, 0x00, 0x00, 0x00])
 
         code.append(PVMOpcodes.halt.rawValue) // Halt
 
-        // Build blob with jump table (1 entry at offset 0)
+        // Build blob with jump table (0 entries - LoadImmJumpInd is a runtime jump)
         var programCode = Data()
-        programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(1)) // 1 jump table entry
-        programCode.append(0) // encode size (0 = no offset encoding, means 0-byte jump table entries)
+        programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(0)) // 0 jump table entries
+        programCode.append(0) // encode size (0 = no offset encoding)
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
         programCode.append(contentsOf: codeLength)
-        // Jump table: 0 bytes when encode size is 0
+        // No jump table entries needed
+
         programCode.append(contentsOf: code)
         let bitmask = ProgramBlobBuilder.generateBitmask([UInt8](code))
         programCode.append(contentsOf: bitmask)
