@@ -122,7 +122,7 @@ uint32_t pvm_host_call_trampoline(
 // Owned by Swift, passed to all C++ functions as void*
 // No global state - completely thread-safe through isolation
 struct RuntimeContext {
-    asmjit::JitRuntime* runtime;
+    asmjit::JitRuntime* _Nonnull runtime;
     std::unordered_map<void*, std::pair<void**, size_t>> dispatcherTables;
 
     RuntimeContext() : runtime(new asmjit::JitRuntime()) {}
