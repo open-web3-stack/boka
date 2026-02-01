@@ -33,13 +33,18 @@ final class ExecutorFrontendSandboxedWithPool: ExecutorFrontend {
         logger.debug("[Frontend] execute() called - ctx: \(ctx != nil ? "non-nil" : "nil")")
 
         // Sandboxed mode does not support InvocationContext
-        // TODO: Implement context serialization for Phase 4
+        // Fall back to in-process execution when context is provided
         if ctx != nil {
-            logger.error("Sandboxed mode does not support InvocationContext yet")
-            return VMExecutionResult(
-                exitReason: .panic(.trap),
-                gasUsed: Gas(0),
-                outputData: nil
+            logger.warning("Sandboxed mode does not support InvocationContext yet - falling back to in-process execution")
+            // Use in-process executor as fallback
+            let inProcessFrontend = ExecutorFrontendInProcess(mode: mode)
+            return await inProcessFrontend.execute(
+                config: config,
+                blob: blob,
+                pc: pc,
+                gas: gas,
+                argumentData: argumentData,
+                ctx: ctx
             )
         }
 

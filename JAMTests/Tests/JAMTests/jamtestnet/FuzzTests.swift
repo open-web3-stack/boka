@@ -46,6 +46,7 @@ struct FuzzTests {
     @Test(arguments: try loadTests(
         version: "0.7.2",
         filters: [
+            ("0.7.2/1767827127_1243", "00404399")
         ],
         ignore: [
         ],
@@ -54,26 +55,25 @@ struct FuzzTests {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .sandboxed)
     }
 
-    // FIXME: JIT tests disabled - C++ JIT uses varint decoding but test vectors use little-endian encoding
-    // @Test(arguments: try loadTests(
-    //     version: "0.7.2",
-    //     filters: [
-    //     ],
-    //     ignore: [
-    //     ],
-    // ))
+    @Test(arguments: try loadTests(
+        version: "0.7.2",
+        filters: [
+        ],
+        ignore: [
+        ],
+    ))
     func v072_jit(input: Testcase) async throws {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .jit)
     }
 
-    // FIXME: JIT sandbox tests disabled - C++ JIT uses varint decoding but test vectors use little-endian encoding
-    // @Test(arguments: try loadTests(
-    //     version: "0.7.2",
-    //     filters: [
-    //     ],
-    //     ignore: [
-    //     ],
-    // ))
+    @Test(arguments: try loadTests(
+        version: "0.7.2",
+        filters: [
+            ("0.7.2/1767827127_1243", "00404399")
+        ],
+        ignore: [
+        ],
+    ))
     func v072_jit_sandbox(input: Testcase) async throws {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: [.jit, .sandboxed])
     }
