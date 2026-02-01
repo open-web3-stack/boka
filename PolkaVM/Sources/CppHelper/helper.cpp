@@ -465,52 +465,73 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
 // ============================================================================
 
 /// Forward declarations from architecture-specific files
-extern "C" void freeDispatcherTable_x64(void* _Nullable funcPtr) noexcept;
-extern "C" void freeDispatcherTable_a64(void* _Nullable funcPtr) noexcept;
-extern "C" void freeAllDispatcherTables_x64() noexcept;
-extern "C" void freeAllDispatcherTables_a64() noexcept;
-extern "C" void releaseJITFunction_x64(void* _Nullable funcPtr) noexcept;
-extern "C" void releaseJITFunction_a64(void* _Nullable funcPtr) noexcept;
+extern "C" void freeDispatcherTable_x64(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept;
+extern "C" void freeDispatcherTable_a64(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept;
+extern "C" void freeAllDispatcherTables_x64(void* _Nonnull context) noexcept;
+extern "C" void freeAllDispatcherTables_a64(void* _Nonnull context) noexcept;
+extern "C" void releaseJITFunction_x64(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept;
+extern "C" void releaseJITFunction_a64(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept;
 
 /// Free the dispatcher table associated with a JIT-compiled function
 /// This is a wrapper that calls the appropriate architecture-specific implementation
 ///
+/// @param context Runtime context owning the dispatcher table
 /// @param funcPtr Function pointer returned by compilePolkaVMCode_x64_labeled or compilePolkaVMCode_a64_labeled
 /// @note Safe to call with nullptr or function pointers that don't have tables
-extern "C" void freeDispatcherTable(void* _Nullable funcPtr) noexcept {
-    if (!funcPtr) {
+extern "C" void freeDispatcherTable(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept {
+    if (!context || !funcPtr) {
         return;
     }
 
     // Try x64 first (most common)
-    freeDispatcherTable_x64(funcPtr);
+    freeDispatcherTable_x64(context, funcPtr);
 
     // ARM64 is a no-op currently (no dispatcher tables stored)
-    // freeDispatcherTable_a64(funcPtr);
+    // freeDispatcherTable_a64(context, funcPtr);
 }
 
 /// Free ALL dispatcher tables
 /// This is a wrapper that calls all architecture-specific implementations
 ///
-/// @note This frees all global dispatcher table storage
-extern "C" void freeAllDispatcherTables() noexcept {
-    freeAllDispatcherTables_x64();
+/// @param context Runtime context whose dispatcher tables should be freed
+extern "C" void freeAllDispatcherTables(void* _Nonnull context) noexcept {
+    if (!context) {
+        return;
+    }
+    freeAllDispatcherTables_x64(context);
     // ARM64 version is a no-op
-    // freeAllDispatcherTables_a64();
+    // freeAllDispatcherTables_a64(context);
 }
 
 /// Release JIT-compiled code memory
 /// This is a wrapper that calls all architecture-specific implementations
 ///
+/// @param context Runtime context owning the JIT runtime
 /// @param funcPtr Function pointer to release
 /// @note Safe to call with nullptr
 /// @warning After calling this, the function pointer becomes invalid and must not be called
-extern "C" void releaseJITFunction(void* _Nullable funcPtr) noexcept {
+extern "C" void releaseJITFunction(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept {
+    if (!context || !funcPtr) {
+        return;
+    }
+
     // Try x64 first (most common)
-    releaseJITFunction_x64(funcPtr);
+    releaseJITFunction_x64(context, funcPtr);
 
     // TODO: Add ARM64 support when needed
-    // releaseJITFunction_a64(funcPtr);
+    // releaseJITFunction_a64(context, funcPtr);
 }
 
 // ============================================================================

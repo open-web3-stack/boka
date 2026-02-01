@@ -319,29 +319,26 @@ private final class JITExecutionContext {
 
 /// ## Internal State Safety
 ///
-/// ⚠️ CRITICAL: C++ runtime and AsmJit are NOT thread-safe
-/// The C++ layer uses global static JitRuntime instances that cannot be accessed concurrently.
-/// Even with per-execution contexts in Swift, we must serialize ALL executions globally.
+/// ✅ Thread-safe via per-instance isolation
+/// Each ExecutorBackendJIT instance owns a JITCompiler with its own RuntimeContext
+/// Multiple instances can execute concurrently with no shared state and no locks
+/// C++ code is completely thread-agnostic - it receives context as parameter
 final class ExecutorBackendJIT: ExecutorBackend {
     private let logger = Logger(label: "ExecutorBackendJIT")
 
-    // CRITICAL: GLOBAL lock to serialize ALL JIT executions
-    // Multiple ExecutorBackendJIT instances share the same C++ global state (JitRuntime)
-    // This lock prevents concurrent access to non-thread-safe C++ code
-    private static let executionLock = Utils.ReadWriteLock()
-
-    // Shared components (stateless or thread-safe)
+    // Each instance has its own JITCompiler with its own RuntimeContext
+    // This makes C++ completely thread-agnostic - no global locks needed
+    // Multiple ExecutorBackendJIT instances can execute concurrently without any serialization
     private let jitCompiler = JITCompiler()
     private let jitExecutor = JITExecutor()
     private let codeCache = JITCodeCache()
 
-    // TODO: Implement thread safety for JIT execution (similar to interpreter's async execution model)
     // TODO: Add support for debugging JIT-compiled code (instruction tracing, register dumps)
     // TODO: Implement proper memory management for JIT code (code cache eviction policies)
     // TODO: Add support for tiered compilation (interpret first, then JIT hot paths)
 
     init() {
-        // Initialization simplified - execution-specific state now in JITExecutionContext
+        // Each instance has isolated C++ state via JITCompiler's RuntimeContext
     }
 
     deinit {
@@ -433,24 +430,22 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                // CRITICAL: Acquire global execution lock to prevent concurrent C++ access
-                // This serializes ALL JIT executions across all ExecutorBackendJIT instances
+                // No lock needed! Each ExecutorBackendJIT instance has its own RuntimeContext
+                // Multiple executions can run concurrently with complete isolation
                 var result: VMExecutionResult?
                 var error: Error?
 
-                Self.executionLock.withWriteLock {
-                    do {
-                        result = try boxedSelf.value.executeSynchronous(
-                            config: boxedConfig.value,
-                            blob: boxedBlob.value,
-                            pc: pc,
-                            gas: gas,
-                            argumentData: boxedArgumentData.value,
-                            ctx: boxedCtx.value
-                        )
-                    } catch let e {
-                        error = e
-                    }
+                do {
+                    result = try boxedSelf.value.executeSynchronous(
+                        config: boxedConfig.value,
+                        blob: boxedBlob.value,
+                        pc: pc,
+                        gas: gas,
+                        argumentData: boxedArgumentData.value,
+                        ctx: boxedCtx.value
+                    )
+                } catch let e {
+                    error = e
                 }
 
                 // Resume continuation with result or error
@@ -607,23 +602,29 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 )
 
                 // Retrieve dispatcher jump table for this compiled function
-                // This allows JumpInd to work without a PVM jump table
-                var size: size_t = 0
-                let table = getDispatcherTable(funcPtr, &size)
+                // Use type-safe wrapper method
+                let runtimeCtx = jitCompiler.getRuntimeContext()
 
-                // Store in cache for future use
-                codeCache.store(
-                    bytecode: bytecode,
-                    config: config,
-                    initialPC: pc,
-                    functionPtr: funcPtr,
-                    dispatcherTable: table,
-                    dispatcherTableSize: UInt32(size)
-                )
+                // Use wrapper's getDispatcherTable method which returns optional tuple
+                if let (table, size) = runtimeCtx.getDispatcherTable(for: funcPtr) {
+                    // Store in cache for future use
+                    codeCache.store(
+                        bytecode: bytecode,
+                        config: config,
+                        initialPC: pc,
+                        functionPtr: funcPtr,
+                        dispatcherTable: table,
+                        dispatcherTableSize: UInt32(size)
+                    )
 
-                compiledFuncPtr = funcPtr
-                dispatcherTable = table
-                dispatcherTableSize = UInt32(size)
+                    compiledFuncPtr = funcPtr
+                    dispatcherTable = table
+                    dispatcherTableSize = UInt32(size)
+                } else {
+                    compiledFuncPtr = funcPtr
+                    dispatcherTable = nil
+                    dispatcherTableSize = 0
+                }
             }
 
             // Update the JITHostFunctionTable with the dispatcher table
@@ -806,9 +807,8 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         // Each bitmap has 2^20 bits (1 bit per 4KB page for 2^32 address space)
                         let pageSize = UInt32(config.pvmMemoryPageSize)  // 4096 bytes per page
 
-                        // CRITICAL: Use lock to protect bitmap initialization during concurrent execution
-                        // Multiple tests may execute concurrently and share the same ExecutorBackendJIT instance
-                        // NOTE: executionLock already protects this entire executeSynchronous method
+                        // Thread-safe: Each ExecutorBackendJIT instance has its own RuntimeContext
+                        // No concurrent access to shared resources
 
                         // Deallocate old bitmaps if they exist
                         context.readMapBitmap?.deallocate()

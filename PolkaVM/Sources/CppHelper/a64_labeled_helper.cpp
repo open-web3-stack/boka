@@ -128,16 +128,19 @@ static uint64_t decode_varint(const uint8_t* bytecode, uint32_t offset, uint32_t
 
 // Main compilation function with labels for ARM64
 extern "C" int32_t compilePolkaVMCode_a64_labeled(
+    void* _Nonnull context,
     const uint8_t* _Nonnull codeBuffer,
     size_t codeSize,
     uint32_t initialPC,
     uint32_t jitMemorySize,
-    const uint32_t* _Nullable skipTable,   // NEW: instruction skip values
-    size_t skipTableSize,                   // NEW: skip table size
-    const uint8_t* _Nullable bitmask,      // NEW: bitmask for instruction boundaries
-    size_t bitmaskSize,                    // NEW: bitmask size
+    const uint32_t* _Nullable skipTable,
+    size_t skipTableSize,
+    const uint8_t* _Nullable bitmask,
+    size_t bitmaskSize,
     void* _Nullable * _Nonnull funcOut)
 {
+    auto* ctx = static_cast<RuntimeContext*>(context);
+
     // Validate inputs
     if (!codeBuffer || codeSize == 0) {
         return 1; // Invalid input
@@ -174,10 +177,9 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         return getInstructionSize(codeBuffer, pc, codeSize);
     };
 
-    // Initialize asmjit runtime
-    static JitRuntime runtime;
+    // Use the runtime from the context (owned by Swift)
     CodeHolder code;
-    code.init(runtime.environment());
+    code.init(ctx->runtime->environment());
 
     // Create ARM64 assembler
     a64::Assembler a(&code);
@@ -1424,7 +1426,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     a.ret(x30);
 
     // Generate the function code
-    Error err = runtime.add(funcOut, &code);
+    Error err = ctx->runtime->add(funcOut, &code);
     if (err != kErrorOk) {
         return int32_t(err);
     }
