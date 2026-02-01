@@ -21,23 +21,25 @@ using namespace asmjit::x86;
 using namespace JIT;
 using namespace PVM;
 
-// Global storage for dispatcher jump tables
-// Maps function pointer -> dispatcher table
-static std::unordered_map<void*, std::pair<void**, size_t>> s_dispatcherTables;
-static std::mutex s_dispatcherTablesMutex;
+// Export function to create a new RuntimeContext (called from Swift)
+extern "C" RuntimeContext* _Nonnull createRuntimeContext() noexcept {
+    return new RuntimeContext();
+}
 
-// Global AsmJit runtime for JIT compilation and memory management
-// This must be static to ensure it lives for the entire process
-static JitRuntime* g_globalRuntime = nullptr;
-
-// Global mutex for runtime access
-static std::mutex g_runtimeMutex;
+// Export function to destroy a RuntimeContext (called from Swift)
+extern "C" void destroyRuntimeContext(void* _Nonnull context) noexcept {
+    delete static_cast<RuntimeContext*>(context);
+}
 
 // Export function to get dispatcher table for a function
-extern "C" void* _Nullable * _Nullable getDispatcherTable(void* _Nonnull funcPtr, size_t* _Nonnull outSize) noexcept {
-    std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
-    auto it = s_dispatcherTables.find(funcPtr);
-    if (it != s_dispatcherTables.end()) {
+extern "C" void* _Nullable * _Nullable getDispatcherTable(
+    void* _Nonnull context,
+    void* _Nonnull funcPtr,
+    size_t* _Nonnull outSize) noexcept {
+    auto* ctx = static_cast<RuntimeContext*>(context);
+    auto& tables = ctx->dispatcherTables;
+    auto it = tables.find(funcPtr);
+    if (it != tables.end()) {
         *outSize = it->second.second;
         return it->second.first;
     }
@@ -46,9 +48,13 @@ extern "C" void* _Nullable * _Nullable getDispatcherTable(void* _Nonnull funcPtr
 }
 
 // Export function to set dispatcher table for a function (called from Swift)
-extern "C" void setDispatcherTable(void* _Nonnull funcPtr, void* _Nullable * _Nullable table, size_t size) noexcept {
-    std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
-    s_dispatcherTables[funcPtr] = {table, size};
+extern "C" void setDispatcherTable(
+    void* _Nonnull context,
+    void* _Nonnull funcPtr,
+    void* _Nullable * _Nullable table,
+    size_t size) noexcept {
+    auto* ctx = static_cast<RuntimeContext*>(context);
+    ctx->dispatcherTables[funcPtr] = {table, size};
 }
 
 // External declaration for the instruction emitter
@@ -158,16 +164,19 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
 
 // Main compilation function with labels
 extern "C" int32_t compilePolkaVMCode_x64_labeled(
+    void* _Nonnull context,
     const uint8_t* _Nonnull codeBuffer,
     size_t codeSize,
     uint32_t initialPC,
     uint32_t jitMemorySize,
-    const uint32_t* _Nullable skipTable,   // NEW: instruction skip values
-    size_t skipTableSize,                   // NEW: skip table size
-    const uint8_t* _Nullable bitmask,      // NEW: bitmask for instruction boundaries
-    size_t bitmaskSize,                    // NEW: bitmask size
+    const uint32_t* _Nullable skipTable,
+    size_t skipTableSize,
+    const uint8_t* _Nullable bitmask,
+    size_t bitmaskSize,
     void* _Nullable * _Nonnull funcOut)
 {
+    auto* ctx = static_cast<RuntimeContext*>(context);
+
     // Validate inputs
     if (!codeBuffer || codeSize == 0) {
         return 1; // Invalid input
@@ -204,16 +213,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         return getInstructionSize(codeBuffer, pc, codeSize);
     };
 
-    // Initialize global runtime if needed
-    {
-        std::lock_guard<std::mutex> lock(g_runtimeMutex);
-        if (!g_globalRuntime) {
-            g_globalRuntime = new JitRuntime();
-        }
-    }
-
+    // Use the runtime from the context (owned by Swift)
     CodeHolder code;
-    code.init(g_globalRuntime->environment());
+    code.init(ctx->runtime->environment());
 
     // Create x86 assembler
     x86::Assembler a(&code);
@@ -1935,7 +1937,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // NOTE: Execution never returns here - either jumps to target or falls back
 
     // Generate the function code
-    Error err = g_globalRuntime->add(funcOut, &code);
+    Error err = ctx->runtime->add(funcOut, &code);
     if (err != kErrorOk) {
         return int32_t(err);
     }
@@ -1985,13 +1987,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
 
-        // Store the dispatcher table in global map for later retrieval
-        {
-            std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
-            // Transfer ownership to global storage
-            void** tablePtr = dispatcherTable.release();
-            s_dispatcherTables[*funcOut] = {tablePtr, static_cast<size_t>(codeSize)};
-        }
+        // Store the dispatcher table in context for later retrieval
+        // Transfer ownership to context storage
+        void** tablePtr = dispatcherTable.release();
+        ctx->dispatcherTables[*funcOut] = {tablePtr, static_cast<size_t>(codeSize)};
     }
 
     return 0; // Success
@@ -2013,19 +2012,20 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 /// @param hasDispatcherTableOut Output: 1 if function has dispatcher table, 0 otherwise
 /// @return 0 on success, error code on failure
 extern "C" int32_t getCompiledCodeInfo(
+    void* _Nonnull context,
     void* _Nonnull funcPtr,
     void* _Nullable * _Nullable * _Nonnull dispatcherTableOut,
     size_t* _Nonnull dispatcherTableSizeOut,
     int* _Nonnull hasDispatcherTableOut) noexcept
 {
-    if (!funcPtr || !dispatcherTableOut || !dispatcherTableSizeOut || !hasDispatcherTableOut) {
+    auto* ctx = static_cast<RuntimeContext*>(context);
+    if (!ctx || !funcPtr || !dispatcherTableOut || !dispatcherTableSizeOut || !hasDispatcherTableOut) {
         return -1;  // Invalid parameters
     }
 
-    std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
-    auto it = s_dispatcherTables.find(funcPtr);
+    auto it = ctx->dispatcherTables.find(funcPtr);
 
-    if (it != s_dispatcherTables.end()) {
+    if (it != ctx->dispatcherTables.end()) {
         // Function has a dispatcher table
         *dispatcherTableOut = it->second.first;
         *dispatcherTableSizeOut = it->second.second;
@@ -2070,60 +2070,64 @@ extern "C" int32_t setCompiledCodeMetadata(
 /// Free the dispatcher table associated with a JIT-compiled function (x64 version)
 /// This prevents memory leaks from accumulating dispatcher tables
 ///
+/// @param context Runtime context owning the dispatcher table
 /// @param funcPtr Function pointer returned by compilePolkaVMCode_x64_labeled
 /// @note Safe to call with nullptr or function pointers that don't have tables
-extern "C" void freeDispatcherTable_x64(void* _Nullable funcPtr) noexcept {
-    if (!funcPtr) {
+extern "C" void freeDispatcherTable_x64(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept {
+    auto* ctx = static_cast<RuntimeContext*>(context);
+    if (!ctx || !funcPtr) {
         return;  // Nothing to free
     }
 
-    std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
-    auto it = s_dispatcherTables.find(funcPtr);
+    auto it = ctx->dispatcherTables.find(funcPtr);
 
-    if (it != s_dispatcherTables.end()) {
+    if (it != ctx->dispatcherTables.end()) {
         // Free the dispatcher table array
         void** table = it->second.first;
-        delete[] table;
+        free(table);  // Use free() since it was allocated with malloc/calloc
 
         // Remove from map
-        s_dispatcherTables.erase(it);
+        ctx->dispatcherTables.erase(it);
     }
 }
 
 /// Free ALL dispatcher tables (x64 version)
 /// Useful for process cleanup or memory pressure situations
 ///
-/// @note This frees all global dispatcher table storage
-extern "C" void freeAllDispatcherTables_x64() noexcept {
-    std::lock_guard<std::mutex> lock(s_dispatcherTablesMutex);
-
-    for (auto& entry : s_dispatcherTables) {
-        void** table = entry.second.first;
-        delete[] table;
+/// @param context Runtime context whose dispatcher tables should be freed
+extern "C" void freeAllDispatcherTables_x64(void* _Nonnull context) noexcept {
+    auto* ctx = static_cast<RuntimeContext*>(context);
+    if (!ctx) {
+        return;
     }
 
-    size_t count = s_dispatcherTables.size();
-    s_dispatcherTables.clear();
+    for (auto& entry : ctx->dispatcherTables) {
+        void** table = entry.second.first;
+        free(table);  // Use free() since it was allocated with malloc/calloc
+    }
+
+    ctx->dispatcherTables.clear();
 }
 
 /// Release JIT-compiled code memory (x64 version)
 /// This frees the machine code allocated by AsmJit's JitRuntime
 ///
+/// @param context Runtime context owning the JIT runtime
 /// @param funcPtr Function pointer to release
 /// @note Safe to call with nullptr
 /// @warning After calling this, the function pointer becomes invalid and must not be called
-extern "C" void releaseJITFunction_x64(void* _Nullable funcPtr) noexcept {
-    if (!funcPtr) {
+extern "C" void releaseJITFunction_x64(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept {
+    auto* ctx = static_cast<RuntimeContext*>(context);
+    if (!ctx || !funcPtr) {
         return;  // Nothing to release
     }
 
-    std::lock_guard<std::mutex> lock(g_runtimeMutex);
-    if (!g_globalRuntime) {
-        return;  // Runtime not initialized, nothing to release
-    }
-
     // Release the function memory
-    g_globalRuntime->release((uint8_t*)funcPtr);
+    ctx->runtime->release((uint8_t*)funcPtr);
 
     #ifdef DEBUG_JIT
     fprintf(stderr, "[JIT x64] Released JIT function %p\n", funcPtr);
