@@ -90,6 +90,15 @@ final class JITCompiler {
             throw CompilationError.invalidBlob
         }
 
+        // Validate skip table consistency
+        for (pc, skip) in skipTable.enumerated() {
+            let maxSkip = blob.count - pc - 1
+            if skip > UInt32(maxSkip) {
+                logger.error("Invalid skip value \(skip) at PC \(pc) (max: \(maxSkip))")
+                throw CompilationError.invalidBlob
+            }
+        }
+
         // Compile based on architecture
         // Using label-based compilation for maximum performance
         // This enables proper control flow (branches, loops) with direct jumps
