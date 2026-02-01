@@ -21,38 +21,39 @@ private let logger = Logger(label: "JITControlFlowTests")
 struct JITControlFlowTests {
     // MARK: - Halt Instruction (Opcode 1)
 
-    @Test("JIT: Halt instruction terminates normally")
+    @Test("JIT: Fallthrough instruction at end of program traps")
     func jitHalt() async throws {
-        // Create a halt program using proper StandardProgram format
-        let haltProgram = ProgramBlobBuilder.createSingleInstructionProgram([0x01]) // halt instruction
+        // Create a program with just fallthrough (opcode 1) at the end
+        // Per spec, when execution continues past the program end, it should trap
+        let program = ProgramBlobBuilder.createSingleInstructionProgram([0x01]) // fallthrough
 
-        let result = await JITInstructionExecutor.execute(blob: haltProgram)
+        let result = await JITInstructionExecutor.execute(blob: program)
 
-        // Should halt normally
-        JITTestAssertions.assertExitReason(result, equals: .halt)
+        // Should trap (execution continued past end of program)
+        JITTestAssertions.assertExitReason(result, equals: .panic(.trap))
     }
 
-    @Test("JIT vs Interpreter: Halt parity")
+    @Test("JIT vs Interpreter: Fallthrough parity")
     func jitHaltParity() async throws {
-        let haltProgram = ProgramBlobBuilder.createSingleInstructionProgram([0x01]) // halt instruction
+        let program = ProgramBlobBuilder.createSingleInstructionProgram([0x01]) // fallthrough
 
         let (interpreterResult, jitResult, differences) = await JITParityComparator.compare(
-            blob: haltProgram,
-            testName: "Halt"
+            blob: program,
+            testName: "Fallthrough"
         )
 
-        // Both should halt
+        // Both should trap (execution continued past end of program)
         #expect(
-            interpreterResult.exitReason == .halt,
-            "Interpreter should halt: got \(interpreterResult.exitReason)"
+            interpreterResult.exitReason == .panic(.trap),
+            "Interpreter should trap: got \(interpreterResult.exitReason)"
         )
         #expect(
-            jitResult.exitReason == .halt,
-            "JIT should halt: got \(jitResult.exitReason)"
+            jitResult.exitReason == .panic(.trap),
+            "JIT should trap: got \(jitResult.exitReason)"
         )
         #expect(
             differences == nil,
-            "Halt parity mismatch: \(differences ?? "none")"
+            "Fallthrough parity mismatch: \(differences ?? "none")"
         )
     }
 
@@ -102,30 +103,30 @@ struct JITControlFlowTests {
 
     @Test("JIT: Jump forward over instruction")
     func jitJumpForward() async throws {
-        // Build a simple program: Jump(forward), Halt
+        // Build a simple program: Jump(forward), Fallthrough
         // This tests if Jump instruction works at all
 
-        // Jump to PC=5 (jump past the jump instruction itself to the Halt)
+        // Jump to PC=5 (jump past the jump instruction itself to the Fallthrough)
         // Jump instruction is at PC=0, so offset = 5 to jump to PC=5
         var jumpOffset = Int32(5)
         let jumpInst: [UInt8] = [
             0x28, // Jump opcode
         ] + withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) }
 
-        // Halt instruction (at PC=5)
-        let haltInst: [UInt8] = [0x01]
+        // Fallthrough instruction (at PC=5) - will trap when execution continues past end
+        let fallthroughInst: [UInt8] = [0x01]
 
         let blob = ProgramBlobBuilder.createMultiInstructionProgram([
             jumpInst,
-            haltInst,
+            fallthroughInst,
         ])
 
         let result = await JITInstructionExecutor.execute(blob: blob)
 
-        // Both JIT and interpreter should halt
+        // Jump to fallthrough, then execution continues past end → trap
         #expect(
-            result.exitReason == .halt,
-            "Expected halt, got \(result.exitReason)"
+            result.exitReason == .panic(.trap),
+            "Expected trap after fallthrough, got \(result.exitReason)"
         )
     }
 
@@ -452,11 +453,11 @@ struct JITControlFlowTests {
         // Test jumping with a large offset value
         var code = Data()
 
-        // Jump forward over 100 LoadImm instructions to the Halt instruction
+        // Jump forward over 100 LoadImm instructions to the Fallthrough instruction
         // Jump offset is relative to current PC (at start of Jump instruction)
-        // Jump instruction is at PC=0, Halt is at PC=5 + 100*3 = 305
+        // Jump instruction is at PC=0, Fallthrough is at PC=5 + 100*3 = 305
         // So offset should be 305
-        var jumpOffset = Int32(305)  // Target PC = 0 + 305 = 305 (Halt instruction)
+        var jumpOffset = Int32(305)  // Target PC = 0 + 305 = 305 (Fallthrough instruction)
         code.append(PVMOpcodes.jump.rawValue) // Jump opcode
         code.append(contentsOf: withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) })
 
@@ -467,16 +468,16 @@ struct JITControlFlowTests {
             code.append(0x00) // immediate 0 (varint: single byte)
         }
 
-        // Halt
-        code.append(PVMOpcodes.halt.rawValue)
+        // Fallthrough (will trap when execution continues past end)
+        code.append(PVMOpcodes.halt.rawValue) // opcode 1 = fallthrough
 
         // Build blob using helper
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
 
         let result = await JITInstructionExecutor.execute(blob: blob)
 
-        // Should halt successfully
-        JITTestAssertions.assertExitReason(result, equals: .halt)
+        // Jump to fallthrough, then execution continues past end → trap
+        JITTestAssertions.assertExitReason(result, equals: .panic(.trap))
     }
 
     @Test("Interpreter: Branch validation using bitmask", .disabled("isInstructionBoundary temporarily disabled due to Data corruption issues"))

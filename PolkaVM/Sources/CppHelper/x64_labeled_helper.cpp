@@ -328,7 +328,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
             if (targetPC != pc + instrSize) {
                 // This is a branch/jump instruction (not a fallthrough)
-                // VALIDATE: Check if target is at an instruction boundary
+                // VALIDATE: Check if target is within code bounds and at an instruction boundary
+                if (targetPC >= codeSize) {
+                    fprintf(stderr, "[JIT] Invalid branch target: PC=%u is beyond code size %zu\n", targetPC, codeSize);
+                    return 4; // Compilation error: invalid branch target
+                }
                 if (bitmask && !isInstructionBoundary(targetPC)) {
                     fprintf(stderr, "[JIT] Invalid branch target: PC=%u is not at instruction boundary\n", targetPC);
                     return 4; // Compilation error: invalid branch target
