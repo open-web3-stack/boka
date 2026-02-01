@@ -345,9 +345,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         uint32_t instrSize = getInstrSize(pc);  // Now handles fixed-size correctly
 
         if (instrSize == 0) {
-            // Unknown opcode - log and fail compilation
-            fprintf(stderr, "[JIT] Unknown opcode %d (0x%02X) at PC %u\n", opcode, opcode, pc);
-            return 3; // Compilation error
+            // Unknown opcode - skip and treat as data
+            // This can happen when the bitmask marks data as an instruction boundary
+            fprintf(stderr, "[JIT] Unknown opcode %d (0x%02X) at PC %u, treating as data\n", opcode, opcode, pc);
+            pc++;
+            continue;
         }
 
         // Check if this code has JumpInd, LoadImmJump, or LoadImmJumpInd (which need dispatcher)
@@ -423,9 +425,11 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         uint32_t instrSize = getInstrSize(pc);  // Now handles fixed-size correctly
 
         if (instrSize == 0) {
-            // Unknown opcode - log and fail compilation
-            fprintf(stderr, "[JIT] Unknown opcode %d (0x%02X) at PC %u\n", opcode, opcode, pc);
-            return 3; // Compilation error
+            // Unknown opcode - skip and treat as data
+            // This can happen when the bitmask marks data as an instruction boundary
+            fprintf(stderr, "[JIT] Unknown opcode %d (0x%02X) at PC %u, treating as data\n", opcode, opcode, pc);
+            pc++;
+            continue;
         }
 
         // Bind label for this PC if:
