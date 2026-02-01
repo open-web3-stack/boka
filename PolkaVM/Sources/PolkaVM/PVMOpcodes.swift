@@ -11,7 +11,9 @@ import Foundation
 enum PVMOpcodes: UInt8 {
     // Control Flow Instructions
     case trap = 0
-    case halt = 1  // Per spec called "fallthrough" - continues execution (not a true halt)
+    case halt = 1  // Per spec called "fallthrough" - continues execution.
+                  // IMPORTANT: When execution continues past end of program, it causes a trap per spec pvm.tex lines 89-92.
+                  // This is NOT a true halt - programs should terminate via special djump address or other mechanisms.
     case jump = 40
     case jumpInd = 50
     case loadImmJump = 80

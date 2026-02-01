@@ -81,9 +81,9 @@ struct JITInstructionParityTests {
     @Test("JIT vs Interpreter: LoadImm64")
     func testLoadImm64() async throws {
         // LoadImm64 r1, 0x123456789ABCDEF0
-        // Opcode 0x33, dest_reg=0x01, immediate=0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12
+        // Opcode 0x14 (20 = loadImmU64), dest_reg=0x01, immediate=0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12
         let instruction: [UInt8] = [
-            0x33, 0x01, 0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12,
+            0x14, 0x01, 0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12,
         ]
         try await compareExecution(
             instructionBytes: instruction,
@@ -124,27 +124,28 @@ struct JITInstructionParityTests {
     // Use InvokePVMTests.testSumToN for interpreter testing instead.
     // JIT should be tested with properly constructed programs using ProgramBlobBuilder.
 
-    @Test("JIT vs Interpreter: Halt program")
+    @Test("JIT vs Interpreter: Fallthrough program")
     func testHalt() async throws {
         let config = DefaultPvmConfig()
 
-        // Create proper halt program using ProgramBlobBuilder
-        let haltProgram = createSingleInstructionProgram([0x01]) // halt instruction
+        // Create fallthrough program using ProgramBlobBuilder
+        // Per spec, when execution continues past program end, it traps
+        let program = createSingleInstructionProgram([0x01]) // fallthrough instruction
 
         // Execute in JIT mode only
         // (Interpreter requires properly formed StandardProgram with valid stack size)
         let (exitReasonJIT, _, outputJIT) = await invokePVM(
             config: config,
             executionMode: .jit,
-            blob: haltProgram,
+            blob: program,
             pc: 0,
             gas: Gas(100_000),
             argumentData: nil,
             ctx: nil
         )
 
-        // JIT should halt
-        #expect(exitReasonJIT == .halt, "JIT should halt: got \(exitReasonJIT)")
+        // JIT should trap (execution continued past end of program)
+        #expect(exitReasonJIT == .panic(.trap), "JIT should trap: got \(exitReasonJIT)")
 
         // JIT should have no output
         let hasOutputJIT = (outputJIT != nil && !outputJIT!.isEmpty)
