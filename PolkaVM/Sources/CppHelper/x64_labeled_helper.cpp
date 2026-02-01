@@ -452,6 +452,15 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         // Handle control flow instructions with labels
         if (opcode_is(opcode, Opcode::Jump)) {
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
+
+            // CRITICAL: Only compile jump if target was validated in pre-pass
+            // If target is beyond code size or not a jump target, fall through
+            if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
+                // Invalid jump target - treat as fallthrough (don't jump)
+                pc += instrSize;
+                continue;
+            }
+
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_jump_labeled(&a, "x86_64", targetLabel);
             pc += instrSize;
@@ -462,6 +471,13 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t reg1 = codeBuffer[pc + 1];
             uint8_t reg2 = codeBuffer[pc + 2];
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
+
+            // CRITICAL: Only compile branch if target was validated in pre-pass
+            if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
+                // Invalid jump target - treat as fallthrough
+                pc += instrSize;
+                continue;
+            }
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_branch_eq_labeled(&a, "x86_64", reg1, reg2, targetLabel);
@@ -474,6 +490,13 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t reg1 = codeBuffer[pc + 1];
             uint8_t reg2 = codeBuffer[pc + 2];
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
+
+            // CRITICAL: Only compile branch if target was validated in pre-pass
+            if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
+                // Invalid jump target - treat as fallthrough
+                pc += instrSize;
+                continue;
+            }
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_branch_ne_labeled(&a, "x86_64", reg1, reg2, targetLabel);
@@ -533,6 +556,14 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             }
 
             uint32_t targetPC = pc + uint32_t(int32_t(jumpOffset));  // Offset is relative
+
+            // CRITICAL: Only compile jump if target is within bounds and was validated
+            if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
+                // Invalid jump target - treat as fallthrough (don't jump)
+                fprintf(stderr, "[JIT] LoadImmJump at PC %u: invalid target %u, treating as fallthrough\n", pc, targetPC);
+                pc += instrSize;
+                continue;
+            }
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_load_imm_jump_labeled(&a, "x86_64", destReg, immediate, targetLabel);
