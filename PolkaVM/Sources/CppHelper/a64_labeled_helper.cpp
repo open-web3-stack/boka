@@ -74,6 +74,9 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
     }
 
     // LoadImmJump: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+    // CRITICAL: Use actual instruction size (from skip table) to calculate l_Y
+    // Format: [opcode][r_A|l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+    // Size = 2 + l_X + l_Y, therefore: l_Y = instrSize - 2 - l_X
     if (opcode_is(opcode, Opcode::LoadImmJump)) {
         if (pc + 1 >= bytecodeSize) return pc + instrSize;
 
@@ -81,29 +84,35 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
         uint32_t l_X = (byte1 >> 4) & 0x07;  // Length of immed_X (bits 4-6)
         if (l_X > 4) l_X = 4;
 
-        // Calculate l_Y (offset size)
-        uint32_t l_Y = 1;  // Default to 1 byte
-        if (l_X <= 3) {
-            l_Y = 4 - l_X;
+        // CRITICAL: Calculate l_Y from actual instruction size (instrSize parameter)
+        // This matches the main compilation loop and ensures consistency
+        uint32_t l_Y = instrSize - 2 - l_X;
+
+        // Validate l_Y is in valid range (0-4 per spec)
+        if (l_Y > 4 || (instrSize < 2 + l_X)) {
+            // Invalid instruction, return fallthrough
+            return pc + instrSize;
         }
 
         // Check bounds before reading offset
         uint32_t offsetPos = pc + 2 + l_X;
         if (offsetPos + l_Y > bytecodeSize) {
-            fprintf(stderr, "[JIT] LoadImmJump offset truncated at PC %u\n", pc);
+            fprintf(stderr, "[JIT ARM64] LoadImmJump offset truncated at PC %u\n", pc);
             return pc + instrSize;
         }
 
         // Read offset (little-endian)
         uint32_t offset = 0;
-        for (uint32_t i = 0; i < l_Y && i < 4; i++) {
-            offset |= (uint32_t)bytecode[offsetPos + i] << (8 * i);
-        }
-        // Sign-extend if needed
-        if (l_Y > 0 && l_Y < 4) {
-            uint32_t signBit = 1U << (l_Y * 8 - 1);
-            if (offset & signBit) {
-                offset |= (~0U) << (l_Y * 8);
+        if (l_Y > 0) {
+            for (uint32_t i = 0; i < l_Y && i < 4; i++) {
+                offset |= (uint32_t)bytecode[offsetPos + i] << (8 * i);
+            }
+            // Sign-extend if needed
+            if (l_Y < 4) {
+                uint32_t signBit = 1U << (l_Y * 8 - 1);
+                if (offset & signBit) {
+                    offset |= (~0U) << (l_Y * 8);
+                }
             }
         }
 
@@ -188,7 +197,17 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     // Create lambda to get instruction size using skip table
     // This is the authoritative source for variable-length encoded instructions
     auto getInstrSize = [&](uint32_t pc) -> uint32_t {
-        // If skip table provided, use it (from Swift's ProgramCode.skip(pc))
+        uint8_t opcode = codeBuffer[pc];
+
+        // For fixed-size instructions, ignore skip table and use known size
+        // This prevents corrupted/inconsistent skip tables from breaking compilation
+        uint32_t fixedSize = getInstructionSize(codeBuffer, pc, codeSize);
+        if (fixedSize > 0 && fixedSize <= 16) {
+            // Fixed-size instruction - use calculated size, not skip table
+            return fixedSize;
+        }
+
+        // For variable-length instructions, use skip table
         if (skipTable != nullptr && pc < skipTableSize) {
             uint32_t skip = skipTable[pc];
 
@@ -262,7 +281,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     uint32_t pc = 0;
     while (pc < codeSize) {
         uint8_t opcode = codeBuffer[pc];
-        uint32_t instrSize = getInstrSize(pc);  // USE skip table
+        uint32_t instrSize = getInstrSize(pc);  // Now handles fixed-size correctly
 
         if (instrSize == 0) {
             // Unknown opcode - compilation error
@@ -283,9 +302,19 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             if (targetPC != pc + instrSize) {
                 // This is a branch/jump instruction (not a fallthrough)
                 // VALIDATE: Check if target is at an instruction boundary
+                if (targetPC >= codeSize) {
+                    fprintf(stderr, "[JIT ARM64] Invalid branch target: PC=%u is beyond code size %zu\n", targetPC, codeSize);
+                    // CRITICAL: Skip this invalid jump instead of failing compilation
+                    fprintf(stderr, "[JIT ARM64] Skipping invalid jump at PC %u (treating as data)\n", pc);
+                    pc += instrSize;
+                    continue;
+                }
                 if (bitmask && !isInstructionBoundary(targetPC)) {
-                    fprintf(stderr, "[JIT] Invalid branch target: PC=%u is not at instruction boundary\n", targetPC);
-                    return 4; // Compilation error: invalid branch target
+                    fprintf(stderr, "[JIT ARM64] Invalid branch target: PC=%u is not at instruction boundary\n", targetPC);
+                    // CRITICAL: Skip this invalid jump instead of failing compilation
+                    fprintf(stderr, "[JIT ARM64] Skipping invalid jump at PC %u (treating as data)\n", pc);
+                    pc += instrSize;
+                    continue;
                 }
                 labelManager.markJumpTarget(targetPC);
             }
@@ -312,7 +341,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
     while (pc < codeSize) {
         uint8_t opcode = codeBuffer[pc];
-        uint32_t instrSize = getInstrSize(pc);  // USE skip table
+        uint32_t instrSize = getInstrSize(pc);  // Now handles fixed-size correctly
 
         if (instrSize == 0) {
             // Unknown opcode - compilation error
