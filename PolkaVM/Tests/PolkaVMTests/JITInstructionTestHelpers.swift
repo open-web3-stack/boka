@@ -359,21 +359,10 @@ enum ProgramBlobBuilder {
             return 1
         }
 
-        // LoadImm (varint-encoded value)
-        // Format: opcode (1) + register (1) + varint_value (variable)
+        // LoadImm (32-bit fixed-size value)
+        // Format: opcode (1) + register (1) + immediate32 (4) = 6 bytes
         if opcode == 0x33 { // LoadImm (opcode 51)
-            var size = 2 // opcode + register
-            var offset = pc + 2
-
-            // Decode varint to find its size
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break } // Last varint byte
-            }
-
-            return size
+            return 1 + 1 + 4 // opcode + register + immediate32
         }
 
         // Instructions with register + 64-bit immediate (10 bytes total)
@@ -407,29 +396,10 @@ enum ProgramBlobBuilder {
             return 2 + clamped_l_X + l_Y
         }
 
-        // LoadImmJumpInd - variable size due to varint encoding
-        // Format: opcode (1) + register (1) + varint_offset (variable) + varint_value (variable)
+        // LoadImmJumpInd - fixed size
+        // Format: opcode (1) + ra_rb_packed (1) + value_byte (1) + offset_byte (1) = 4 bytes
         if opcode == 0xB4 { // LoadImmJumpInd (opcode 180)
-            var size = 2 // opcode + register
-            var offset = pc + 2
-
-            // Decode varint offset
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break }
-            }
-
-            // Decode varint value
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break }
-            }
-
-            return size
+            return 4
         }
 
         // Arithmetic instructions (3 bytes: opcode + packed registers + rd)
