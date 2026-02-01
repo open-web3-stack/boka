@@ -5,6 +5,7 @@
 #include "helper.hh"
 #include "jit_label_manager.hh"
 #include "jit_control_flow.hh"
+#include "jit_cfg_helper.hh"
 #include "opcodes.hh"
 #include <asmjit/a64.h>
 #include <asmjit/asmjit.h>
@@ -309,25 +310,28 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
                     fprintf(stderr, "[JIT ARM64] Invalid branch target: PC=%u is beyond code size %zu\n", targetPC, codeSize);
                     // CRITICAL: Skip this invalid jump instead of failing compilation
                     fprintf(stderr, "[JIT ARM64] Skipping invalid jump at PC %u (treating as data)\n", pc);
-                    pc += instrSize;
-                    continue;
+                                continue;
                 }
                 if (bitmask && !isInstructionBoundary(targetPC)) {
                     fprintf(stderr, "[JIT ARM64] Invalid branch target: PC=%u is not at instruction boundary\n", targetPC);
                     // CRITICAL: Skip this invalid jump instead of failing compilation
                     fprintf(stderr, "[JIT ARM64] Skipping invalid jump at PC %u (treating as data)\n", pc);
-                    pc += instrSize;
-                    continue;
+                                continue;
                 }
                 labelManager.markJumpTarget(targetPC);
             }
         }
 
-        pc += instrSize;
     }
 
-    // === MAIN COMPILATION PASS ===
-    pc = 0;
+    // === BUILD CONTROL FLOW GRAPH ===
+    // CFG analysis ensures we only compile code reachable from entry point (PC=0)
+    // This matches interpreter behavior and reduces semantic differences
+    ControlFlowGraph cfg;
+    cfg.build(codeBuffer, codeSize, skipTable, skipTableSize, bitmask, /* entryPC= */ 0);
+
+    fprintf(stderr, "[JIT ARM64 CFG] Found %zu reachable PCs out of %zu total PCs\n",
+            cfg.getReachablePCs().size(), static_cast<size_t>(codeSize));
 
     // === GAS ACCOUNTING HELPER ===
     // Lambda to deduct gas and check for exhaustion
@@ -342,21 +346,23 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         a.b_lo(outOfGasLabel);
     };
 
-    while (pc < codeSize) {
+    // === MAIN COMPILATION PASS: ONLY COMPILE REACHABLE CODE ===
+    // Iterate through reachable PCs instead of scanning all PCs sequentially
+    // This matches interpreter behavior by only compiling code that will be executed
+    const auto& reachablePCs = cfg.getReachablePCs();
+
+    for (uint32_t pc : reachablePCs) {
         uint8_t opcode = codeBuffer[pc];
-        uint32_t instrSize = getInstrSize(pc);  // Now handles fixed-size correctly
+        uint32_t instrSize = getInstrSize(pc);
 
         if (instrSize == 0) {
-            // Unknown opcode - skip and treat as data
-            // This can happen when the bitmask marks data as an instruction boundary
-            fprintf(stderr, "[JIT ARM64] Unknown opcode at PC %u, treating as data\n", pc);
-            pc++;
+            // Unknown opcode - skip even in reachable code
+            fprintf(stderr, "[JIT ARM64] Unknown opcode at reachable PC %u, skipping\n", pc);
             continue;
         }
 
-        // Check if this PC is a jump target (from pre-pass or previous branch)
-        // Bind label here if so
-        if (labelManager.isMarkedTarget(pc) || labelManager.isJumpTarget(pc)) {
+        // Bind label for this PC if it's a jump target or marked
+        if (labelManager.isMarkedTarget(pc) || labelManager.isJumpTarget(pc) || cfg.isJumpTarget(pc)) {
             labelManager.bindLabel(&a, pc, "aarch64");
         }
 
@@ -370,7 +376,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_jump_labeled(&a, "aarch64", targetLabel);
-            pc += instrSize;
             continue;
         }
 
@@ -382,7 +387,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_branch_eq_labeled(&a, "aarch64", reg1, reg2, targetLabel);
 
-            pc += instrSize;
             continue;
         }
 
@@ -394,7 +398,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_branch_ne_labeled(&a, "aarch64", reg1, reg2, targetLabel);
 
-            pc += instrSize;
             continue;
         }
 
@@ -452,7 +455,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_load_imm_jump_labeled(&a, "aarch64", destReg, uint32_t(immediate), targetLabel);
 
-            pc += instrSize;
             continue;
         }
 
@@ -560,7 +562,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.mov(a64::w0, 2);  // Exit code 2 = exit to interpreter with updated PC
             a.b(epilogueLabel);
 
-            pc += instrSize;
             continue;
         }
 
@@ -726,7 +727,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // Store result in R0
             a.str(a64::x0, a64::ptr(a64::x19, 0));
 
-            pc += instrSize;
             continue;
         }
 
@@ -734,7 +734,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // Set return value to -1 (trap) in w0, then jump to epilogue
             a.mov(a64::w0, -1);
             a.b(epilogueLabel);
-            pc += instrSize;
             continue;
         }
 
@@ -768,7 +767,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
                 return 3; // Compilation error
             }
 
-            pc += instrSize;
             continue;
         }
 
@@ -835,7 +833,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
                 a.str(a64::x1, a64::ptr(a64::x19, dest_reg * 8));
             }
 
-            pc += instrSize;
             continue;
         }
 
@@ -887,7 +884,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
                 a.str(a64::x1, a64::ptr(a64::x20, a64::x0));
             }
 
-            pc += instrSize;
             continue;
         }
 
@@ -916,7 +912,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.mov(a64::w8, value);
             a.strb(a64::w8, a64::ptr(a64::x20, a64::x0));
 
-            pc += instrSize;
             continue;
         }
 
@@ -943,7 +938,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.mov(a64::w8, value);
             a.strh(a64::w8, a64::ptr(a64::x20, a64::x0));
 
-            pc += instrSize;
             continue;
         }
 
@@ -970,7 +964,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.mov(a64::w8, value);
             a.str(a64::w8, a64::ptr(a64::x20, a64::x0));
 
-            pc += instrSize;
             continue;
         }
 
@@ -997,7 +990,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.mov(a64::x8, value);
             a.str(a64::x8, a64::ptr(a64::x20, a64::x0));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1089,7 +1081,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.movk(a64::x8, imm3, 48);
             a.str(a64::x8, a64::ptr(a64::x19, destReg * 8));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1110,7 +1101,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // Store to rd
             a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1131,7 +1121,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // Store to rd
             a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1160,7 +1149,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // Store to memory [VM_MEMORY_PTR + address]
             a.str(a64::x1, a64::ptr(a64::x20, a64::x0));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1193,7 +1181,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1225,7 +1212,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1257,7 +1243,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1289,7 +1274,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1321,7 +1305,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1353,7 +1336,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1385,7 +1367,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.str(a64::x1, a64::ptr(a64::x19, ra * 8));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1418,7 +1399,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.strb(a64::w1, a64::ptr(a64::x20, a64::x0));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1450,7 +1430,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.strh(a64::w1, a64::ptr(a64::x20, a64::x0));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1482,7 +1461,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.str(a64::w1, a64::ptr(a64::x20, a64::x0));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1514,7 +1492,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             a.str(a64::x1, a64::ptr(a64::x20, a64::x0));
 
-            pc += instrSize;
             continue;
         }
 
@@ -1523,7 +1500,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             return 3; // Compilation error
         }
 
-        pc += instrSize;
     }
 
     // Bind panic label
