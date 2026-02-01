@@ -141,21 +141,37 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
         return pc + int32_t(offset);
     }
 
-    // LoadImmJump: [opcode][reg_index][varint_value][varint_offset] - variable size
+    // LoadImmJump: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+    // Spec: l_Y = min(4, max(0, ℓ - l_X - 1)) where ℓ is remaining instruction length
+    // For fixed-size encoding: l_Y = 4 - l_X when l_X <= 3
     if (opcode_is(opcode, Opcode::LoadImmJump)) {
-        // Skip reg byte and first varint (value)
-        uint32_t offset = pc + 2;
-        uint32_t varintSize1;
-        decode_varint(bytecode, offset, bytecodeSize, varintSize1);  // Skip value
-        if (varintSize1 == 0) {
-            return pc + instrSize;  // Invalid varint, fallthrough
+        if (pc + 1 >= bytecodeSize) return pc + instrSize;
+
+        uint8_t byte1 = bytecode[pc + 1];
+        uint32_t l_X = (byte1 >> 4) & 0x07;
+        if (l_X > 4) l_X = 4;
+
+        // Fixed-size calculation: l_Y = 4 - l_X (when l_X <= 3), otherwise l_Y = 1
+        uint32_t l_Y = (l_X <= 3) ? (4 - l_X) : 1;
+
+        // Format: [opcode][byte1][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+        // immed_Y (jump offset) starts at: pc + 2 + l_X
+        uint32_t offsetPos = pc + 2 + l_X;
+
+        // Decode immed_Y as l_Y-byte signed integer
+        int64_t jumpOffset = 0;
+        if (offsetPos + l_Y <= bytecodeSize) {
+            // Read l_Y bytes and sign-extend
+            uint64_t rawValue = 0;
+            for (uint32_t i = 0; i < l_Y; i++) {
+                rawValue |= uint64_t(bytecode[offsetPos + i]) << (i * 8);
+            }
+
+            // Sign-extend based on l_Y
+            uint64_t signBit = 1ULL << (l_Y * 8 - 1);
+            jumpOffset = (rawValue & signBit) ? (rawValue | (~((1ULL << (l_Y * 8)) - 1))) : rawValue;
         }
-        uint32_t offset2 = offset + varintSize1;
-        uint32_t varintSize2;
-        uint64_t jumpOffset = decode_varint(bytecode, offset2, bytecodeSize, varintSize2);
-        if (varintSize2 == 0) {
-            return pc + instrSize;  // Invalid varint, fallthrough
-        }
+
         return pc + uint32_t(jumpOffset);
     }
 
@@ -206,6 +222,17 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         // If skip table provided, use it (from Swift's ProgramCode.skip(pc))
         if (skipTable != nullptr && pc < skipTableSize) {
             uint32_t skip = skipTable[pc];
+
+            // CRITICAL: Validate skip won't cause buffer overflow
+            // skip is additional bytes beyond opcode, so pc + skip + 1 must be <= codeSize
+            if (pc + skip + 1 > codeSize) {
+                // Invalid skip value - log and fall back to fixed-size calculation
+                uint32_t maxSkip = codeSize - pc - 1;
+                fprintf(stderr, "[JIT] Invalid skip value %u at PC %u (max: %u), using fallback\n",
+                        skip, pc, maxSkip);
+                return getInstructionSize(codeBuffer, pc, codeSize);
+            }
+
             return skip + 1;  // skip is additional bytes, +1 for opcode
         }
 
@@ -215,7 +242,17 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
     // Use the runtime from the context (owned by Swift)
     CodeHolder code;
-    code.init(ctx->runtime->environment());
+    Error err = code.init(ctx->runtime->environment());
+    if (err != kErrorOk) {
+        fprintf(stderr, "[JIT] Failed to initialize CodeHolder: %d\n", err);
+        return int32_t(err);
+    }
+
+    // Validate runtime state before creating assembler
+    if (!ctx->runtime) {
+        fprintf(stderr, "[JIT] Runtime context is null\n");
+        return 5; // Compilation error
+    }
 
     // Create x86 assembler
     x86::Assembler a(&code);
@@ -389,6 +426,18 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Safety: limit l_X to reasonable range
             if (l_X > 4) l_X = 4;
 
+            // CRITICAL: Calculate l_Y from actual instruction size (from skip table)
+            // Format: [opcode][r_A|l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+            // Size = 2 + l_X + l_Y, therefore: l_Y = instrSize - 2 - l_X
+            uint32_t l_Y = instrSize - 2 - l_X;
+
+            // Validate l_Y is in valid range (0-4 per spec)
+            if (l_Y > 4 || (instrSize < 2 + l_X)) {
+                fprintf(stderr, "[JIT] Invalid LoadImmJump at PC %u: l_X=%u, l_Y=%u, instrSize=%u (skiptable=%u)\n",
+                        pc, l_X, l_Y, instrSize, skipTable ? skipTable[pc] : 0);
+                return 3; // Compilation error
+            }
+
             // Decode immed_X (l_X bytes, little-endian)
             uint64_t immediate = 0;
             for (uint32_t i = 0; i < l_X; i++) {
@@ -404,13 +453,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 }
             }
 
-            // Decode immed_Y (jump offset)
-            // Tests use l_Y=1 with l_X=4
-            uint32_t l_Y = 1;  // Default to 1 byte
-            if (l_X <= 3) {
-                l_Y = 4 - l_X;
-            }
-
+            // Decode immed_Y (jump offset, l_Y bytes)
             uint64_t jumpOffset = 0;
             for (uint32_t i = 0; i < l_Y; i++) {
                 if (pc + 2 + l_X + i >= codeSize) return 3;  // Bounds check
@@ -1937,9 +1980,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // NOTE: Execution never returns here - either jumps to target or falls back
 
     // Generate the function code
-    Error err = ctx->runtime->add(funcOut, &code);
-    if (err != kErrorOk) {
-        return int32_t(err);
+    Error addErr = ctx->runtime->add(funcOut, &code);
+    if (addErr != kErrorOk) {
+        return int32_t(addErr);
     }
 
     // Build dispatcher jump table ONLY if needed (has JumpInd instructions)

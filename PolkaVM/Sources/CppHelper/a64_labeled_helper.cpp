@@ -170,6 +170,17 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         // If skip table provided, use it (from Swift's ProgramCode.skip(pc))
         if (skipTable != nullptr && pc < skipTableSize) {
             uint32_t skip = skipTable[pc];
+
+            // CRITICAL: Validate skip won't cause buffer overflow
+            // skip is additional bytes beyond opcode, so pc + skip + 1 must be <= codeSize
+            if (pc + skip + 1 > codeSize) {
+                // Invalid skip value - log and fall back to fixed-size calculation
+                uint32_t maxSkip = codeSize - pc - 1;
+                fprintf(stderr, "[JIT ARM64] Invalid skip value %u at PC %u (max: %u), using fallback\n",
+                        skip, pc, maxSkip);
+                return getInstructionSize(codeBuffer, pc, codeSize);
+            }
+
             return skip + 1;  // skip is additional bytes, +1 for opcode
         }
 
@@ -179,7 +190,17 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
     // Use the runtime from the context (owned by Swift)
     CodeHolder code;
-    code.init(ctx->runtime->environment());
+    Error err = code.init(ctx->runtime->environment());
+    if (err != kErrorOk) {
+        fprintf(stderr, "[JIT ARM64] Failed to initialize CodeHolder: %d\n", err);
+        return int32_t(err);
+    }
+
+    // Validate runtime state before creating assembler
+    if (!ctx->runtime) {
+        fprintf(stderr, "[JIT ARM64] Runtime context is null\n");
+        return 5; // Compilation error
+    }
 
     // Create ARM64 assembler
     a64::Assembler a(&code);
@@ -330,6 +351,18 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             // Safety: limit l_X to reasonable range
             if (l_X > 4) l_X = 4;
 
+            // CRITICAL: Calculate l_Y from actual instruction size (from skip table)
+            // Format: [opcode][r_A|l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+            // Size = 2 + l_X + l_Y, therefore: l_Y = instrSize - 2 - l_X
+            uint32_t l_Y = instrSize - 2 - l_X;
+
+            // Validate l_Y is in valid range (0-4 per spec)
+            if (l_Y > 4 || (instrSize < 2 + l_X)) {
+                fprintf(stderr, "[JIT ARM64] Invalid LoadImmJump at PC %u: l_X=%u, l_Y=%u, instrSize=%u (skiptable=%u)\n",
+                        pc, l_X, l_Y, instrSize, skipTable ? skipTable[pc] : 0);
+                return 3; // Compilation error
+            }
+
             // Decode immed_X (l_X bytes, little-endian)
             uint64_t immediate = 0;
             for (uint32_t i = 0; i < l_X; i++) {
@@ -344,12 +377,7 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
                 }
             }
 
-            // Decode immed_Y (jump offset)
-            uint32_t l_Y = 1;  // Default to 1 byte
-            if (l_X <= 3) {
-                l_Y = 4 - l_X;
-            }
-
+            // Decode immed_Y (jump offset, l_Y bytes)
             uint64_t jumpOffset = 0;
             for (uint32_t i = 0; i < l_Y; i++) {
                 if (pc + 2 + l_X + i >= codeSize) return 3;  // Bounds check
@@ -1426,9 +1454,9 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     a.ret(x30);
 
     // Generate the function code
-    Error err = ctx->runtime->add(funcOut, &code);
-    if (err != kErrorOk) {
-        return int32_t(err);
+    Error addErr = ctx->runtime->add(funcOut, &code);
+    if (addErr != kErrorOk) {
+        return int32_t(addErr);
     }
 
     return 0; // Success
