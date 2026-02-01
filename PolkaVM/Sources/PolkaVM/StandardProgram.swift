@@ -21,10 +21,8 @@ public class StandardProgram {
     public let initialRegisters: Registers
 
     public init(blob: Data, argumentData: Data?) throws {
-        // Make a deep copy to ensure thread-safety - Data uses copy-on-write
-        // Using Array to force a true deep copy with no shared storage
-        let blobCopy = Data(Array(blob))
-        var slice = Slice(base: blobCopy, bounds: blobCopy.startIndex ..< blobCopy.endIndex)
+        // Data is already thread-safe (value semantic, copy-on-write)
+        var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
 
         guard let readOnlyLen: UInt32 = slice.decode(length: 3) else { throw Error.invalidReadOnlyLength }
         guard let readWriteLen: UInt32 = slice.decode(length: 3) else { throw Error.invalidReadWriteLength }
@@ -33,11 +31,11 @@ public class StandardProgram {
 
         let readOnlyEndIdx = slice.startIndex + Int(readOnlyLen)
         guard readOnlyEndIdx <= slice.endIndex else { throw Error.invalidDataLength }
-        let readOnlyData = Data(Array(blobCopy[slice.startIndex ..< readOnlyEndIdx]))
+        let readOnlyData = blob[slice.startIndex ..< readOnlyEndIdx]
 
         let readWriteEndIdx = readOnlyEndIdx + Int(readWriteLen)
         guard readWriteEndIdx <= slice.endIndex else { throw Error.invalidDataLength }
-        let readWriteData = Data(Array(blobCopy[readOnlyEndIdx ..< readWriteEndIdx]))
+        let readWriteData = blob[readOnlyEndIdx ..< readWriteEndIdx]
 
         slice = slice.dropFirst(Int(readOnlyLen + readWriteLen))
         guard let codeLength: UInt32 = slice.decode(length: 4), slice.startIndex + Int(codeLength) <= slice.endIndex else {
@@ -62,7 +60,7 @@ public class StandardProgram {
         // CRITICAL: Create a new Data object with indices starting from 0
         // ProgramCode expects blob.startIndex to be 0, not an offset into the original blob
         // Using Array to ensure we get a copy with zero-based indices
-        let programCodeBytes = Array(blobCopy[slice.startIndex ..< slice.startIndex + Int(codeLength)])
+        let programCodeBytes = Array(blob[slice.startIndex ..< slice.startIndex + Int(codeLength)])
         let programCodeData = Data(programCodeBytes)
         code = try ProgramCode(programCodeData)
 
