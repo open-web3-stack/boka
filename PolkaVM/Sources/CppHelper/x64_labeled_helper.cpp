@@ -318,11 +318,14 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         // Mark jump targets for all control flow instructions
         // This is necessary to handle backward jumps (loops) correctly
         // Only call getJumpTarget for actual branch/jump opcodes to avoid misinterpreting data
+        // Note: LoadImmJumpInd is a runtime jump (target depends on register value),
+        // so we cannot validate its target at compile time
         bool isBranchInstruction = opcode_is(opcode, Opcode::Jump) ||
                                    (instrSize == 7) ||  // Branch register instructions
                                    (instrSize == 14) || // Branch immediate instructions
-                                   opcode_is(opcode, Opcode::LoadImmJump) ||
-                                   opcode_is(opcode, Opcode::LoadImmJumpInd);
+                                   opcode_is(opcode, Opcode::LoadImmJump);
+
+        bool isRuntimeJump = opcode_is(opcode, Opcode::LoadImmJumpInd);
 
         if (isBranchInstruction) {
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
@@ -339,6 +342,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 }
                 labelManager.markJumpTarget(targetPC);
             }
+        } else if (isRuntimeJump) {
+            // LoadImmJumpInd jumps through a register - cannot validate target at compile time
+            // Skip validation and label marking for runtime jumps
         }
 
         pc += instrSize;
@@ -610,9 +616,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
             // Load target address from base register
-            a.mov(x86::eax, x86::dword_ptr(x86::rbx, base_reg * 8));
+            // IMPORTANT: Zero-extend by loading into rax directly, not eax
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
 
-            // Add offset (zero-extend to 64-bit by loading into register first)
+            // Add offset
             a.mov(x86::rcx, offset);
             a.add(x86::rax, x86::rcx);
 
@@ -629,6 +636,10 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::ecx, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, alignmentFactor)));
             a.mov(x86::r8d, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableEntrySize)));
             a.mov(x86::r9d, x86::dword_ptr(x86::rbp, offsetof(JITHostFunctionTable, jumpTableEntriesCount)));
+
+            // Special case: if jump table is empty (0 entries), use dispatcher loop instead
+            a.test(x86::r9d, x86::r9d);
+            a.jz(dispatcherLoopNoJumpTable2);
 
             // Validate target != 0
             a.test(x86::eax, x86::eax);
@@ -1766,22 +1777,18 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             continue;
         }
 
-        // LoadImm: Load 32-bit immediate into register using varint encoding
+        // LoadImm: Load 32-bit immediate into register
         if (opcode_is(opcode, Opcode::LoadImm)) {
-            // LoadImm: [opcode][reg_index][varint_value] - variable length
+            // LoadImm: [opcode][reg_index][value_32bit] = 6 bytes total
             uint8_t destReg = codeBuffer[pc + 1];
 
-            // Decode varint immediate starting at pc + 2 (after register)
-            uint32_t varint_size = 0;
-            uint64_t immediate = decode_varint(codeBuffer, pc + 2, codeSize, varint_size);
-            if (varint_size == 0) {
-                // Invalid varint encoding - compilation error
-                return 3;
-            }
+            // Load 32-bit immediate value from bytecode (little-endian)
+            uint32_t immediate;
+            memcpy(&immediate, &codeBuffer[pc + 2], 4);
 
             // LoadImm loads signed 32-bit values and sign-extends to 64-bit
             // Use movsxd to sign-extend the 32-bit immediate to 64-bit
-            a.mov(x86::eax, static_cast<uint32_t>(immediate));
+            a.mov(x86::eax, immediate);
             a.movsxd(x86::rax, x86::eax);  // Sign-extend eax to rax
             a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
 
