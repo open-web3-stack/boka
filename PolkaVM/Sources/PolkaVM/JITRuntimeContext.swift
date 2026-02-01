@@ -9,7 +9,7 @@ import Foundation
 /// Manages the lifecycle of a JIT runtime instance
 /// Each instance has its own isolated C++ state for thread-safe concurrent execution
 final class JITRuntimeContext {
-    private let contextPtr: OpaquePointer
+    private let contextPtr: UnsafeMutableRawPointer
 
     /// Creates a new RuntimeContext
     init() {
@@ -21,14 +21,12 @@ final class JITRuntimeContext {
 
     /// Destroys the RuntimeContext and frees all associated resources
     deinit {
-        if let ptr = contextPtr {
-            destroyRuntimeContext(ptr)
-        }
+        destroyRuntimeContext(contextPtr)
     }
 
     /// Get the opaque context pointer for passing to C++ functions
-    var contextPointer: OpaquePointer {
-        return contextPtr
+    var contextPointer: UnsafeMutableRawPointer {
+        contextPtr
     }
 
     /// Get dispatcher table for a compiled function

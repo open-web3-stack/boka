@@ -16,6 +16,7 @@ private struct JITCacheEntry {
     let bytecode: Data // Store actual bytecode for hash collision verification
     let configHash: Int
     let initialPC: UInt32
+    let runtimeContext: JITRuntimeContext // Runtime context for cleanup
 }
 
 /// Simple in-memory cache for JIT-compiled functions with LRU eviction
@@ -30,6 +31,7 @@ private final class JITCodeCache {
 
     // Lock to protect cache access during concurrent execution
     private let lock = Utils.ReadWriteLock()
+    private let runtimeContext: JITRuntimeContext
 
     /// Maximum cache size - prevents unbounded memory growth
     /// Each entry can be ~10KB+, so 100 entries = ~1MB max
@@ -41,8 +43,9 @@ private final class JITCodeCache {
     }
 
     /// Initialize cache with optional max size
-    init(maxSize: Int = defaultMaxSize) {
+    init(maxSize: Int = defaultMaxSize, runtimeContext: JITRuntimeContext) {
         maxCacheSize = maxSize
+        self.runtimeContext = runtimeContext
     }
 
     /// Generate hash from bytecode data
@@ -119,8 +122,12 @@ private final class JITCodeCache {
             if cache.count >= maxCacheSize, let lruKey = accessOrder.first {
                 if let evictedEntry = cache.removeValue(forKey: lruKey) {
                     // Free dispatcher table and function code for evicted entry
-                    CppHelper.freeDispatcherTable(UnsafeMutableRawPointer(mutating: evictedEntry.functionPtr))
-                    CppHelper.releaseJITFunction(UnsafeMutableRawPointer(mutating: evictedEntry.functionPtr))
+                    // Use wrapper methods for type-safe cleanup
+                    if let table = evictedEntry.dispatcherTable {
+                        // Note: dispatcher tables are managed by the runtime context
+                        // and will be freed when the context is destroyed
+                    }
+                    evictedEntry.runtimeContext.releaseFunction(functionPtr: evictedEntry.functionPtr)
                 }
                 accessOrder.removeFirst()
                 logger.debug("JIT cache EVICTED entry (cache size: \(cache.count), max: \(maxCacheSize))")
@@ -132,7 +139,8 @@ private final class JITCodeCache {
                 dispatcherTableSize: dispatcherTableSize,
                 bytecode: bytecode,
                 configHash: configHash,
-                initialPC: initialPC
+                initialPC: initialPC,
+                runtimeContext: runtimeContext
             )
 
             cache[key] = entry
@@ -145,8 +153,8 @@ private final class JITCodeCache {
     func clear() {
         // Free dispatcher tables and function code for all entries
         for entry in cache.values {
-            CppHelper.freeDispatcherTable(UnsafeMutableRawPointer(mutating: entry.functionPtr))
-            CppHelper.releaseJITFunction(UnsafeMutableRawPointer(mutating: entry.functionPtr))
+            // Use wrapper methods for type-safe cleanup
+            entry.runtimeContext.releaseFunction(functionPtr: entry.functionPtr)
         }
         cache.removeAll()
         accessOrder.removeAll()
@@ -329,16 +337,20 @@ final class ExecutorBackendJIT: ExecutorBackend {
     // Each instance has its own JITCompiler with its own RuntimeContext
     // This makes C++ completely thread-agnostic - no global locks needed
     // Multiple ExecutorBackendJIT instances can execute concurrently without any serialization
-    private let jitCompiler = JITCompiler()
-    private let jitExecutor = JITExecutor()
-    private let codeCache = JITCodeCache()
+    private let jitCompiler: JITCompiler
+    private let jitExecutor: JITExecutor
+    private let codeCache: JITCodeCache
 
     // TODO: Add support for debugging JIT-compiled code (instruction tracing, register dumps)
     // TODO: Implement proper memory management for JIT code (code cache eviction policies)
     // TODO: Add support for tiered compilation (interpret first, then JIT hot paths)
 
     init() {
-        // Each instance has isolated C++ state via JITCompiler's RuntimeContext
+        // Initialize JIT compiler (creates its own RuntimeContext)
+        jitCompiler = JITCompiler()
+        jitExecutor = JITExecutor()
+        // Initialize code cache with reference to runtime context for cleanup
+        codeCache = JITCodeCache(runtimeContext: jitCompiler.getRuntimeContext())
     }
 
     deinit {
