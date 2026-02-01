@@ -119,6 +119,10 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
 
     // Jump: [opcode][offset_32bit] = 5 bytes
     if (opcode_is(opcode, Opcode::Jump)) {
+        if (pc + 5 > bytecodeSize) {
+            fprintf(stderr, "[JIT] Jump instruction truncated at PC %u (need 5 bytes, have %zu)\n", pc, bytecodeSize);
+            return pc + instrSize; // Fallthrough on error
+        }
         uint32_t offset;
         memcpy(&offset, &bytecode[pc + 1], 4);
         return pc + int32_t(offset);
@@ -127,6 +131,10 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
     // Branch register instructions (7 bytes): [opcode][reg1][reg2][offset_32bit]
     // BranchEq, BranchNe, BranchLtU, BranchLtS, BranchGeU, BranchGeS
     if (instrSize == 7) {
+        if (pc + 7 > bytecodeSize) {
+            fprintf(stderr, "[JIT] Branch instruction truncated at PC %u (need 7 bytes, have %zu)\n", pc, bytecodeSize);
+            return pc + instrSize;
+        }
         uint32_t offset;
         memcpy(&offset, &bytecode[pc + 3], 4);
         return pc + int32_t(offset);
@@ -136,6 +144,10 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
     // BranchEqImm, BranchNeImm, BranchLtUImm, BranchLeUImm, BranchGeUImm, BranchGtUImm,
     // BranchLtSImm, BranchLeSImm, BranchGeSImm, BranchGtSImm
     if (instrSize == 14) {
+        if (pc + 14 > bytecodeSize) {
+            fprintf(stderr, "[JIT] BranchImm instruction truncated at PC %u (need 14 bytes, have %zu)\n", pc, bytecodeSize);
+            return pc + instrSize;
+        }
         uint32_t offset;
         memcpy(&offset, &bytecode[pc + 10], 4);  // Offset starts at byte 10
         return pc + int32_t(offset);
@@ -600,10 +612,12 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode_is(opcode, Opcode::LoadImmJumpInd)) {
-            // LoadImmJumpInd: [opcode][ra_rb_packed][value_byte][offset_byte]
-            // ra = dest register (bits 0-3 of byte 1)
-            // rb = base register (bits 4-7 of byte 1)
-            // Note: This is a simplified format using 1-byte values
+            // LoadImmJumpInd: [opcode][ra_rb_packed][value_byte][offset_byte] = 4 bytes
+            // Per spec: simplified format using 1-byte values
+            if (pc + 4 > codeSize) {
+                fprintf(stderr, "[JIT] LoadImmJumpInd instruction truncated at PC %u (need 4 bytes, have %zu)\n", pc, codeSize);
+                return 3; // Compilation error
+            }
             uint8_t packed_regs = codeBuffer[pc + 1];
             uint8_t dest_reg = packed_regs & 0x0F;  // bits 0-3
             uint8_t base_reg = (packed_regs >> 4) & 0x0F;  // bits 4-7
@@ -1779,20 +1793,45 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         // LoadImm: Load 32-bit immediate into register
         if (opcode_is(opcode, Opcode::LoadImm)) {
-            // LoadImm: [opcode][reg_index][value_32bit] = 6 bytes total
+            // Per spec pvm.tex lines 250-256:
+            // Format: [opcode][reg_index][immed_X (l_X bytes)]
+            // where l_X = min(4, remaining_length) and immed_X is sign-extended
+            // This is a variable-length encoding!
+            if (pc + 2 > codeSize) {
+                fprintf(stderr, "[JIT] LoadImm instruction truncated at PC %u (need at least 2 bytes, have %zu)\n", pc, codeSize);
+                return 3; // Compilation error
+            }
             uint8_t destReg = codeBuffer[pc + 1];
 
-            // Load 32-bit immediate value from bytecode (little-endian)
-            uint32_t immediate;
-            memcpy(&immediate, &codeBuffer[pc + 2], 4);
+            // Calculate l_X (length of immediate in bytes)
+            uint32_t remaining_length = codeSize - (pc + 2);
+            uint32_t l_X = (remaining_length < 4) ? remaining_length : 4;
+            if (l_X == 0) l_X = 1;  // Must have at least 1 byte
 
-            // LoadImm loads signed 32-bit values and sign-extends to 64-bit
-            // Use movsxd to sign-extend the 32-bit immediate to 64-bit
-            a.mov(x86::eax, immediate);
-            a.movsxd(x86::rax, x86::eax);  // Sign-extend eax to rax
+            // Load immediate value with l_X bytes (sign-extend based on l_X)
+            uint64_t immediate = 0;
+            for (uint32_t i = 0; i < l_X; i++) {
+                if (pc + 2 + i < codeSize) {
+                    immediate |= uint64_t(codeBuffer[pc + 2 + i]) << (i * 8);
+                }
+            }
+
+            // Sign-extend based on l_X
+            if (l_X == 1) {
+                immediate = int64_t(int8_t(immediate & 0xFF));
+            } else if (l_X == 2) {
+                immediate = int64_t(int16_t(immediate & 0xFFFF));
+            } else if (l_X == 3) {
+                immediate = int64_t(int32_t(immediate & 0xFFFFFFFF));
+            } else {
+                // l_X == 4, already 64-bit
+                // Keep as-is (already loaded as 64-bit)
+            }
+
+            a.mov(x86::rax, immediate);
             a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
 
-            pc += instrSize;
+            pc += 2 + l_X;
             continue;
         }
 
