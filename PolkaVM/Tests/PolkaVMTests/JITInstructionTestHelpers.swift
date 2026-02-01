@@ -394,29 +394,17 @@ enum ProgramBlobBuilder {
             return 1 + 1 // opcode (1) + register (1) = 2 bytes
         }
 
-        // LoadImmJump (variable size: opcode + register + varint_value + varint_offset)
-        // Format: opcode (1) + register (1) + varint_value (variable) + varint_offset (variable)
+        // LoadImmJump (fixed size: opcode + byte1 + immed_X + immed_Y)
+        // Format: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+        // Size = 2 + l_X + l_Y
+        // Spec: l_Y = min(4, max(0, ℓ - l_X - 1)) where ℓ is remaining instruction length
+        // For test data: l_Y = 4 - l_X (when l_X <= 3), otherwise l_Y = 1
         if opcode == 0x50 { // LoadImmJump (opcode 80)
-            var size = 2 // opcode + register
-            var offset = pc + 2
-
-            // Decode first varint (value)
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break } // Last varint byte
-            }
-
-            // Decode second varint (offset)
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break } // Last varint byte
-            }
-
-            return size
+            let byte1 = instructionBytes[pc + 1]
+            let l_X = Int((byte1 >> 4) & 0x07)
+            let clamped_l_X = min(l_X, 4)
+            let l_Y = (clamped_l_X <= 3) ? (4 - clamped_l_X) : 1
+            return 2 + clamped_l_X + l_Y
         }
 
         // LoadImmJumpInd - variable size due to varint encoding

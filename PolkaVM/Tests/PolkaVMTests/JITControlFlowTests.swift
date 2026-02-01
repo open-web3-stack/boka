@@ -231,10 +231,11 @@ struct JITControlFlowTests {
 
         // LoadImmJump r1, 0x12345678, jump_forward by 1 instruction
         // Per spec pvm.tex section 5.10: [opcode][r_A | l_X][immed_X][immed_Y]
+        // offset=10 means target PC = 0 + 10 = PC 10 (LoadImm r3)
         code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump opcode (80/0x50)
         code.append(0x01 | (4 << 4)) // r1=1, l_X=4 (4-byte immediate)
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }) // immed_X
-        code.append(11) // immed_Y (jump offset: skip to r3)
+        code.append(10) // immed_Y (jump offset to PC 10)
 
         // LoadImm r2, 0x42 (should be skipped)
         code.append(PVMOpcodes.loadImm.rawValue)
@@ -269,12 +270,13 @@ struct JITControlFlowTests {
 
         var code = Data()
 
-        // LoadImmJump r1, 0x12345678, jump_offset=11
+        // LoadImmJump r1, 0x12345678, jump_target=PC 10
         // r1=1, l_X=4 (for 4-byte immediate), l_Y=1 (for 1-byte offset)
+        // offset=10 means target PC = 0 + 10 = PC 10 (LoadImm r3)
         code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump opcode (80/0x50)
         code.append(0x01 | (4 << 4)) // r1=1 (lower 4 bits), l_X=4 (bits 4-6)
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }) // immed_X
-        code.append(11) // immed_Y (jump offset)
+        code.append(10) // immed_Y (jump offset to PC 10)
 
         code.append(PVMOpcodes.loadImm.rawValue) // Skipped: LoadImm r2, 0x42
         code.append(0x02)
