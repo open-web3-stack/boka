@@ -284,8 +284,11 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         uint32_t instrSize = getInstrSize(pc);  // Now handles fixed-size correctly
 
         if (instrSize == 0) {
-            // Unknown opcode - compilation error
-            return 3; // Compilation error
+            // Unknown opcode - skip and treat as data
+            // This can happen when the bitmask marks data as an instruction boundary
+            fprintf(stderr, "[JIT ARM64] Unknown opcode at PC %u, treating as data\n", pc);
+            pc++;
+            continue;
         }
 
         // Mark jump targets for all control flow instructions
@@ -344,8 +347,11 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         uint32_t instrSize = getInstrSize(pc);  // Now handles fixed-size correctly
 
         if (instrSize == 0) {
-            // Unknown opcode - compilation error
-            return 3; // Compilation error
+            // Unknown opcode - skip and treat as data
+            // This can happen when the bitmask marks data as an instruction boundary
+            fprintf(stderr, "[JIT ARM64] Unknown opcode at PC %u, treating as data\n", pc);
+            pc++;
+            continue;
         }
 
         // Check if this PC is a jump target (from pre-pass or previous branch)
