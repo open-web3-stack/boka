@@ -43,11 +43,13 @@ void ControlFlowGraph::build(
 
         // Must be at instruction boundary
         if (!isInstructionBoundary(pc)) {
+            fprintf(stderr, "[CFG] PC %u NOT at instruction boundary, skipping\n", pc);
             continue;
         }
 
         // Mark as reachable
         reachablePCs.insert(pc);
+        fprintf(stderr, "[CFG] Marking PC %u as reachable (opcode=0x%02x)\n", pc, codeBuffer[pc]);
 
         // Process instruction and add successors
         processInstruction(pc, worklist);
@@ -58,8 +60,11 @@ void ControlFlowGraph::processInstruction(uint32_t pc, std::queue<uint32_t>& wor
     uint8_t opcode = codeBuffer[pc];
     uint32_t instrSize = getInstrSize(pc);
 
+    fprintf(stderr, "[CFG] Processing PC %u (opcode=0x%02x), instrSize=%u\n", pc, opcode, instrSize);
+
     if (instrSize == 0) {
         // Invalid opcode, stop CFG traversal here
+        fprintf(stderr, "[CFG] PC %u has instrSize=0, stopping traversal\n", pc);
         return;
     }
 
@@ -79,8 +84,10 @@ void ControlFlowGraph::processInstruction(uint32_t pc, std::queue<uint32_t>& wor
         // For conditional branches (Branch*), add fallthrough
         if (!isTerminator(opcode)) {
             uint32_t nextPC = pc + instrSize;
+            fprintf(stderr, "[CFG] Jump instruction at PC %u, nextPC=%u\n", pc, nextPC);
             if (nextPC < codeSize && !reachablePCs.contains(nextPC)) {
                 worklist.push(nextPC);
+                fprintf(stderr, "[CFG] Adding nextPC %u to worklist (fallthrough from jump)\n", nextPC);
             }
         }
     } else {
@@ -92,6 +99,7 @@ void ControlFlowGraph::processInstruction(uint32_t pc, std::queue<uint32_t>& wor
             if (nextPC < codeSize) {
                 if (!reachablePCs.contains(nextPC)) {
                     worklist.push(nextPC);
+                    fprintf(stderr, "[CFG] Adding nextPC %u to worklist (fallthrough)\n", nextPC);
                 }
             }
         }
@@ -111,11 +119,70 @@ uint32_t ControlFlowGraph::getInstrSize(uint32_t pc) const {
         return 2;
     }
 
-    return get_instruction_size(codeBuffer, pc, codeSize);
+    // Use bitmask to find the next instruction boundary
+    // This is more reliable than re-decoding varint instructions
+    if (!bitmask) {
+        // Fall back to get_instruction_size if no bitmask available
+        return get_instruction_size(codeBuffer, pc, codeSize);
+    }
+
+    // Scan forward from pc+1 to find the next instruction boundary
+    // The current instruction size is the distance to the next boundary
+    for (uint32_t nextPC = pc + 1; nextPC < codeSize; nextPC++) {
+        if (isInstructionBoundary(nextPC)) {
+            return nextPC - pc;
+        }
+    }
+
+    // No more instruction boundaries found - size is to end of code
+    return codeSize - pc;
 }
 
 uint32_t ControlFlowGraph::getJumpTarget(uint32_t pc, uint32_t instrSize) const {
     uint8_t opcode = codeBuffer[pc];
+
+    // CRITICAL: Check opcode FIRST before checking instrSize
+    // LoadImmJump and LoadImmJumpInd have variable sizes and must be handled
+    // before the generic size-based handlers to avoid misclassification
+
+    // LoadImmJump: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
+    if (opcode_is(opcode, Opcode::LoadImmJump)) {
+        if (pc + 1 >= codeSize) return pc + instrSize;
+
+        uint8_t byte1 = codeBuffer[pc + 1];
+        uint32_t l_X = (byte1 >> 4) & 0x07;
+        if (l_X > 4) l_X = 4;
+
+        uint32_t l_Y = instrSize - 2 - l_X;
+
+        if (l_Y > 4 || (instrSize < 2 + l_X)) {
+            return pc + instrSize;
+        }
+
+        uint32_t offsetPos = pc + 2 + l_X;
+        if (offsetPos + l_Y > codeSize) {
+            return pc + instrSize;
+        }
+
+        // For LoadImmJump, the offset is UNSIGNED (relative to current PC)
+        // This is different from branches which use SIGNED offsets
+        uint64_t jumpOffset = 0;
+        if (l_Y > 0) {
+            for (uint32_t i = 0; i < l_Y; i++) {
+                jumpOffset |= uint64_t(codeBuffer[offsetPos + i]) << (i * 8);
+            }
+        }
+
+        uint32_t targetPC = pc + uint32_t(jumpOffset);
+        return targetPC;
+    }
+
+    // LoadImmJumpInd: [opcode][ra | rb][immed (1 byte)][offset (1 byte)]
+    if (opcode_is(opcode, Opcode::LoadImmJumpInd)) {
+        // LoadImmJumpInd jumps through a register, not to a fixed PC
+        // For CFG purposes, treat as fallthrough (we can't predict runtime register values)
+        return pc + instrSize;
+    }
 
     // Jump: [opcode][offset_32bit] = 5 bytes
     if (opcode_is(opcode, Opcode::Jump)) {
@@ -145,39 +212,6 @@ uint32_t ControlFlowGraph::getJumpTarget(uint32_t pc, uint32_t instrSize) const 
         uint32_t offset;
         memcpy(&offset, &codeBuffer[pc + 10], 4);
         return pc + int32_t(offset);
-    }
-
-    // LoadImmJump: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
-    if (opcode_is(opcode, Opcode::LoadImmJump)) {
-        if (pc + 1 >= codeSize) return pc + instrSize;
-
-        uint8_t byte1 = codeBuffer[pc + 1];
-        uint32_t l_X = (byte1 >> 4) & 0x07;
-        if (l_X > 4) l_X = 4;
-
-        uint32_t l_Y = instrSize - 2 - l_X;
-
-        if (l_Y > 4 || (instrSize < 2 + l_X)) {
-            return pc + instrSize;
-        }
-
-        uint32_t offsetPos = pc + 2 + l_X;
-        if (offsetPos + l_Y > codeSize) {
-            return pc + instrSize;
-        }
-
-        int64_t jumpOffset = 0;
-        if (l_Y > 0) {
-            uint64_t rawValue = 0;
-            for (uint32_t i = 0; i < l_Y; i++) {
-                rawValue |= uint64_t(codeBuffer[offsetPos + i]) << (i * 8);
-            }
-
-            uint64_t signBit = 1ULL << (l_Y * 8 - 1);
-            jumpOffset = (rawValue & signBit) ? (rawValue | (~((1ULL << (l_Y * 8)) - 1))) : rawValue;
-        }
-
-        return pc + uint32_t(jumpOffset);
     }
 
     return pc + instrSize; // Fallthrough
