@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <unordered_map>
-#include <asmjit/asmjit.h>
+#include <asmjit/core.h>
 #include "opcodes.hh"
 
 // JIT instruction generation interface

@@ -3,6 +3,8 @@
 
 #include "helper.hh"
 #include <asmjit/a64.h>
+#include <asmjit/x86.h>
+#include <asmjit/core.h>
 #include <cstddef>
 #include <cstring>
 #include <stdio.h>
