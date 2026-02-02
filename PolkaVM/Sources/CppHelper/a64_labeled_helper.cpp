@@ -8,7 +8,7 @@
 #include "jit_cfg_helper.hh"
 #include "opcodes.hh"
 #include <asmjit/a64.h>
-#include <asmjit/asmjit.h>
+#include <asmjit/core.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -294,34 +294,50 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
         // Mark jump targets for all control flow instructions
         // This is necessary to handle backward jumps (loops) correctly
-        // Only call getJumpTarget for actual branch/jump opcodes to avoid misinterpreting data
-        bool isBranchInstruction = opcode_is(opcode, Opcode::Jump) ||
-                                   (instrSize == 7) ||  // Branch register instructions
-                                   (instrSize == 14) || // Branch immediate instructions
-                                   opcode_is(opcode, Opcode::LoadImmJump) ||
-                                   opcode_is(opcode, Opcode::LoadImmJumpInd);
+        // IMPORTANT: Only validate known jump/branch opcodes - don't use size-based heuristics
+        // because size-based detection can misidentify data as code
+        bool isJumpInstruction = opcode_is(opcode, Opcode::Jump) ||
+                                  opcode_is(opcode, Opcode::LoadImmJump) ||
+                                  opcode_is(opcode, Opcode::LoadImmJumpInd);
 
-        if (isBranchInstruction) {
+        bool isBranchInstruction = opcode_is(opcode, Opcode::BranchEq) ||
+                                   opcode_is(opcode, Opcode::BranchNe) ||
+                                   opcode_is(opcode, Opcode::BranchLtU) ||
+                                   opcode_is(opcode, Opcode::BranchLtS) ||
+                                   opcode_is(opcode, Opcode::BranchGeU) ||
+                                   opcode_is(opcode, Opcode::BranchGeS) ||
+                                   opcode_is(opcode, Opcode::BranchEqImm) ||
+                                   opcode_is(opcode, Opcode::BranchNeImm) ||
+                                   opcode_is(opcode, Opcode::BranchLtUImm) ||
+                                   opcode_is(opcode, Opcode::BranchLeUImm) ||
+                                   opcode_is(opcode, Opcode::BranchGeUImm) ||
+                                   opcode_is(opcode, Opcode::BranchGtUImm) ||
+                                   opcode_is(opcode, Opcode::BranchLtSImm) ||
+                                   opcode_is(opcode, Opcode::BranchLeSImm) ||
+                                   opcode_is(opcode, Opcode::BranchGeSImm) ||
+                                   opcode_is(opcode, Opcode::BranchGtSImm);
+
+        if (isJumpInstruction || isBranchInstruction) {
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
             if (targetPC != pc + instrSize) {
                 // This is a branch/jump instruction (not a fallthrough)
                 // VALIDATE: Check if target is at an instruction boundary
                 if (targetPC >= codeSize) {
-                    fprintf(stderr, "[JIT ARM64] Invalid branch target: PC=%u is beyond code size %zu\n", targetPC, codeSize);
-                    // CRITICAL: Skip this invalid jump instead of failing compilation
-                    fprintf(stderr, "[JIT ARM64] Skipping invalid jump at PC %u (treating as data)\n", pc);
-                                continue;
+                    // Invalid jump target - skip this instruction and continue
+                    pc += instrSize;
+                    continue;
                 }
                 if (bitmask && !isInstructionBoundary(targetPC)) {
-                    fprintf(stderr, "[JIT ARM64] Invalid branch target: PC=%u is not at instruction boundary\n", targetPC);
-                    // CRITICAL: Skip this invalid jump instead of failing compilation
-                    fprintf(stderr, "[JIT ARM64] Skipping invalid jump at PC %u (treating as data)\n", pc);
-                                continue;
+                    // Invalid jump target - skip this instruction and continue
+                    pc += instrSize;
+                    continue;
                 }
                 labelManager.markJumpTarget(targetPC);
             }
         }
 
+        // Advance to next instruction
+        pc += instrSize;
     }
 
     // === BUILD CONTROL FLOW GRAPH ===

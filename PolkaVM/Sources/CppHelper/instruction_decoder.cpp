@@ -3,7 +3,8 @@
 
 #include "instructions.hh"
 #include "jit_instructions.hh"
-#include <asmjit/asmjit.h>
+#include <asmjit/x86.h>
+#include <asmjit/core.h>
 #include <unordered_map>
 
 using namespace asmjit;
