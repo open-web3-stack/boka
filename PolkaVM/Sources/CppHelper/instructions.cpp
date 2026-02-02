@@ -1,7 +1,8 @@
 #include "instructions.hh"
 #include "helper.hh"
 #include <asmjit/a64.h>
-#include <asmjit/asmjit.h>
+#include <asmjit/x86.h>
+#include <asmjit/core.h>
 
 namespace Instructions {
     // to workaround duplicated .init issue in Swift

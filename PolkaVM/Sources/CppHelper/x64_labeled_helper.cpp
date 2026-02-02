@@ -7,7 +7,8 @@
 #include "jit_control_flow.hh"
 #include "jit_cfg_helper.hh"
 #include "opcodes.hh"
-#include <asmjit/asmjit.h>
+#include <asmjit/x86.h>
+#include <asmjit/core.h>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -362,35 +363,47 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         // Mark jump targets for all control flow instructions
         // This is necessary to handle backward jumps (loops) correctly
-        // Only call getJumpTarget for actual branch/jump opcodes to avoid misinterpreting data
+        // IMPORTANT: Only validate known jump/branch opcodes - don't use size-based heuristics
+        // because size-based detection can misidentify data as code
         // Note: LoadImmJumpInd is a runtime jump (target depends on register value),
         // so we cannot validate its target at compile time
-        bool isBranchInstruction = opcode_is(opcode, Opcode::Jump) ||
-                                   (instrSize == 7) ||  // Branch register instructions
-                                   (instrSize == 14) || // Branch immediate instructions
-                                   opcode_is(opcode, Opcode::LoadImmJump);
+        bool isJumpInstruction = opcode_is(opcode, Opcode::Jump) ||
+                                  opcode_is(opcode, Opcode::LoadImmJump);
+
+        bool isBranchInstruction = opcode_is(opcode, Opcode::BranchEq) ||
+                                   opcode_is(opcode, Opcode::BranchNe) ||
+                                   opcode_is(opcode, Opcode::BranchLtU) ||
+                                   opcode_is(opcode, Opcode::BranchLtS) ||
+                                   opcode_is(opcode, Opcode::BranchGeU) ||
+                                   opcode_is(opcode, Opcode::BranchGeS) ||
+                                   opcode_is(opcode, Opcode::BranchEqImm) ||
+                                   opcode_is(opcode, Opcode::BranchNeImm) ||
+                                   opcode_is(opcode, Opcode::BranchLtUImm) ||
+                                   opcode_is(opcode, Opcode::BranchLeUImm) ||
+                                   opcode_is(opcode, Opcode::BranchGeUImm) ||
+                                   opcode_is(opcode, Opcode::BranchGtUImm) ||
+                                   opcode_is(opcode, Opcode::BranchLtSImm) ||
+                                   opcode_is(opcode, Opcode::BranchLeSImm) ||
+                                   opcode_is(opcode, Opcode::BranchGeSImm) ||
+                                   opcode_is(opcode, Opcode::BranchGtSImm);
 
         bool isRuntimeJump = opcode_is(opcode, Opcode::LoadImmJumpInd);
 
-        if (isBranchInstruction) {
+        if (isJumpInstruction || isBranchInstruction) {
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
             if (targetPC != pc + instrSize) {
                 // This is a branch/jump instruction (not a fallthrough)
                 // VALIDATE: Check if target is within code bounds and at an instruction boundary
                 if (targetPC >= codeSize) {
-                    fprintf(stderr, "[JIT] Invalid branch target: PC=%u is beyond code size %zu\n", targetPC, codeSize);
-                    // CRITICAL: Skip this invalid jump instead of failing compilation
-                    // This allows compilation to continue for blobs with data that looks like code
-                    fprintf(stderr, "[JIT] Skipping invalid jump at PC %u (treating as data)\n", pc);
-                                continue;
-                    // return 4; // Compilation error: invalid branch target
+                    // Invalid jump target - skip this instruction and continue
+                    // Don't log spam - this is expected for blobs with data
+                    pc += instrSize;
+                    continue;
                 }
                 if (bitmask && !isInstructionBoundary(targetPC)) {
-                    fprintf(stderr, "[JIT] Invalid branch target: PC=%u is not at instruction boundary\n", targetPC);
-                    // CRITICAL: Skip this invalid jump instead of failing compilation
-                    fprintf(stderr, "[JIT] Skipping invalid jump at PC %u (treating as data)\n", pc);
-                                continue;
-                    // return 4; // Compilation error: invalid branch target
+                    // Invalid jump target - skip this instruction and continue
+                    pc += instrSize;
+                    continue;
                 }
                 labelManager.markJumpTarget(targetPC);
             }
@@ -399,6 +412,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Skip validation and label marking for runtime jumps
         }
 
+        // Advance to next instruction
+        pc += instrSize;
     }
 
     // === BUILD CONTROL FLOW GRAPH ===
@@ -1984,6 +1999,256 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Subtract
             a.sub(x86::rax, x86::rcx);
+
+            // Store to rd
+            a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+
+            continue;
+        }
+
+        // AddImm64: Add 64-bit immediate to register
+        if (opcode_is(opcode, Opcode::AddImm64)) {
+            // AddImm64: [opcode][packed_ra_rb][value_le32] = 6 bytes
+            // where packed_ra_rb = (rb << 4) | ra
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;  // dest register
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;  // source register
+
+            // Decode 32-bit little-endian immediate and sign-extend to 64-bit
+            int32_t imm32;
+            memcpy(&imm32, &codeBuffer[pc + 2], 4);
+
+            // Load rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Add sign-extended 32-bit immediate (add with sign-extension is automatic)
+            a.add(x86::rax, imm32);
+
+            // Store to ra
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            continue;
+        }
+
+        // MulImm64: Multiply 64-bit immediate with register
+        if (opcode_is(opcode, Opcode::MulImm64)) {
+            // MulImm64: [opcode][packed_ra_rb][value_le32] = 6 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;  // dest register
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;  // source register
+
+            // Decode 32-bit little-endian immediate and sign-extend to 64-bit
+            int32_t imm32;
+            memcpy(&imm32, &codeBuffer[pc + 2], 4);
+
+            // Load rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Multiply with sign-extended 32-bit immediate
+            // imul r64, imm32 sign-extends the immediate
+            a.imul(x86::rax, imm32);
+
+            // Store to ra
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            continue;
+        }
+
+        // ShloLImm64: Shift left by immediate
+        if (opcode_is(opcode, Opcode::ShloLImm64)) {
+            // ShloLImm64: [opcode][packed_ra_rb][value_le32] = 6 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;  // dest register
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;  // source register
+
+            // Decode 32-bit little-endian immediate and sign-extend to 64-bit
+            int32_t imm32;
+            memcpy(&imm32, &codeBuffer[pc + 2], 4);
+            int64_t imm64 = imm32;  // Sign-extend
+
+            // Load rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Shift left by immediate (modulo 64)
+            a.mov(x86::rcx, imm64);
+            a.and_(x86::rcx, 63);  // Mask to 0-63
+            a.shl(x86::rax, x86::cl);
+
+            // Store to ra
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            continue;
+        }
+
+        // ShloRImm64: Shift right logical by immediate
+        if (opcode_is(opcode, Opcode::ShloRImm64)) {
+            // ShloRImm64: [opcode][packed_ra_rb][value_le32] = 6 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;  // dest register
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;  // source register
+
+            // Decode 32-bit little-endian immediate and sign-extend to 64-bit
+            int32_t imm32;
+            memcpy(&imm32, &codeBuffer[pc + 2], 4);
+            int64_t imm64 = imm32;  // Sign-extend
+
+            // Load rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Shift right logical by immediate (modulo 64)
+            a.mov(x86::rcx, imm64);
+            a.and_(x86::rcx, 63);  // Mask to 0-63
+            a.shr(x86::rax, x86::cl);
+
+            // Store to ra
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            continue;
+        }
+
+        // SharRImm64: Shift right arithmetic by immediate
+        if (opcode_is(opcode, Opcode::SharRImm64)) {
+            // SharRImm64: [opcode][packed_ra_rb][value_le32] = 6 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;  // dest register
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;  // source register
+
+            // Decode 32-bit little-endian immediate and sign-extend to 64-bit
+            int32_t imm32;
+            memcpy(&imm32, &codeBuffer[pc + 2], 4);
+            int64_t imm64 = imm32;  // Sign-extend
+
+            // Load rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Shift right arithmetic by immediate (modulo 64)
+            a.mov(x86::rcx, imm64);
+            a.and_(x86::rcx, 63);  // Mask to 0-63
+            a.sar(x86::rax, x86::cl);
+
+            // Store to ra
+            a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
+
+            continue;
+        }
+
+        // ShloL64: Shift left by register (3-register format)
+        if (opcode_is(opcode, Opcode::ShloL64)) {
+            // ShloL64: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and shift amount rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Mask shift amount to 0-63
+            a.and_(x86::rcx, 63);
+
+            // Shift left
+            a.shl(x86::rax, x86::cl);
+
+            // Store to rd
+            a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+
+            continue;
+        }
+
+        // ShloR64: Shift right logical by register
+        if (opcode_is(opcode, Opcode::ShloR64)) {
+            // ShloR64: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and shift amount rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Mask shift amount to 0-63
+            a.and_(x86::rcx, 63);
+
+            // Shift right logical
+            a.shr(x86::rax, x86::cl);
+
+            // Store to rd
+            a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+
+            continue;
+        }
+
+        // SharR64: Shift right arithmetic by register
+        if (opcode_is(opcode, Opcode::SharR64)) {
+            // SharR64: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and shift amount rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Mask shift amount to 0-63
+            a.and_(x86::rcx, 63);
+
+            // Shift right arithmetic (preserves sign)
+            a.sar(x86::rax, x86::cl);
+
+            // Store to rd
+            a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+
+            continue;
+        }
+
+        // And: Bitwise AND
+        if (opcode_is(opcode, Opcode::And)) {
+            // And: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Bitwise AND
+            a.and_(x86::rax, x86::rcx);
+
+            // Store to rd
+            a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+
+            continue;
+        }
+
+        // Or: Bitwise OR
+        if (opcode_is(opcode, Opcode::Or)) {
+            // Or: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Bitwise OR
+            a.or_(x86::rax, x86::rcx);
+
+            // Store to rd
+            a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
+
+            continue;
+        }
+
+        // Xor: Bitwise XOR
+        if (opcode_is(opcode, Opcode::Xor)) {
+            // Xor: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            // Load ra and rb
+            a.mov(x86::rax, x86::qword_ptr(x86::rbx, ra * 8));
+            a.mov(x86::rcx, x86::qword_ptr(x86::rbx, rb * 8));
+
+            // Bitwise XOR
+            a.xor_(x86::rax, x86::rcx);
 
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);

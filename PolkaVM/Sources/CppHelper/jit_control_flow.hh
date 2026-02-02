@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <asmjit/asmjit.h>
+#include <asmjit/core.h>
 #include <cstdint>
 
 // Forward declaration

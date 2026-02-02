@@ -5,9 +5,12 @@
 #include "jit_control_flow.hh"
 #include "jit_label_manager.hh"
 #include <asmjit/a64.h>
+#include <asmjit/x86.h>
+#include <asmjit/core.h>
 #include <cstring>
 
 using namespace asmjit;
+using namespace asmjit::x86;
 
 namespace JIT {
 
