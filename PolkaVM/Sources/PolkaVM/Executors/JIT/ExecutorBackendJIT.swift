@@ -122,11 +122,6 @@ private final class JITCodeCache {
             if cache.count >= maxCacheSize, let lruKey = accessOrder.first {
                 if let evictedEntry = cache.removeValue(forKey: lruKey) {
                     // Free dispatcher table and function code for evicted entry
-                    // Use wrapper methods for type-safe cleanup
-                    if let table = evictedEntry.dispatcherTable {
-                        // Note: dispatcher tables are managed by the runtime context
-                        // and will be freed when the context is destroyed
-                    }
                     evictedEntry.runtimeContext.releaseFunction(functionPtr: evictedEntry.functionPtr)
                 }
                 accessOrder.removeFirst()
