@@ -14,9 +14,6 @@ final class JITRuntimeContext {
     /// Creates a new RuntimeContext
     init() {
         contextPtr = createRuntimeContext()
-        if contextPtr == nil {
-            fatalError("Failed to create RuntimeContext")
-        }
     }
 
     /// Destroys the RuntimeContext and frees all associated resources

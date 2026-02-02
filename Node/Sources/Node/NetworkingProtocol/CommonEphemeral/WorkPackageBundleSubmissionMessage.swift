@@ -75,7 +75,7 @@ extension WorkPackageBundleSubmissionMessage: CEMessage {
         var messages: [Data] = []
 
         // Message 1: Core Index ++ Segments-Root Mappings
-        var encoder1 = JamEncoder()
+        let encoder1 = JamEncoder()
         try encoder1.encode(coreIndex)
         try encoder1.encode(UInt32(segmentsRootMappings.count))
         for mapping in segmentsRootMappings {
@@ -91,7 +91,7 @@ extension WorkPackageBundleSubmissionMessage: CEMessage {
         messages.append(extrinsics)
 
         // Message 4: [Segment]
-        var encoder4 = JamEncoder()
+        let encoder4 = JamEncoder()
         try encoder4.encode(UInt32(segments.count))
         for segment in segments {
             try encoder4.encode(segment)
@@ -99,7 +99,7 @@ extension WorkPackageBundleSubmissionMessage: CEMessage {
         messages.append(encoder4.data)
 
         // Message 5: [Import-Proof]
-        var encoder5 = JamEncoder()
+        let encoder5 = JamEncoder()
         try encoder5.encode(UInt32(importProofs.count))
         for proof in importProofs {
             try encoder5.encode(proof)
