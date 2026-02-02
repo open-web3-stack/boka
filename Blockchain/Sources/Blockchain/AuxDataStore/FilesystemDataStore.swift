@@ -299,14 +299,14 @@ extension FilesystemDataStore {
             if FileManager.default.fileExists(atPath: targetPath) {
                 // Target exists - use replaceItem for atomic replacement
                 #if os(Linux)
-                    try FileManager.default.replaceItem(
+                    _ = try FileManager.default.replaceItem(
                         at: targetURL,
                         withItemAt: URL(fileURLWithPath: tempPath),
                         backupItemName: nil,
                         options: .usingNewMetadataOnly
                     )
                 #else
-                    try FileManager.default.replaceItem(
+                    _ = try FileManager.default.replaceItem(
                         at: targetURL,
                         withItemAt: URL(fileURLWithPath: tempPath),
                         backupItemName: nil,
