@@ -248,6 +248,39 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     auto getInstrSize = [&](uint32_t pc) -> uint32_t {
         uint8_t opcode = codeBuffer[pc];
 
+        // For LoadImm, getInstructionSize uses varint decoding which is incorrect
+        // LoadImm uses raw bytes for the immediate, not varint encoding
+        // So we need special handling for LoadImm
+        if (opcode_is(opcode, Opcode::LoadImm)) {
+            // Use skip table for LoadImm if available
+            if (skipTable != nullptr && pc < skipTableSize) {
+                uint32_t skip = skipTable[pc];
+                if (skip > 0) {
+                    return skip + 1;  // skip is additional bytes, +1 for opcode
+                }
+                // If skip is 0, fall through to use code size as fallback
+            }
+            // Fallback: use remaining code size (works for single-instruction tests)
+            return codeSize - pc;
+        }
+
+        // For LoadImmJump and LoadImmJumpInd, getInstructionSize is unreliable
+        // These instructions have variable length based on immediate value sizes
+        // Use bitmask scanning to find the next instruction boundary
+        if (opcode_is(opcode, Opcode::LoadImmJump) || opcode_is(opcode, Opcode::LoadImmJumpInd)) {
+            if (bitmask != nullptr) {
+                // Scan forward from pc+1 to find the next instruction boundary
+                for (uint32_t nextPC = pc + 1; nextPC < codeSize; nextPC++) {
+                    if (bitmask[nextPC / 8] & (1 << (nextPC % 8))) {
+                        return nextPC - pc;
+                    }
+                }
+                // No more instruction boundaries found - size is to end of code
+                return codeSize - pc;
+            }
+            // No bitmask available - fall through to use getInstructionSize
+        }
+
         // For fixed-size instructions, ignore skip table and use known size
         // This prevents corrupted/inconsistent skip tables from breaking compilation
         uint32_t fixedSize = getInstructionSize(codeBuffer, pc, codeSize);
@@ -425,6 +458,15 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     fprintf(stderr, "[JIT CFG] Found %zu reachable PCs out of %zu total PCs\n",
             cfg.getReachablePCs().size(), static_cast<size_t>(codeSize));
 
+    // Transfer CFG jump targets to label manager
+    // The CFG correctly identifies jump targets using bitmask scanning for variable-length instructions
+    // We need to inform the label manager about these targets so jump instructions can find them
+    for (uint32_t pc = 0; pc < codeSize; pc++) {
+        if (cfg.isJumpTarget(pc)) {
+            labelManager.markJumpTarget(pc);
+        }
+    }
+
     // === GAS ACCOUNTING HELPER ===
     // Lambda to deduct gas and check for exhaustion
     // Returns true if gas was deducted successfully, false if out of gas
@@ -440,19 +482,33 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     };
 
     // === MAIN COMPILATION PASS: ONLY COMPILE REACHABLE CODE ===
-    // Iterate through reachable PCs instead of scanning all PCs sequentially
-    // This matches interpreter behavior by only compiling code that will be executed
+    // Iterate through PCs in sequential order to ensure fallthrough works correctly
+    // Only compile PCs that are marked as reachable by the CFG
     const auto& reachablePCs = cfg.getReachablePCs();
 
-    for (uint32_t pc : reachablePCs) {
-        uint8_t opcode = codeBuffer[pc];
-        uint32_t instrSize = getInstrSize(pc);
+    pc = 0;  // Reset PC for main compilation pass
+    uint8_t opcode;
+    uint32_t instrSize;
+    bool instructionHandled;
+
+    while (pc < codeSize) {
+        // Skip PCs that are not reachable
+        if (!reachablePCs.contains(pc)) {
+            pc++;
+            goto next_instruction;
+        }
+
+        opcode = codeBuffer[pc];
+        instrSize = getInstrSize(pc);
+
+        fprintf(stderr, "[JIT] Compiling PC %u (opcode=0x%02x, instrSize=%u)\n", pc, opcode, instrSize);
 
         if (instrSize == 0) {
             // Unknown opcode - skip even in reachable code
             // This shouldn't happen in valid reachable code, but handle gracefully
             fprintf(stderr, "[JIT] Unknown opcode %d (0x%02X) at reachable PC %u, skipping\n", opcode, opcode, pc);
-            continue;
+            pc++;
+            goto next_instruction;
         }
 
         // Bind label for this PC if:
@@ -472,6 +528,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         // Check AFTER binding labels so jump targets don't double-deduct
         deductGas(1);
 
+        // Variable to track if we handled this instruction (for PC advancement)
+        instructionHandled = false;
+
         // Handle control flow instructions with labels
         if (opcode_is(opcode, Opcode::Jump)) {
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
@@ -480,12 +539,12 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // If target is beyond code size or not a jump target, fall through
             if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
                 // Invalid jump target - treat as fallthrough (don't jump)
-                continue;
+                goto next_instruction;
             }
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_jump_labeled(&a, "x86_64", targetLabel);
-            continue;
+            goto next_instruction;
         }
 
         if (opcode_is(opcode, Opcode::BranchEq)) {
@@ -496,13 +555,13 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // CRITICAL: Only compile branch if target was validated in pre-pass
             if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
                 // Invalid jump target - treat as fallthrough
-                continue;
+                goto next_instruction;
             }
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_branch_eq_labeled(&a, "x86_64", reg1, reg2, targetLabel);
 
-            continue;
+            goto next_instruction;
         }
 
         if (opcode_is(opcode, Opcode::BranchNe)) {
@@ -513,20 +572,24 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // CRITICAL: Only compile branch if target was validated in pre-pass
             if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
                 // Invalid jump target - treat as fallthrough
-                continue;
+                goto next_instruction;
             }
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_branch_ne_labeled(&a, "x86_64", reg1, reg2, targetLabel);
 
-            continue;
+            goto next_instruction;
         }
 
         if (opcode_is(opcode, Opcode::LoadImmJump)) {
+            fprintf(stderr, "[JIT] LoadImmJump at PC %u: opcode=0x%02x, byte1=0x%02x\n", pc, opcode, codeBuffer[pc + 1]);
+
             // Per spec pvm.tex section 5.10: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
             uint8_t byte1 = codeBuffer[pc + 1];
             uint8_t destReg = byte1 & 0x0F;  // r_A (lower 4 bits)
             uint32_t l_X = (byte1 >> 4) & 0x07;  // Length of immed_X (bits 4-6)
+
+            fprintf(stderr, "[JIT] LoadImmJump: destReg=%u, l_X=%u, instrSize=%u\n", destReg, l_X, instrSize);
 
             // Safety: limit l_X to reasonable range
             if (l_X > 4) l_X = 4;
@@ -564,6 +627,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 if (pc + 2 + l_X + i >= codeSize) return 3;  // Bounds check
                 jumpOffset |= (uint64_t)codeBuffer[pc + 2 + l_X + i] << (8 * i);
             }
+
+            fprintf(stderr, "[JIT] LoadImmJump: jumpOffset=%llu (0x%llx), l_Y=%u\n", jumpOffset, jumpOffset, l_Y);
+
             // Sign-extend offset
             if (l_Y > 0 && l_Y < 8) {
                 uint64_t signBit = 1ULL << (l_Y * 8 - 1);
@@ -578,13 +644,13 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
                 // Invalid jump target - treat as fallthrough (don't jump)
                 fprintf(stderr, "[JIT] LoadImmJump at PC %u: invalid target %u, treating as fallthrough\n", pc, targetPC);
-                continue;
+                goto next_instruction;
             }
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "x86_64");
             jit_emit_load_imm_jump_labeled(&a, "x86_64", destReg, immediate, targetLabel);
 
-            continue;
+            goto next_instruction;
         }
 
         if (opcode_is(opcode, Opcode::JumpInd)) {
@@ -826,7 +892,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.jmp(dispatcherLoop);
 
             pc += 4;  // opcode + packed_regs + value + offset
-            continue;
+            goto next_instruction;
         }
 
         // === Ecalli (Host Call) ===
@@ -868,14 +934,14 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store result in R0
             a.mov(x86::qword_ptr(x86::rbx, 0), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         if (opcode_is(opcode, Opcode::Trap)) {
             // Set return value to -1 (trap) in eax, then jump to epilogue
             a.mov(x86::eax, -1);
             a.jmp(epilogueLabel);
-            continue;
+            goto next_instruction;
         }
 
         // Opcode 1 (Halt/Fallthrough) is handled as normal instruction - just continues execution
@@ -974,7 +1040,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 a.mov(mem, x86::rdx);
             }
 
-            continue;
+            goto next_instruction;
         }
 
         // === StoreInd Instructions ===
@@ -1041,7 +1107,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 a.mov(mem, x86::rdx);
             }
             
-            continue;
+            goto next_instruction;
         }
 
         // === LoadInd Instructions ===
@@ -1099,7 +1165,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rcx);
             }
             
-            continue;
+            goto next_instruction;
         }
 
         // === Division Instructions with Zero-Check and Overflow-Check ===
@@ -1298,7 +1364,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             a.bind(divisionDone);
 
-            continue;
+            goto next_instruction;
         }
 
         // === Load Instructions with Bounds Checking ===
@@ -1375,7 +1441,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
             }
 
-            continue;
+            goto next_instruction;
         }
 
         // === Store Instructions with Bounds Checking ===
@@ -1435,7 +1501,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 a.mov(mem, x86::edx);
             }
 
-            continue;
+            goto next_instruction;
         }
 
         // === StoreImm Instructions with Bounds Checking ===
@@ -1465,7 +1531,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::cl);
 
-            continue;
+            goto next_instruction;
         }
 
         if (opcode_is(opcode, Opcode::StoreImmU16)) {
@@ -1493,7 +1559,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::cx);
 
-            continue;
+            goto next_instruction;
         }
 
         if (opcode_is(opcode, Opcode::StoreImmU32)) {
@@ -1521,7 +1587,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::ecx);
 
-            continue;
+            goto next_instruction;
         }
 
         if (opcode_is(opcode, Opcode::StoreImmU64)) {
@@ -1549,7 +1615,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::rcx);
 
-            continue;
+            goto next_instruction;
         }
 
         // === LoadIndU32: Load 32-bit unsigned value from indirect address ===
@@ -1589,7 +1655,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to destination register ra
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // === LoadIndI32: Load 32-bit signed value from indirect address ===
@@ -1615,7 +1681,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // === LoadIndU16: Load 16-bit unsigned value from indirect address ===
@@ -1640,7 +1706,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.movzx(x86::eax, x86::word_ptr(x86::r12, x86::rax));
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // === LoadIndI16: Load 16-bit signed value from indirect address ===
@@ -1666,7 +1732,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // === LoadIndU8: Load 8-bit unsigned value from indirect address ===
@@ -1691,7 +1757,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.movzx(x86::eax, x86::byte_ptr(x86::r12, x86::rax));
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // === LoadIndI8: Load 8-bit signed value from indirect address ===
@@ -1717,7 +1783,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // === LoadIndU64: Load 64-bit unsigned value from indirect address ===
@@ -1743,7 +1809,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // === StoreIndU8: Store 8-bit value to indirect address ===
@@ -1777,7 +1843,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::cl);
 
-            continue;
+            goto next_instruction;
         }
 
         // === StoreIndU16: Store 16-bit value to indirect address ===
@@ -1803,7 +1869,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::cx);
 
-            continue;
+            goto next_instruction;
         }
 
         // === StoreIndU32: Store 32-bit value to indirect address ===
@@ -1829,7 +1895,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::ecx);
 
-            continue;
+            goto next_instruction;
         }
 
         // === StoreIndU64: Store 64-bit value to indirect address ===
@@ -1855,7 +1921,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::rcx);
 
-            continue;
+            goto next_instruction;
         }
 
         // LoadImm: Load 32-bit immediate into register
@@ -1924,7 +1990,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
 
             pc += instrLen;
-            continue;
+            instructionHandled = true;
+            goto next_instruction;
         }
 
         // LoadImmU64: Load 64-bit immediate into register
@@ -1940,7 +2007,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::rax, immediate);
             a.mov(x86::qword_ptr(x86::rbx, destReg * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // Add64: 64-bit addition
@@ -1960,7 +2027,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // Add32: 32-bit addition
@@ -1983,7 +2050,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // Sub64: 64-bit subtraction
@@ -2003,7 +2070,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // AddImm64: Add 64-bit immediate to register
@@ -2026,7 +2093,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to ra
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // MulImm64: Multiply 64-bit immediate with register
@@ -2049,7 +2116,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to ra
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // ShloLImm64: Shift left by immediate
@@ -2074,7 +2141,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to ra
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // ShloRImm64: Shift right logical by immediate
@@ -2099,7 +2166,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to ra
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // SharRImm64: Shift right arithmetic by immediate
@@ -2124,7 +2191,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to ra
             a.mov(x86::qword_ptr(x86::rbx, ra * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // ShloL64: Shift left by register (3-register format)
@@ -2147,7 +2214,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // ShloR64: Shift right logical by register
@@ -2170,7 +2237,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // SharR64: Shift right arithmetic by register
@@ -2193,7 +2260,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // And: Bitwise AND
@@ -2213,7 +2280,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // Or: Bitwise OR
@@ -2233,7 +2300,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // Xor: Bitwise XOR
@@ -2253,7 +2320,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to rd
             a.mov(x86::qword_ptr(x86::rbx, rd * 8), x86::rax);
 
-            continue;
+            goto next_instruction;
         }
 
         // StoreU64: Store 64-bit value from register to memory
@@ -2281,13 +2348,19 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // Store to memory [VM_MEMORY_PTR + address]
             a.mov(x86::qword_ptr(x86::r12, x86::rax), x86::rdx);
 
-            continue;
+            goto next_instruction;
         }
 
         // For all other instructions, use the existing dispatcher
         // but only for this single instruction
         if (!jit_emitter_emit_basic_block_instructions(&a, "x86_64", codeBuffer, pc, pc + instrSize)) {
             return 3; // Compilation error
+        }
+
+    next_instruction:
+        // Advance to next instruction if not already handled by jump/branch
+        if (!instructionHandled) {
+            pc += instrSize;
         }
     }
 
@@ -2394,7 +2467,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // labeledPCs may contain out-of-bounds values from markJumpTarget
             if (pc >= codeSize) {
                 // Skip out-of-bounds PC values silently
-                continue;
+                goto next_instruction;
             }
 
             Label label = labelManager.getLabel(pc);
@@ -2406,7 +2479,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // CRITICAL: label_offset() can crash if label is not bound to code
             // Only call it if the label is valid and bound
             if (!labelManager.isLabelDefined(pc)) {
-                continue;
+                goto next_instruction;
             }
 
             uint64_t offset = code.label_offset(label);

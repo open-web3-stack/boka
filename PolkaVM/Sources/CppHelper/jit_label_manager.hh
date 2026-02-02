@@ -80,8 +80,9 @@ public:
     }
 
     // Check if a PC is a jump target
+    // Returns true if PC has a label OR was marked as a target
     bool isJumpTarget(uint32_t pc) const {
-        return labels.find(pc) != labels.end();
+        return labels.find(pc) != labels.end() || markedTargets.find(pc) != markedTargets.end();
     }
 
     // Check if a label has been defined (bound) at this PC
