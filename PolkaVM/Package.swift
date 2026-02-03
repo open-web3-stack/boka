@@ -35,13 +35,21 @@ let package = Package(
                 "CppHelper",
                 .product(name: "Logging", package: "swift-log"),
             ],
+            cSettings: [
+                .headerSearchPath("../asmjit"),
+                .unsafeFlags([
+                    "-I/usr/include/c++/13",
+                    "-I/usr/include/x86_64-linux-gnu/c++/13",
+                ]),
+            ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
                 .unsafeFlags([
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
                     "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit",
+                    "-Xcc", "-I../asmjit",
+                    "-Xcc", "-I../Sources/CppHelper",
                 ]),
             ]
         ),
@@ -61,7 +69,8 @@ let package = Package(
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
                     "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit",
+                    "-Xcc", "-I../asmjit",
+                    "-Xcc", "-I../Sources/CppHelper",
                 ]),
             ]
         ),
@@ -79,7 +88,8 @@ let package = Package(
                     "-Xcc", "-std=c++20",
                     "-Xcc", "-I/usr/include/c++/13",
                     "-Xcc", "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit",
+                    "-Xcc", "-I../asmjit",
+                    "-Xcc", "-I../Sources/CppHelper",
                 ]),
             ]
         ),
@@ -105,10 +115,11 @@ let package = Package(
                 "asmjit/configure_vs2022_x86.bat",
                 "asmjit/configure_vs2022_x64.bat",
                 "asmjit/CMakePresets.json",
-                "asmjit/include",
             ],
             sources: [
                 ".",
+                "asmjit",
+                "../asmjit/asmjit",
                 "../asmjit/asmjit/core",
                 "../asmjit/asmjit/arm",
                 "../asmjit/asmjit/x86",
@@ -117,12 +128,13 @@ let package = Package(
             ],
             publicHeadersPath: ".",
             cxxSettings: [
-                .headerSearchPath("../../Sources/asmjit"),
+                .headerSearchPath("asmjit"),
                 .unsafeFlags([
                     "-std=c++20",
                     "-I/usr/include/c++/13",
                     "-I/usr/include/x86_64-linux-gnu/c++/13",
-                    "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit",
+                    "-I../asmjit",
+                    "-Iasmjit",
                 ]),
                 .define("ASMJIT_STATIC"),
             ]
