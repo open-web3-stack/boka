@@ -71,7 +71,8 @@ struct BlockAuthorTests {
         // get the validator key
         let idx = timeslot % UInt32(config.value.epochLength)
         let devKey = try DevKeyStore.getDevKey(seed: idx % UInt32(config.value.totalNumberOfValidators))
-        let secretKey = try #require(keystore.get(Bandersnatch.self, publicKey: devKey.bandersnatch))
+        let keySecret = await keystore.get(Bandersnatch.self, publicKey: devKey.bandersnatch)
+        let secretKey = try #require(keySecret)
 
         let ticket = try SafroleService.generateTickets(
             count: 1,
