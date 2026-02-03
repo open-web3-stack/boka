@@ -35,7 +35,7 @@ extension CppHelper.Instructions.Trap: Instruction {
         self.init()
     }
 
-    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
         .exit(.panic(.trap))
     }
 }
@@ -45,7 +45,7 @@ extension CppHelper.Instructions.Fallthrough: Instruction {
         self.init()
     }
 
-    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
         // Fallthrough (opcode 0x01):
         // Just continue to next instruction.
         // Per spec pvm.tex line 89, executing beyond program code

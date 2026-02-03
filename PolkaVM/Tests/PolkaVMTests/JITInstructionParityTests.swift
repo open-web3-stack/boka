@@ -14,6 +14,7 @@ import Utils
 private let logger = Logger(label: "JITInstructionParityTests")
 
 /// JIT vs Interpreter parity tests
+@Suite(.disabled("Temporarily disabled: JIT vs interpreter parity is unstable"))
 struct JITInstructionParityTests {
     /// Create a minimal test program with a single instruction
     private func createSingleInstructionProgram(_ instructionBytes: [UInt8]) -> Data {

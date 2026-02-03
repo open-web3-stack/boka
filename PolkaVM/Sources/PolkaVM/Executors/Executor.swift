@@ -12,7 +12,7 @@ public final class Executor: @unchecked Sendable {
         self.mode = mode
         self.config = config
         // Read sandbox path from environment variable, default to "boka-sandbox"
-        self.sandboxPath = ProcessInfo.processInfo.environment["BOKA_SANDBOX_PATH"] ?? "boka-sandbox"
+        sandboxPath = ProcessInfo.processInfo.environment["BOKA_SANDBOX_PATH"] ?? "boka-sandbox"
 
         if mode.contains(.sandboxed) {
             frontend = ExecutorFrontendSandboxed(mode: mode)

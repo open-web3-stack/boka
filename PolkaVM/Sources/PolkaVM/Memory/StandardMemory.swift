@@ -234,7 +234,7 @@ public final class StandardMemory: Memory {
         }
     }
 
-    public func sbrk(_ size: UInt32) throws (MemoryError) -> UInt32 {
+    public func sbrk(_ size: UInt32) throws(MemoryError) -> UInt32 {
         // NOTE: sbrk will be removed from GP
         // NOTE: this impl aligns with w3f traces test vector README
 

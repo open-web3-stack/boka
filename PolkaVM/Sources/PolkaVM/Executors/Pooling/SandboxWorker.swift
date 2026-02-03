@@ -120,7 +120,7 @@ actor SandboxWorker {
             }
 
             logger
-                .info(
+                .debug(
                     "[EXEC] Worker \(workerID): Execution successful (total: \(stats.totalExecutions), failures: \(stats.failedExecutions))"
                 )
 

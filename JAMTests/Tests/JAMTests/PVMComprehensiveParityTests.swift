@@ -70,18 +70,16 @@ struct PVMComprehensiveParityTests {
 
             // Verify expected output
             // Only load UInt32 if output has at least 4 bytes
-            let valueInterpreter: UInt32
-            if let output = outputInterpreter, output.count >= 4 {
-                valueInterpreter = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            let valueInterpreter: UInt32 = if let output = outputInterpreter, output.count >= 4 {
+                output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
             } else {
-                valueInterpreter = 0
+                0
             }
 
-            let valueSandbox: UInt32
-            if let output = outputSandbox, output.count >= 4 {
-                valueSandbox = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            let valueSandbox: UInt32 = if let output = outputSandbox, output.count >= 4 {
+                output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
             } else {
-                valueSandbox = 0
+                0
             }
 
             #expect(
@@ -149,18 +147,16 @@ struct PVMComprehensiveParityTests {
             #expect(outputInterpreter == outputSandbox)
 
             // Only load UInt32 if output has at least 4 bytes
-            let valueInterpreter: UInt32
-            if let output = outputInterpreter, output.count >= 4 {
-                valueInterpreter = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            let valueInterpreter: UInt32 = if let output = outputInterpreter, output.count >= 4 {
+                output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
             } else {
-                valueInterpreter = 0
+                0
             }
 
-            let valueSandbox: UInt32
-            if let output = outputSandbox, output.count >= 4 {
-                valueSandbox = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+            let valueSandbox: UInt32 = if let output = outputSandbox, output.count >= 4 {
+                output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
             } else {
-                valueSandbox = 0
+                0
             }
 
             #expect(valueInterpreter == expectedOutput)

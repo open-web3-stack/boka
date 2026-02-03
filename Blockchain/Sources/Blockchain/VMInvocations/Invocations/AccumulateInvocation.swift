@@ -78,7 +78,10 @@ public func accumulate(
         ctx: ctx
     )
 
-    logger.info("=== Service \(serviceIndex): exit reason: \(exitReason), remaining gas: \(gas), output: \(output?.toDebugHexString() ?? "nil") ===")
+    logger
+        .info(
+            "=== Service \(serviceIndex): exit reason: \(exitReason), remaining gas: \(gas), output: \(output?.toDebugHexString() ?? "nil") ==="
+        )
 
     return try collapse(exitReason: exitReason, output: output, context: ctx.context, gas: gas)
 }

@@ -294,18 +294,16 @@ struct PVMStressTests {
         #expect(outputInterpreter == outputSandbox)
 
         // sum(0) = 0
-        let valueInterpreter: UInt32
-        if let output = outputInterpreter, output.count >= MemoryLayout<UInt32>.size {
-            valueInterpreter = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+        let valueInterpreter: UInt32 = if let output = outputInterpreter, output.count >= MemoryLayout<UInt32>.size {
+            output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
         } else {
-            valueInterpreter = 0
+            0
         }
 
-        let valueSandbox: UInt32
-        if let output = outputSandbox, output.count >= MemoryLayout<UInt32>.size {
-            valueSandbox = output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
+        let valueSandbox: UInt32 = if let output = outputSandbox, output.count >= MemoryLayout<UInt32>.size {
+            output.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
         } else {
-            valueSandbox = 0
+            0
         }
 
         #expect(valueInterpreter == 0, "Zero input: Interpreter should output 0, got \(valueInterpreter)")

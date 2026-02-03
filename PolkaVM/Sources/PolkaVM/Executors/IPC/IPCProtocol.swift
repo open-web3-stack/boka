@@ -36,7 +36,7 @@ enum IPCProtocol {
         }
 
         // Read length
-        let lengthData = data[0..<lengthPrefixSize]
+        let lengthData = data[0 ..< lengthPrefixSize]
         let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
 
         // Check we have complete message
@@ -46,7 +46,7 @@ enum IPCProtocol {
         }
 
         // Extract message payload
-        let messageData = data[lengthPrefixSize..<totalSize]
+        let messageData = data[lengthPrefixSize ..< totalSize]
 
         // Decode JSON
         let decoder = JSONDecoder()
@@ -58,7 +58,7 @@ enum IPCProtocol {
     }
 
     /// Encode specific payload to JSON Data
-    static func encodePayload<T: Codable>(_ payload: T) throws -> Data {
+    static func encodePayload(_ payload: some Codable) throws -> Data {
         let encoder = JSONEncoder()
         return try encoder.encode(payload)
     }
@@ -159,8 +159,8 @@ enum IPCError: Error {
     case decodingFailed(String)
     case invalidResponse(String)
     case childProcessError(String)
-    case writeFailed(Int)  // errno
-    case readFailed(Int)   // errno
+    case writeFailed(Int) // errno
+    case readFailed(Int) // errno
     case timeout
     case unexpectedEOF
 }

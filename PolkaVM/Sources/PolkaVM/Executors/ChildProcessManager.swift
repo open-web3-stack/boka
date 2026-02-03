@@ -31,6 +31,7 @@ actor ChildProcessManager {
     /// - Returns: Tuple of process handle and client file descriptor for IPC
     /// - Throws: IPCError if spawning fails
     func spawnChildProcess(executablePath: String) async throws -> (handle: ProcessHandle, clientFD: Int32) {
+        #if os(Linux)
         logger.debug("Spawning child process: \(executablePath)")
         // Create socket pair for IPC
         var sockets: [Int32] = [0, 0]
@@ -44,7 +45,11 @@ actor ChildProcessManager {
             let socketType: Int32 = SOCK_STREAM
         #endif
 
-        let result = Glibc.socketpair(domain, socketType, 0, &sockets)
+        #if canImport(Glibc)
+            let result = Glibc.socketpair(domain, socketType, 0, &sockets)
+        #elseif canImport(Darwin)
+            let result = Darwin.socketpair(domain, socketType, 0, &sockets)
+        #endif
 
         guard result == 0 else {
             let err = errno
@@ -67,33 +72,66 @@ actor ChildProcessManager {
         let execPathCArray = executablePath.utf8CString
 
         // Fork child process
-        let pid = Glibc.fork()
+        #if canImport(Glibc)
+            let pid = Glibc.fork()
+        #elseif canImport(Darwin)
+            let pid = Darwin.fork()
+        #endif
 
         if pid < 0 {
             // Fork failed
             let err = errno
-            Glibc.close(parentFD)
-            Glibc.close(childFD)
+            #if canImport(Glibc)
+                Glibc.close(parentFD)
+                Glibc.close(childFD)
+            #elseif canImport(Darwin)
+                Darwin.close(parentFD)
+                Darwin.close(childFD)
+            #endif
             logger.error("Failed to fork: \(err)")
             throw IPCError.writeFailed(Int(err))
         } else if pid == 0 {
             // Child process - DO NOT use logging, locks, or any async-unsafe functions
-            Glibc.close(parentFD)
+            #if canImport(Glibc)
+                Glibc.close(parentFD)
+            #elseif canImport(Darwin)
+                Darwin.close(parentFD)
+            #endif
 
             // Redirect stdin/stdout to /dev/null, keep stderr for debugging
-            let devNull = Glibc.open("/dev/null", O_RDWR)
+            #if canImport(Glibc)
+                let devNull = Glibc.open("/dev/null", O_RDWR)
+            #elseif canImport(Darwin)
+                let devNull = Darwin.open("/dev/null", O_RDWR)
+            #endif
             if devNull >= 0 {
-                Glibc.dup2(devNull, STDOUT_FILENO)
-                // Glibc.dup2(devNull, STDERR_FILENO)  // Keep stderr for debugging
-                Glibc.close(devNull)
+                #if canImport(Glibc)
+                    Glibc.dup2(devNull, STDOUT_FILENO)
+                    // Glibc.dup2(devNull, STDERR_FILENO)  // Keep stderr for debugging
+                    Glibc.close(devNull)
+                #elseif canImport(Darwin)
+                    Darwin.dup2(devNull, STDOUT_FILENO)
+                    // Darwin.dup2(devNull, STDERR_FILENO)  // Keep stderr for debugging
+                    Darwin.close(devNull)
+                #endif
             }
 
             // Set child FD as stdin (for IPC)
-            if Glibc.dup2(childFD, STDIN_FILENO) == -1 {
-                _exit(1)
-            }
+            #if canImport(Glibc)
+                if Glibc.dup2(childFD, STDIN_FILENO) == -1 {
+                    _exit(1)
+                }
+            #elseif canImport(Darwin)
+                if Darwin.dup2(childFD, STDIN_FILENO) == -1 {
+                    _exit(1)
+                }
+            #endif
 
-            Glibc.close(childFD)
+            #if canImport(Glibc)
+                Glibc.close(childFD)
+            #elseif canImport(Darwin)
+                Darwin.close(childFD)
+            #endif
 
             // Execute child process
             // Use pre-allocated C string array (async-signal-safe)
@@ -106,7 +144,11 @@ actor ChildProcessManager {
                     nil,
                 ]
 
-                let exeResult = Glibc.execvp(execPath, &argv)
+                #if canImport(Glibc)
+                    let exeResult = Glibc.execvp(execPath, &argv)
+                #elseif canImport(Darwin)
+                    let exeResult = Darwin.execvp(execPath, &argv)
+                #endif
 
                 // execvp only returns on failure
                 // Use _exit() instead of exit() to avoid calling atexit() handlers
@@ -121,7 +163,11 @@ actor ChildProcessManager {
         } else {
             // Parent process
             logger.debug("Parent: Closing childFD \(childFD)")
-            Glibc.close(childFD)
+            #if canImport(Glibc)
+                Glibc.close(childFD)
+            #elseif canImport(Darwin)
+                Darwin.close(childFD)
+            #endif
 
             // Validate parentFD is still valid after closing childFD
             let parentFlagsAfterClose = fcntl(parentFD, F_GETFL)
@@ -138,6 +184,9 @@ actor ChildProcessManager {
             logger.debug("Parent: Returning handle and parentFD \(parentFD) to caller")
             return (handle, parentFD)
         }
+        #else
+        throw IPCError.childProcessError("Sandboxed execution is not supported on this platform")
+        #endif
     }
 
     /// Wait for child process to exit
@@ -146,7 +195,11 @@ actor ChildProcessManager {
 
         while Date().timeIntervalSince(startTime) < timeout {
             var status: Int32 = 0
-            let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
+            #if canImport(Glibc)
+                let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
+            #elseif canImport(Darwin)
+                let result = Darwin.waitpid(handle.pid, &status, WNOHANG)
+            #endif
 
             if result < 0 {
                 let err = errno
@@ -182,13 +235,21 @@ actor ChildProcessManager {
         logger.warning("Child process \(handle.pid) timed out, killing...")
 
         // Kill child process
-        Glibc.kill(handle.pid, SIGTERM)
+        #if canImport(Glibc)
+            Glibc.kill(handle.pid, SIGTERM)
+        #elseif canImport(Darwin)
+            Darwin.kill(handle.pid, SIGTERM)
+        #endif
 
         // Wait for it to actually exit
         try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
 
         var status: Int32 = 0
-        _ = Glibc.waitpid(handle.pid, &status, WNOHANG)
+        #if canImport(Glibc)
+            _ = Glibc.waitpid(handle.pid, &status, WNOHANG)
+        #elseif canImport(Darwin)
+            _ = Darwin.waitpid(handle.pid, &status, WNOHANG)
+        #endif
         activeProcesses.removeValue(forKey: handle.pid)
 
         throw IPCError.timeout
@@ -197,11 +258,19 @@ actor ChildProcessManager {
     /// Kill a child process and reap it to avoid zombies
     func kill(handle: ProcessHandle, signal: Int32 = SIGTERM) {
         logger.debug("Killing child process \(handle.pid) with signal \(signal)")
-        Glibc.kill(handle.pid, signal)
+        #if canImport(Glibc)
+            Glibc.kill(handle.pid, signal)
+        #elseif canImport(Darwin)
+            Darwin.kill(handle.pid, signal)
+        #endif
 
         // Try to reap the process immediately to avoid zombies
         var status: Int32 = 0
-        let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
+        #if canImport(Glibc)
+            let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
+        #elseif canImport(Darwin)
+            let result = Darwin.waitpid(handle.pid, &status, WNOHANG)
+        #endif
 
         if result == handle.pid {
             logger.debug("Reaped killed process \(handle.pid)")
@@ -218,7 +287,11 @@ actor ChildProcessManager {
     /// Force reap a specific process (if it's zombie)
     func reap(handle: ProcessHandle) {
         var status: Int32 = 0
-        let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
+        #if canImport(Glibc)
+            let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
+        #elseif canImport(Darwin)
+            let result = Darwin.waitpid(handle.pid, &status, WNOHANG)
+        #endif
 
         if result == handle.pid {
             logger.debug("Reaped zombie process \(handle.pid)")
@@ -229,7 +302,11 @@ actor ChildProcessManager {
     /// Reap zombie processes
     func reapZombies() {
         var status: Int32 = 0
-        let pid = Glibc.waitpid(-1, &status, WNOHANG)
+        #if canImport(Glibc)
+            let pid = Glibc.waitpid(-1, &status, WNOHANG)
+        #elseif canImport(Darwin)
+            let pid = Darwin.waitpid(-1, &status, WNOHANG)
+        #endif
 
         if pid > 0 {
             logger.debug("Reaped zombie process: PID \(pid)")
@@ -242,25 +319,41 @@ actor ChildProcessManager {
         logger.debug("Cleaning up \(activeProcesses.count) active processes")
 
         for (_, handle) in activeProcesses {
-            Glibc.close(handle.ipcFD)
-            Glibc.kill(handle.pid, SIGTERM)
+            #if canImport(Glibc)
+                Glibc.close(handle.ipcFD)
+                Glibc.kill(handle.pid, SIGTERM)
+            #elseif canImport(Darwin)
+                Darwin.close(handle.ipcFD)
+                Darwin.kill(handle.pid, SIGTERM)
+            #endif
         }
 
         activeProcesses.removeAll()
 
         // Final reap
         var status: Int32 = 0
-        while Glibc.waitpid(-1, &status, WNOHANG) > 0 {
-            // Reap all zombies
-        }
+        #if canImport(Glibc)
+            while Glibc.waitpid(-1, &status, WNOHANG) > 0 {
+                // Reap all zombies
+            }
+        #elseif canImport(Darwin)
+            while Darwin.waitpid(-1, &status, WNOHANG) > 0 {
+                // Reap all zombies
+            }
+        #endif
     }
 
     deinit {
         // Clean up in destructor
         // Note: This runs on arbitrary thread, be careful
         for (_, handle) in activeProcesses {
-            Glibc.close(handle.ipcFD)
-            Glibc.kill(handle.pid, SIGKILL)
+            #if canImport(Glibc)
+                Glibc.close(handle.ipcFD)
+                Glibc.kill(handle.pid, SIGKILL)
+            #elseif canImport(Darwin)
+                Darwin.close(handle.ipcFD)
+                Darwin.kill(handle.pid, SIGKILL)
+            #endif
         }
     }
 }

@@ -11,17 +11,17 @@ import Foundation
 enum PVMOpcodes: UInt8 {
     // Control Flow Instructions
     case trap = 0
-    case halt = 1  // Per spec called "fallthrough" - continues execution.
-                  // IMPORTANT: When execution continues past end of program, it causes a trap per spec pvm.tex lines 89-92.
-                  // This is NOT a true halt - programs should terminate via special djump address or other mechanisms.
+    case halt = 1 // Per spec called "fallthrough" - continues execution.
+    // IMPORTANT: When execution continues past end of program, it causes a trap per spec pvm.tex lines 89-92.
+    // This is NOT a true halt - programs should terminate via special djump address or other mechanisms.
     case jump = 40
     case jumpInd = 50
     case loadImmJump = 80
-    case loadImmJumpInd = 180  // Load immediate and jump indirect
+    case loadImmJumpInd = 180 // Load immediate and jump indirect
 
     // Load Immediate Instructions
-    case loadImm = 51      // LoadImm (32-bit immediate) - primary load immediate
-    case loadImmU64 = 20   // LoadImm64 (64-bit immediate)
+    case loadImm = 51 // LoadImm (32-bit immediate) - primary load immediate
+    case loadImmU64 = 20 // LoadImm64 (64-bit immediate)
 
     // Load Instructions
     case loadU8 = 52
@@ -42,7 +42,7 @@ enum PVMOpcodes: UInt8 {
     case storeImmU32 = 32
     case storeImmU64 = 33
 
-    case ecalli = 10       // External call interface (host call)
+    case ecalli = 10 // External call interface (host call)
 
     // Branch Immediate Instructions (Phase 3)
     case branchEqImm = 81
@@ -128,9 +128,9 @@ enum PVMOpcodes: UInt8 {
     case divS32 = 194
     case remU32 = 195
     case remS32 = 196
-    case shloL32 = 197      // Shift left logical 32-bit
-    case shloR32 = 198      // Shift right logical 32-bit
-    case sharR32 = 199      // Shift right arithmetic 32-bit
+    case shloL32 = 197 // Shift left logical 32-bit
+    case shloR32 = 198 // Shift right logical 32-bit
+    case sharR32 = 199 // Shift right arithmetic 32-bit
 
     // 64-bit Arithmetic Instructions
     case add64 = 200
@@ -140,9 +140,9 @@ enum PVMOpcodes: UInt8 {
     case divS64 = 204
     case remU64 = 205
     case remS64 = 206
-    case shloL64 = 207      // Shift left logical 64-bit
-    case shloR64 = 208      // Shift right logical 64-bit
-    case sharR64 = 209      // Shift right arithmetic 64-bit
+    case shloL64 = 207 // Shift left logical 64-bit
+    case shloR64 = 208 // Shift right logical 64-bit
+    case sharR64 = 209 // Shift right arithmetic 64-bit
 
     // Bitwise Operations
     case and = 210
@@ -151,19 +151,19 @@ enum PVMOpcodes: UInt8 {
     case mulUpperSS = 213
     case mulUpperUU = 214
     case mulUpperSU = 215
-    case setLtU = 216      // Set less than unsigned
-    case setLtS = 217      // Set less than signed
-    case cmovIz = 218      // Conditional move if zero
-    case cmovNz = 219      // Conditional move if not zero
-    case rotL64 = 220      // Rotate left 64-bit
-    case rotL32 = 221      // Rotate left 32-bit
-    case rotR64 = 222      // Rotate right 64-bit
-    case rotR32 = 223      // Rotate right 32-bit
-    case andInv = 224      // Bitwise AND with inverted operand
-    case orInv = 225       // Bitwise OR with inverted operand
-    case xnor = 226        // Bitwise XNOR
-    case max = 227         // Maximum signed
-    case maxU = 228        // Maximum unsigned
-    case min = 229         // Minimum signed
-    case minU = 230        // Minimum unsigned
+    case setLtU = 216 // Set less than unsigned
+    case setLtS = 217 // Set less than signed
+    case cmovIz = 218 // Conditional move if zero
+    case cmovNz = 219 // Conditional move if not zero
+    case rotL64 = 220 // Rotate left 64-bit
+    case rotL32 = 221 // Rotate left 32-bit
+    case rotR64 = 222 // Rotate right 64-bit
+    case rotR32 = 223 // Rotate right 32-bit
+    case andInv = 224 // Bitwise AND with inverted operand
+    case orInv = 225 // Bitwise OR with inverted operand
+    case xnor = 226 // Bitwise XNOR
+    case max = 227 // Maximum signed
+    case maxU = 228 // Maximum unsigned
+    case min = 229 // Minimum signed
+    case minU = 230 // Minimum unsigned
 }

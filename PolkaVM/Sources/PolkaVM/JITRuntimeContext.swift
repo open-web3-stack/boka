@@ -31,7 +31,9 @@ final class JITRuntimeContext {
     /// - Returns: Tuple of (dispatcher table pointer, size) or nil if not found
     func getDispatcherTable(for functionPtr: UnsafeRawPointer) -> (UnsafeMutablePointer<UnsafeMutableRawPointer?>?, Int)? {
         var size: size_t = 0
-        guard let table = CppHelper.getDispatcherTable(contextPointer, UnsafeMutableRawPointer(mutating: functionPtr), &size), size > 0 else {
+        guard let table = CppHelper.getDispatcherTable(contextPointer, UnsafeMutableRawPointer(mutating: functionPtr), &size),
+              size > 0
+        else {
             return nil
         }
         return (table, Int(size))

@@ -207,7 +207,11 @@ public class IPCServer {
             while bytesWritten < totalBytes {
                 let ptr = baseAddr.advanced(by: bytesWritten)
                 let result = ptr.withMemoryRebound(to: UInt8.self, capacity: totalBytes - bytesWritten) {
-                    Glibc.write(fd, $0, totalBytes - bytesWritten)
+                    #if canImport(Glibc)
+                        Glibc.write(fd, $0, totalBytes - bytesWritten)
+                    #elseif canImport(Darwin)
+                        Darwin.write(fd, $0, totalBytes - bytesWritten)
+                    #endif
                 }
 
                 if result < 0 {
@@ -247,7 +251,11 @@ public class IPCServer {
                 logger.trace("[IPC-SERVER] readExactBytes: Calling read() for \(bytesToRead) bytes (already read: \(bytesRead)/\(count))")
 
                 let result = ptr.withMemoryRebound(to: UInt8.self, capacity: count - bytesRead) {
-                    Glibc.read(fd, $0, count - bytesRead)
+                    #if canImport(Glibc)
+                        Glibc.read(fd, $0, count - bytesRead)
+                    #elseif canImport(Darwin)
+                        Darwin.read(fd, $0, count - bytesRead)
+                    #endif
                 }
 
                 logger.trace("[IPC-SERVER] readExactBytes: read() returned \(result)")

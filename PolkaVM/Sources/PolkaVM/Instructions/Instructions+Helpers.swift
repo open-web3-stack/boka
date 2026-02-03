@@ -62,7 +62,7 @@ extension Instructions {
     static func decodeImmediate2<T: FixedWidthInteger, U: FixedWidthInteger>(
         _ data: Data,
         divideBy: UInt8 = 1,
-        minus: Int = 1,
+        minus _: Int = 1,
         startIdx: Int = 0
     ) throws -> (T, U) {
         let lX1 = try Int((data.at(relative: startIdx) / divideBy) & 0b111)
@@ -79,8 +79,8 @@ extension Instructions {
         _ = try data.at(relative: endIdx - 1)
 
         // Use relative indices to avoid issues with data.startIndex
-        let range1 = start..<(start + lX)
-        let range2 = (start + lX)..<(start + lX + lY)
+        let range1 = start ..< (start + lX)
+        let range2 = (start + lX) ..< (start + lX + lY)
 
         let vX: T = decodeImmediate(data.subdata(in: range1))
         let vY: U = decodeImmediate(data.subdata(in: range2))

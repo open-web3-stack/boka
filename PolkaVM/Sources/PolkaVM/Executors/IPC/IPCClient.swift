@@ -42,7 +42,11 @@ final class IPCClient: @unchecked Sendable {
     /// Close the file descriptor
     func close() {
         if let fd = fileDescriptor {
-            Glibc.close(fd)
+            #if canImport(Glibc)
+                Glibc.close(fd)
+            #elseif canImport(Darwin)
+                Darwin.close(fd)
+            #endif
             fileDescriptor = nil
         }
     }
@@ -161,7 +165,11 @@ final class IPCClient: @unchecked Sendable {
             while bytesWritten < totalBytes {
                 let ptr = baseAddr.advanced(by: bytesWritten)
                 let result = ptr.withMemoryRebound(to: UInt8.self, capacity: totalBytes - bytesWritten) {
-                    Glibc.write(fd, $0, totalBytes - bytesWritten)
+                    #if canImport(Glibc)
+                        Glibc.write(fd, $0, totalBytes - bytesWritten)
+                    #elseif canImport(Darwin)
+                        Darwin.write(fd, $0, totalBytes - bytesWritten)
+                    #endif
                 }
 
                 if result < 0 {
@@ -234,7 +242,11 @@ final class IPCClient: @unchecked Sendable {
 
                 let ptr = baseAddr.advanced(by: bytesRead)
                 let result = ptr.withMemoryRebound(to: UInt8.self, capacity: count - bytesRead) {
-                    Glibc.read(fd, $0, count - bytesRead)
+                    #if canImport(Glibc)
+                        Glibc.read(fd, $0, count - bytesRead)
+                    #elseif canImport(Darwin)
+                        Darwin.read(fd, $0, count - bytesRead)
+                    #endif
                 }
 
                 if result < 0 {

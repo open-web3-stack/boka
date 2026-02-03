@@ -16,7 +16,7 @@ public struct IPCExecuteRequest: Codable, Sendable {
     public let pc: UInt32
     public let gas: UInt64
     public let argumentData: Data?
-    public let executionMode: UInt8  // Encoded ExecutionMode flags
+    public let executionMode: UInt8 // Encoded ExecutionMode flags
 
     public init(blob: Data, pc: UInt32, gas: UInt64, argumentData: Data?, executionMode: UInt8) {
         self.blob = blob
@@ -29,7 +29,7 @@ public struct IPCExecuteRequest: Codable, Sendable {
 
 /// Response from VM execution
 public struct IPCExecuteResponse: Codable, Sendable {
-    public let exitReasonCode: UInt64  // ExitReason.toUInt64()
+    public let exitReasonCode: UInt64 // ExitReason.toUInt64()
     public let gasUsed: UInt64
     public let outputData: Data?
     public let errorMessage: String?
@@ -43,7 +43,7 @@ public struct IPCExecuteResponse: Codable, Sendable {
 
     /// Convert to ExitReason
     public func toExitReason() -> ExitReason {
-        return ExitReason.fromUInt64(exitReasonCode)
+        ExitReason.fromUInt64(exitReasonCode)
     }
 }
 
@@ -75,12 +75,12 @@ public struct IPCHeartbeat: Codable, Sendable {
 /// Request for host call from child process
 public struct IPCHostCallRequest: Codable, Sendable {
     public let callIndex: UInt32
-    public let registersData: Data  // Serialized register state
+    public let registersData: Data // Serialized register state
 }
 
 /// Response to host call from host process
 public struct IPCHostCallResponse: Codable, Sendable {
-    public let outcomeCode: UInt64  // Encoded ExecOutcome
+    public let outcomeCode: UInt64 // Encoded ExecOutcome
     public let registersData: Data? // Updated register state
 }
 
@@ -88,7 +88,7 @@ public struct IPCHostCallResponse: Codable, Sendable {
 public struct IPCMessage: Codable, Sendable {
     public let type: IPCMessageType
     public let requestId: UInt32
-    public let payload: Data?  // JSON-encoded specific message
+    public let payload: Data? // JSON-encoded specific message
 
     public init(type: IPCMessageType, requestId: UInt32, payload: Data? = nil) {
         self.type = type

@@ -14,10 +14,10 @@ enum JITExitCode: Int32 {
     case trap = -1
     // Host call errors (high bits set)
     // These match JITHostCallError values when cast to Int32
-    case hostRequestedHalt = -6      // 0xFFFFFFFA
-    case hostPageFault = -5          // 0xFFFFFFFB
-    case gasExhausted = -4           // 0xFFFFFFFC
+    case hostRequestedHalt = -6 // 0xFFFFFFFA
+    case hostPageFault = -5 // 0xFFFFFFFB
+    case gasExhausted = -4 // 0xFFFFFFFC
     case hostFunctionThrewError = -3 // 0xFFFFFFFD
-    case hostFunctionNotFound = -2   // 0xFFFFFFFE
+    case hostFunctionNotFound = -2 // 0xFFFFFFFE
     // Note: internalError (0xFFFFFFFF) collides with trap (-1)
 }

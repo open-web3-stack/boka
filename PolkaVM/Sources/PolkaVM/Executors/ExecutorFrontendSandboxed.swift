@@ -2,9 +2,9 @@ import Foundation
 import TracingUtils
 import Utils
 #if canImport(Glibc)
-import Glibc
+    import Glibc
 #elseif canImport(Darwin)
-import Darwin
+    import Darwin
 #endif
 
 final class ExecutorFrontendSandboxed: ExecutorFrontend {
@@ -17,8 +17,8 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         self.mode = mode
         // Default to "boka-sandbox", can be overridden by setting the environment variable
         // or by creating the Executor with a custom sandbox path
-        self.sandboxPath = ProcessInfo.processInfo.environment["BOKA_SANDBOX_PATH"] ?? "boka-sandbox"
-        self.childProcessManager = ChildProcessManager()
+        sandboxPath = ProcessInfo.processInfo.environment["BOKA_SANDBOX_PATH"] ?? "boka-sandbox"
+        childProcessManager = ChildProcessManager()
     }
 
     func execute(
@@ -77,7 +77,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
             ipcClient.close()
 
             // Wait for child to exit
-            if let handle = handle {
+            if let handle {
                 _ = try? await childProcessManager.waitForExit(
                     handle: handle,
                     timeout: 30.0
@@ -94,7 +94,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
             logger.error("Sandboxed execution failed: \(error)")
 
             // Clean up child process if it was spawned
-            if let handle = handle {
+            if let handle {
                 // Try to kill the process and reap it to avoid zombies
                 await childProcessManager.kill(handle: handle)
                 // Try one more reap after a short delay

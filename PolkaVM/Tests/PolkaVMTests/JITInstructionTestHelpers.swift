@@ -484,7 +484,7 @@ enum ProgramBlobBuilder {
         // 64-bit Immediate instructions (opcodes 149-161: 0x95-0xA1)
         // Format: opcode (1) + packed_ra_rb (1) + immediate (4) = 6 bytes
         // Per spec pvm.tex section 5.9: l_X = min(4, max(0, ℓ - 1)), fixed-width little-endian
-        if opcode >= 0x95 && opcode <= 0xA1 {
+        if opcode >= 0x95, opcode <= 0xA1 {
             return 6
         }
 

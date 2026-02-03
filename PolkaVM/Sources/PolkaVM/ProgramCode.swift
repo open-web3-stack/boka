@@ -24,7 +24,7 @@ public class ProgramCode {
     public let jumpTableEntrySize: UInt8
     public let jumpTable: Data
     public let code: Data
-    internal let bitmask: Data
+    let bitmask: Data
 
     // parsed stuff
     public private(set) var basicBlockIndices: Set<UInt32> = []
@@ -43,7 +43,7 @@ public class ProgramCode {
     private static let cachedTrapInst = CppHelper.Instructions.Trap()
     private static let logger = Logger(label: "ProgramCode")
 
-    public init(_ blob: Data) throws (Error) {
+    public init(_ blob: Data) throws(Error) {
         // Data is already thread-safe (value semantic, copy-on-write)
         self.blob = blob
 
@@ -116,7 +116,7 @@ public class ProgramCode {
         instCache = Array(repeating: nil, count: code.count)
     }
 
-    private func buildMetadata() throws (Error) {
+    private func buildMetadata() throws(Error) {
         var i = UInt32(0)
         basicBlockIndices.insert(0)
         var currentBlockStart = i
@@ -147,7 +147,7 @@ public class ProgramCode {
         Gas(1)
     }
 
-    private func parseInstruction(startIndex: Int, skip: UInt32) throws (Error) -> Instruction {
+    private func parseInstruction(startIndex: Int, skip: UInt32) throws(Error) -> Instruction {
         let endIndex = startIndex + Int(skip) + 1
         let data: Data = if endIndex <= code.endIndex {
             code[startIndex ..< endIndex]

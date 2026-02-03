@@ -13,7 +13,11 @@ private let logger = Logger(label: "Boka-Sandbox")
 // Helper function to write debug messages to stderr
 private func debugWrite(_ message: String) {
     _ = message.withCString { ptr in
-        Glibc.write(STDERR_FILENO, ptr, message.count)
+        #if canImport(Glibc)
+            Glibc.write(STDERR_FILENO, ptr, message.count)
+        #elseif canImport(Darwin)
+            Darwin.write(STDERR_FILENO, ptr, message.count)
+        #endif
     }
 }
 

@@ -90,7 +90,10 @@ private final class JITCodeCache {
                     }
 
                     hitCount += 1
-                    logger.debug("JIT cache HIT (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)")
+                    logger
+                        .debug(
+                            "JIT cache HIT (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)"
+                        )
                     return entry
                 } else {
                     // Hash collision detected - unlikely but possible
@@ -574,14 +577,18 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // TODO: Add memory size to cache key to properly enable caching
             let bytecode = programCode.code
             logger
-                .info(
+                .debug(
                     "🔍 JIT bytecode: \(bytecode.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " "))... (total: \(bytecode.count) bytes)"
                 )
             logger.debug("🔍 JIT initial PC: \(pc)")
 
             // CRITICAL: JIT compilation is protected by executionLock wrapping the entire method
             // TODO: Re-enable JIT caching after debugging (currently disabled for troubleshooting)
-            let (compiledFuncPtr, dispatcherTable, dispatcherTableSize): (UnsafeMutableRawPointer, UnsafeMutablePointer<UnsafeMutableRawPointer?>?, UInt32)
+            let (compiledFuncPtr, dispatcherTable, dispatcherTableSize): (
+                UnsafeMutableRawPointer,
+                UnsafeMutablePointer<UnsafeMutableRawPointer?>?,
+                UInt32
+            )
             if false, let cachedEntry = codeCache.lookup(bytecode: bytecode, config: config, initialPC: pc) {
                 // Cache hit - use cached function pointer
                 compiledFuncPtr = UnsafeMutableRawPointer(mutating: cachedEntry.functionPtr)
@@ -654,7 +661,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
             // Log initial register values for debugging
             logger
-                .info(
+                .debug(
                     "Initial registers: R0=\(registers[Registers.Index(raw: 0)]), R1=\(registers[Registers.Index(raw: 1)]), R7=\(registers[Registers.Index(raw: 7)]), R8=\(registers[Registers.Index(raw: 8)])"
                 )
 
@@ -783,7 +790,8 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 // and execute while the pointer is still valid
                 let (er, mi): (ExitReason, MemoryAllocationInfo) = try programCode.jumpTable.withUnsafeBytes { rawBufferPointer in
                     // Set jump table data pointer (valid only within this closure)
-                    context.jitHostFunctionTablePtr.pointee.jumpTableData = rawBufferPointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                    context.jitHostFunctionTablePtr.pointee.jumpTableData = rawBufferPointer.baseAddress?
+                        .assumingMemoryBound(to: UInt8.self)
                     context.jitHostFunctionTablePtr.pointee.jumpTableSize = UInt32(programCode.jumpTable.count)
                     context.jitHostFunctionTablePtr.pointee.jumpTableEntrySize = programCode.jumpTableEntrySize
                     // Guard against division by zero when jumpTableEntrySize is 0 (empty jump table)
@@ -812,7 +820,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     if let stdMem = initialMemory as? StandardMemory {
                         // Allocate 128KB bitmaps for page-level access control
                         // Each bitmap has 2^20 bits (1 bit per 4KB page for 2^32 address space)
-                        let pageSize = UInt32(config.pvmMemoryPageSize)  // 4096 bytes per page
+                        let pageSize = UInt32(config.pvmMemoryPageSize) // 4096 bytes per page
 
                         // Thread-safe: Each ExecutorBackendJIT instance has its own RuntimeContext
                         // No concurrent access to shared resources
@@ -840,7 +848,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                             // Fixed: Use (endAddress - 1) to handle page-aligned zones correctly
                             let zoneEndPage = (zone.endAddress - 1) / pageSize + 1
 
-                            for page in zoneStartPage..<zoneEndPage {
+                            for page in zoneStartPage ..< zoneEndPage {
                                 let byteIndex = Int(page / 8)
                                 let bitIndex = page % 8
                                 context.readMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
@@ -854,7 +862,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                             // Fixed: Use (endAddress - 1) to handle page-aligned zones correctly
                             let zoneEndPage = (zone.endAddress - 1) / pageSize + 1
 
-                            for page in zoneStartPage..<zoneEndPage {
+                            for page in zoneStartPage ..< zoneEndPage {
                                 let byteIndex = Int(page / 8)
                                 let bitIndex = page % 8
                                 context.writeMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
@@ -905,7 +913,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
 
                     // Initialize memory protection page maps for bounds checking
                     // Per PVM spec pvm.tex lines 137-147: memory access must be validated
-                    let pageSize = UInt32(config.pvmMemoryPageSize)  // 4096 bytes per page
+                    let pageSize = UInt32(config.pvmMemoryPageSize) // 4096 bytes per page
 
                     // Deallocate old bitmaps if they exist
                     context.readMapBitmap?.deallocate()
@@ -929,7 +937,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         let zoneStartPage = zone.startAddress / pageSize
                         let zoneEndPage = (zone.endAddress - 1) / pageSize + 1
 
-                        for page in zoneStartPage..<zoneEndPage {
+                        for page in zoneStartPage ..< zoneEndPage {
                             let byteIndex = Int(page / 8)
                             let bitIndex = page % 8
                             context.readMapBitmap![byteIndex] |= UInt8(1 << bitIndex)
@@ -942,7 +950,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         let zoneStartPage = zone.startAddress / pageSize
                         let zoneEndPage = (zone.endAddress - 1) / pageSize + 1
 
-                        for page in zoneStartPage..<zoneEndPage {
+                        for page in zoneStartPage ..< zoneEndPage {
                             let byteIndex = Int(page / 8)
                             let bitIndex = page % 8
                             context.writeMapBitmap![byteIndex] |= UInt8(1 << bitIndex)

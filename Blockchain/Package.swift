@@ -38,7 +38,7 @@ let package = Package(
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
                 .unsafeFlags([
-                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
+                    "-Xcc", "-I../PolkaVM/Sources/asmjit",
                 ]),
             ]
         ),
@@ -51,7 +51,7 @@ let package = Package(
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
                 .unsafeFlags([
-                    "-Xcc", "-I/home/ubuntu/boka/PolkaVM/Sources/asmjit"
+                    "-Xcc", "-I../PolkaVM/Sources/asmjit",
                 ]),
             ]
         ),

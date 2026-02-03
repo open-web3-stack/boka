@@ -70,7 +70,7 @@ public enum JamTestnet {
         config: ProtocolConfigRef = TestVariants.tiny.config,
         executionMode: ExecutionMode = []
     ) async throws -> Result<StateRef, Error> {
-        let runtime = Runtime(config: config, ancestry: nil, executionMode: executionMode)
+        let runtime = Runtime(config: config, ancestry: nil)
         let blockRef = testcase.block.asRef()
         let stateRef = try await testcase.preState.toState(config: config).asRef()
 
