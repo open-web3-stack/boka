@@ -10,7 +10,7 @@ import Utils
 
 private let logger = Logger(label: "Boka-Sandbox")
 
-// Helper function to write debug messages to stderr
+/// Helper function to write debug messages to stderr
 private func debugWrite(_ message: String) {
     _ = message.withCString { ptr in
         #if canImport(Glibc)
@@ -158,7 +158,7 @@ enum SandboxMain {
             pc: request.pc,
             gas: Gas(request.gas),
             argumentData: request.argumentData,
-            ctx: nil as (any InvocationContext)? // TODO: Handle context serialization in Phase 4
+            ctx: nil as (any InvocationContext)?, // TODO: Handle context serialization in Phase 4
         )
 
         logger.debug("Execution completed: \(result.exitReason), gas used: \(result.gasUsed.value)")
@@ -167,7 +167,7 @@ enum SandboxMain {
             exitReasonCode: result.exitReason.toUInt64(),
             gasUsed: result.gasUsed.value,
             outputData: result.outputData,
-            errorMessage: nil
+            errorMessage: nil,
         )
     }
 }

@@ -6,18 +6,18 @@ import Utils
 public func refine(
     config: ProtocolConfigRef,
     serviceAccounts: some ServiceAccounts,
-    /// Index of the work item to be refined
+    // Index of the work item to be refined
     workItemIndex: Int,
-    /// The work package
+    // The work package
     workPackage: WorkPackage,
-    /// The core which is doing refine
+    // The core which is doing refine
     coreIndex: CoreIndex,
-    /// The output of the authorizer
+    // The output of the authorizer
     authorizerTrace: Data,
-    /// all work items's import segments
+    // all work items's import segments
     importSegments: [[Data4104]],
-    /// Export segment offset
-    exportSegmentOffset: UInt64
+    // Export segment offset
+    exportSegmentOffset: UInt64,
 ) async throws -> (result: Result<Data, WorkResultError>, exports: [Data4104], gasUsed: Gas) {
     let workItem = workPackage.workItems[workItemIndex]
     let service = workItem.serviceIndex
@@ -25,7 +25,7 @@ public func refine(
     let preimage = try await serviceAccounts.historicalLookup(
         serviceAccount: service,
         timeslot: workPackage.context.lookupAnchor.timeslot,
-        preimageHash: workItem.codeHash
+        preimageHash: workItem.codeHash,
     )
 
     guard let preimage, try await serviceAccounts.get(serviceAccount: service) != nil else {
@@ -55,7 +55,7 @@ public func refine(
         serviceAccounts: serviceAccounts,
         workPackage: workPackage,
         workItemIndex: workItemIndex,
-        authorizerTrace: authorizerTrace
+        authorizerTrace: authorizerTrace,
     )
 
     let (exitReason, gasUsed, output) = await invokePVM(
@@ -64,7 +64,7 @@ public func refine(
         pc: 0,
         gas: workItem.refineGasLimit,
         argumentData: argumentData,
-        ctx: ctx
+        ctx: ctx,
     )
 
     switch exitReason {

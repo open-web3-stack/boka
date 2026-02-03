@@ -15,7 +15,7 @@ public struct ExtrinsicPreimages: Sendable, Equatable, Codable {
     public var preimages: [PreimageItem]
 
     public init(
-        preimages: [PreimageItem]
+        preimages: [PreimageItem],
     ) {
         self.preimages = preimages
     }

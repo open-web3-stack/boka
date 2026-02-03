@@ -42,7 +42,7 @@ public enum BLS: KeyType {
                     ptrs[0].ptr,
                     ptrs[0].count,
                     out_buf.ptr,
-                    out_buf.count
+                    out_buf.count,
                 )
             } onErr: { err throws(Error) in
                 throw .keypairSignFailed(err)
@@ -125,7 +125,7 @@ public enum BLS: KeyType {
                     ptrs[0].count,
                     ptrs[1].ptr,
                     ptrs[1].count,
-                    &output
+                    &output,
                 )
             } onErr: { err throws(Error) in
                 // no need to throw here, but still need to catch errors
@@ -137,7 +137,7 @@ public enum BLS: KeyType {
     }
 
     public static func aggregateVerify(
-        message: Data, signatures: [Data], publicKeys: [PublicKey]
+        message: Data, signatures: [Data], publicKeys: [PublicKey],
     ) throws(Error) -> Bool {
         if signatures.count != publicKeys.count {
             return false
@@ -160,7 +160,7 @@ public enum BLS: KeyType {
             message_new_from_bytes(
                 ptrs[0].ptr,
                 ptrs[0].count,
-                &msgPtr
+                &msgPtr,
             )
         } onErr: { err throws(Error) in
             throw .createMessageFailed(err)
@@ -172,7 +172,7 @@ public enum BLS: KeyType {
                 signature_new_from_bytes(
                     ptrs[0].ptr,
                     ptrs[0].count,
-                    &sigPtr
+                    &sigPtr,
                 )
             } onErr: { err throws(Error) in
                 throw .createSignatureFailed(err)
@@ -193,7 +193,7 @@ public enum BLS: KeyType {
                         UInt(sigPtrs.count),
                         keyPtrs.baseAddress!,
                         UInt(keyPtrs.count),
-                        &output
+                        &output,
                     )
                 }
             }

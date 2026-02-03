@@ -45,16 +45,14 @@ public actor PagedProofsGenerator {
                 pageSegments: pageSegments,
                 pageIndex: pageIndex,
                 segmentsRoot: segmentsRoot,
-                totalSegments: segments.count
+                totalSegments: segments.count,
             )
 
             pages.append(pageMetadata)
         }
 
         // Encode pages using JamEncoder
-        let encoded = try JamEncoder.encode(pageCount, segmentsRoot, pages)
-
-        return encoded
+        return try JamEncoder.encode(pageCount, segmentsRoot, pages)
     }
 
     /// Generate metadata for a single page of segments
@@ -75,7 +73,7 @@ public actor PagedProofsGenerator {
         pageSegments: [Data4104],
         pageIndex: Int,
         segmentsRoot _: Data32,
-        totalSegments _: Int
+        totalSegments _: Int,
     ) throws -> Data {
         // Per GP spec: depth 6 for 64 segments per page
         let merkleDepth: UInt8 = 6
@@ -89,7 +87,7 @@ public actor PagedProofsGenerator {
             let path = Merklization.trace(
                 pageSegments.map(\.data),
                 index: localIndex,
-                hasher: Blake2b256.self
+                hasher: Blake2b256.self,
             )
 
             // Convert PathElements to Data32 hashes
@@ -119,14 +117,12 @@ public actor PagedProofsGenerator {
         // - Merkle depth (6)
         // - Justification paths for each segment
         // - Subtree root
-        let encoded = try JamEncoder.encode(
+        return try JamEncoder.encode(
             merkleDepth,
             justificationPaths.count,
             justificationPaths,
-            subtreeRoot
+            subtreeRoot,
         )
-
-        return encoded
     }
 
     /// Verify a segment's Paged-Proofs justification
@@ -143,7 +139,7 @@ public actor PagedProofsGenerator {
         pageIndex: Int,
         localIndex: Int,
         proof: [Data32],
-        segmentsRoot: Data32
+        segmentsRoot: Data32,
     ) -> Bool {
         // Calculate segment hash
         let segmentHash = segment.data.blake2b256hash()

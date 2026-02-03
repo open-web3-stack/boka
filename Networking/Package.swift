@@ -12,7 +12,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "Networking",
-            targets: ["Networking"]
+            targets: ["Networking"],
         ),
     ],
     dependencies: [
@@ -30,7 +30,7 @@ let package = Package(
                 .product(name: "AsyncChannels", package: "Async-Channels"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "X509", package: "swift-certificates"),
-            ]
+            ],
         ),
         .target(
             name: "CHelpers",
@@ -41,7 +41,7 @@ let package = Package(
             publicHeadersPath: ".",
             cSettings: [
                 .headerSearchPath("../include"),
-            ]
+            ],
         ),
         .target(
             name: "MsQuicSwift",
@@ -53,30 +53,30 @@ let package = Package(
             ],
             linkerSettings: [
                 .unsafeFlags(["-L../.lib"]),
-            ]
+            ],
         ),
         .systemLibrary(
             name: "msquic",
-            path: "Sources"
+            path: "Sources",
         ),
         .systemLibrary(
             name: "openssl",
-            path: "Sources"
+            path: "Sources",
         ),
         .testTarget(
             name: "NetworkingTests",
             dependencies: [
                 "Networking",
                 .product(name: "Testing", package: "swift-testing"),
-            ]
+            ],
         ),
         .testTarget(
             name: "MsQuicSwiftTests",
             dependencies: [
                 "MsQuicSwift",
                 .product(name: "Testing", package: "swift-testing"),
-            ]
+            ],
         ),
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageModes: [.version("6")],
 )

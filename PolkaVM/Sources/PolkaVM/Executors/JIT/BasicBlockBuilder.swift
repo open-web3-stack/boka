@@ -60,7 +60,7 @@ final class BasicBlockBuilder {
                 return get_instruction_size(
                     baseAddress.assumingMemoryBound(to: UInt8.self),
                     UInt32(currentPC),
-                    program.code.count
+                    program.code.count,
                 )
             }
 

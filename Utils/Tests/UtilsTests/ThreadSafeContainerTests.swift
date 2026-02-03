@@ -1,9 +1,8 @@
 import Testing
-
 @testable import Utils
 
 struct ThreadSafeContainerTests {
-    @Test func exchangeValue() throws {
+    @Test func exchangeValue() {
         let container = ThreadSafeContainer<Int>(10)
         let oldValue = container.exchange(20)
         #expect(oldValue == 10)

@@ -13,7 +13,7 @@ public enum CertificateType {
 }
 
 public func parseCertificate(data: Data, type: CertificateType) throws -> (
-    publicKey: Data, alternativeName: String
+    publicKey: Data, alternativeName: String,
 ) {
     var publicKeyPointer: UnsafeMutablePointer<UInt8>!
     var publicKeyLen = 0
@@ -31,7 +31,7 @@ public func parseCertificate(data: Data, type: CertificateType) throws -> (
                     &publicKeyPointer,
                     &publicKeyLen,
                     &altNamePointer,
-                    &errorMessage
+                    &errorMessage,
                 )
             }
         case .p12:
@@ -42,7 +42,7 @@ public func parseCertificate(data: Data, type: CertificateType) throws -> (
                     &publicKeyPointer,
                     &publicKeyLen,
                     &altNamePointer,
-                    &errorMessage
+                    &errorMessage,
                 )
             }
         }
@@ -52,7 +52,7 @@ public func parseCertificate(data: Data, type: CertificateType) throws -> (
     }
 
     let publicKeyData = Data(
-        bytesNoCopy: publicKeyPointer, count: Int(publicKeyLen), deallocator: .free
+        bytesNoCopy: publicKeyPointer, count: Int(publicKeyLen), deallocator: .free,
     )
     let alternativeName = String(cString: altNamePointer)
     return (publicKey: publicKeyData, alternativeName: alternativeName)
@@ -75,7 +75,7 @@ public func generateSelfSignedCertificate(privateKey: Ed25519.SecretKey) throws 
                 secretKeyDataPtr.count,
                 altNamePtr,
                 &pkcs12Data,
-                &pkcs12Length
+                &pkcs12Length,
             )
         }
     }

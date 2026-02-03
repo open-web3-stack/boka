@@ -130,7 +130,9 @@ extension CppHelper.Instructions.Jump: Instruction {
         self.init(offset: Instructions.decodeImmediate(data))
     }
 
-    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
+        .continued
+    }
 
     public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
         guard Instructions.isBranchValid(context: context, offset: offset) else {
@@ -148,7 +150,9 @@ extension CppHelper.Instructions.JumpInd: Instruction {
         self.init(reg: register, offset: offset)
     }
 
-    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome { .continued }
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
+        .continued
+    }
 
     public func updatePC(context: ExecutionContext, skip _: UInt32) -> ExecOutcome {
         let regVal: UInt32 = context.state.readRegister(reg)
@@ -351,7 +355,7 @@ extension CppHelper.Instructions.StoreImmIndU16: Instruction {
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         try context.state.writeMemory(
             address: context.state.readRegister(reg) &+ address,
-            values: value.encode()
+            values: value.encode(),
         )
         return .continued
     }
@@ -367,7 +371,7 @@ extension CppHelper.Instructions.StoreImmIndU32: Instruction {
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         try context.state.writeMemory(
             address: context.state.readRegister(reg) &+ address,
-            values: value.encode()
+            values: value.encode(),
         )
         return .continued
     }
@@ -383,7 +387,7 @@ extension CppHelper.Instructions.StoreImmIndU64: Instruction {
     public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
         try context.state.writeMemory(
             address: context.state.readRegister(reg) &+ address,
-            values: value.encode()
+            values: value.encode(),
         )
         return .continued
     }
@@ -725,7 +729,7 @@ extension CppHelper.Instructions.StoreIndU16: Instruction {
         let value: UInt16 = context.state.readRegister(src)
         try context.state.writeMemory(
             address: context.state.readRegister(dest) &+ offset,
-            values: value.encode()
+            values: value.encode(),
         )
         return .continued
     }
@@ -742,7 +746,7 @@ extension CppHelper.Instructions.StoreIndU32: Instruction {
         let value: UInt32 = context.state.readRegister(src)
         try context.state.writeMemory(
             address: context.state.readRegister(dest) &+ offset,
-            values: value.encode()
+            values: value.encode(),
         )
         return .continued
     }
@@ -759,7 +763,7 @@ extension CppHelper.Instructions.StoreIndU64: Instruction {
         let value: UInt64 = context.state.readRegister(src)
         try context.state.writeMemory(
             address: context.state.readRegister(dest) &+ offset,
-            values: value.encode()
+            values: value.encode(),
         )
         return .continued
     }

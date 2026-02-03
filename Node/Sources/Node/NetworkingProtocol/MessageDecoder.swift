@@ -21,12 +21,12 @@ class BlockAnnouncementDecoder: PresistentStreamMessageDecoder {
     func decode(data: Data) throws -> Message {
         if handshakeReceived {
             return try .blockAnnouncement(
-                JamDecoder.decode(BlockAnnouncement.self, from: data, withConfig: config)
+                JamDecoder.decode(BlockAnnouncement.self, from: data, withConfig: config),
             )
         } else {
             handshakeReceived = true
             return try .blockAnnouncementHandshake(
-                JamDecoder.decode(BlockAnnouncementHandshake.self, from: data, withConfig: config)
+                JamDecoder.decode(BlockAnnouncementHandshake.self, from: data, withConfig: config),
             )
         }
     }
@@ -49,7 +49,7 @@ class CEMessageDecoder: EphemeralStreamMessageDecoder {
         guard let message = CERequest.from(kind: kind, data: payload) else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "unreachable: invalid CE message"
+                debugDescription: "unreachable: invalid CE message",
             ))
         }
         return message

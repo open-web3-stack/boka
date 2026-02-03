@@ -41,7 +41,7 @@ func polkaVMBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(exitReason)
@@ -55,7 +55,7 @@ func polkaVMBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([8]),
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(exitReason)
@@ -69,7 +69,7 @@ func polkaVMBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([4]),
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(exitReason)
@@ -86,7 +86,7 @@ func polkaVMBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data(),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }
@@ -102,7 +102,7 @@ func polkaVMBenchmarks() {
             pc: 0,
             gas: Gas(10_000_000),
             argumentData: Data([20]),
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(exitReason)
@@ -118,7 +118,7 @@ func polkaVMBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([UInt8(i)]),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }
@@ -135,7 +135,7 @@ func polkaVMBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([5]),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }
@@ -153,7 +153,7 @@ func polkaVMBenchmarks() {
             pc: 0,
             gas: Gas(10_000_000),
             argumentData: Data([15]),
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(exitReason)
@@ -168,7 +168,7 @@ func polkaVMBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([10]),
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(exitReason)

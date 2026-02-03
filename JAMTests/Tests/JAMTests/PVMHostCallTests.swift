@@ -1,10 +1,9 @@
 import Foundation
+@testable import JAMTests
 import PolkaVM
 import Testing
 import TracingUtils
 import Utils
-
-@testable import JAMTests
 
 private let logger = Logger(label: "PVMHostCallTests")
 
@@ -15,11 +14,11 @@ private let logger = Logger(label: "PVMHostCallTests")
 struct PVMHostCallTests {
     // MARK: - Host Call with Context Tests
 
-    @Test func testHostCall_interpreter() async throws {
+    @Test func hostCall_interpreter() async throws {
         try await testHostCall(mode: .interpreter)
     }
 
-    @Test func testHostCall_sandbox() async throws {
+    @Test func hostCall_sandbox() async throws {
         try await testHostCall(mode: .sandbox)
     }
 
@@ -59,7 +58,7 @@ struct PVMHostCallTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([5]),
-            ctx: TestInvocationContext()
+            ctx: TestInvocationContext(),
         )
 
         let value = output?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
@@ -72,11 +71,11 @@ struct PVMHostCallTests {
 
     // MARK: - Host Call Error Handling
 
-    @Test func testHostCallError_interpreter() async throws {
+    @Test func hostCallError_interpreter() async throws {
         try await testHostCallError(mode: .interpreter)
     }
 
-    @Test func testHostCallError_sandbox() async throws {
+    @Test func hostCallError_sandbox() async throws {
         try await testHostCallError(mode: .sandbox)
     }
 
@@ -106,7 +105,7 @@ struct PVMHostCallTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([5]),
-            ctx: ErrorInvocationContext()
+            ctx: ErrorInvocationContext(),
         )
 
         // Should handle the error gracefully
@@ -115,7 +114,7 @@ struct PVMHostCallTests {
 
     // MARK: - Host Call Gas Consumption
 
-    @Test func testHostCallGasParity() async throws {
+    @Test func hostCallGasParity() async {
         let config = DefaultPvmConfig()
 
         let sumToNWithHostCall = Data([
@@ -151,7 +150,7 @@ struct PVMHostCallTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([5]),
-            ctx: SimpleContext()
+            ctx: SimpleContext(),
         )
 
         // Run in sandbox mode
@@ -162,14 +161,14 @@ struct PVMHostCallTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([5]),
-            ctx: SimpleContext()
+            ctx: SimpleContext(),
         )
 
         // Gas consumption should be similar
         let gasDiff = abs(Int64(gasUsedInterpreter.value) - Int64(gasUsedSandbox.value))
         #expect(
             gasDiff <= 20,
-            "Host call gas consumption differs significantly: interpreter=\(gasUsedInterpreter), sandbox=\(gasUsedSandbox), diff=\(gasDiff)"
+            "Host call gas consumption differs significantly: interpreter=\(gasUsedInterpreter), sandbox=\(gasUsedSandbox), diff=\(gasDiff)",
         )
 
         logger.info("Host call gas parity: interpreter=\(gasUsedInterpreter), sandbox=\(gasUsedSandbox), diff=\(gasDiff)")
@@ -177,11 +176,11 @@ struct PVMHostCallTests {
 
     // MARK: - Multiple Host Calls
 
-    @Test func testMultipleHostCalls_interpreter() async throws {
+    @Test func multipleHostCalls_interpreter() async throws {
         try await testMultipleHostCalls(mode: .interpreter)
     }
 
-    @Test func testMultipleHostCalls_sandbox() async throws {
+    @Test func multipleHostCalls_sandbox() async throws {
         try await testMultipleHostCalls(mode: .sandbox)
     }
 
@@ -193,11 +192,11 @@ struct PVMHostCallTests {
 
     // MARK: - Host Call with Gas Limits
 
-    @Test func testHostCallWithGasLimit_interpreter() async throws {
+    @Test func hostCallWithGasLimit_interpreter() async throws {
         try await testHostCallWithGasLimit(mode: .interpreter)
     }
 
-    @Test func testHostCallWithGasLimit_sandbox() async throws {
+    @Test func hostCallWithGasLimit_sandbox() async throws {
         try await testHostCallWithGasLimit(mode: .sandbox)
     }
 
@@ -217,7 +216,7 @@ struct PVMHostCallTests {
             pc: 0,
             gas: limitedGas,
             argumentData: Data([3]), // Smaller input for faster execution
-            ctx: nil
+            ctx: nil,
         )
 
         // Should either complete successfully or run out of gas
@@ -226,11 +225,11 @@ struct PVMHostCallTests {
 
     // MARK: - Host Call State Modification
 
-    @Test func testHostCallStateModification_interpreter() async throws {
+    @Test func hostCallStateModification_interpreter() async throws {
         try await testHostCallStateModification(mode: .interpreter)
     }
 
-    @Test func testHostCallStateModification_sandbox() async throws {
+    @Test func hostCallStateModification_sandbox() async throws {
         try await testHostCallStateModification(mode: .sandbox)
     }
 
@@ -260,7 +259,7 @@ struct PVMHostCallTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([2]),
-            ctx: StateModifyingContext()
+            ctx: StateModifyingContext(),
         )
 
         logger.info("\(mode.description) host call state modification test completed")

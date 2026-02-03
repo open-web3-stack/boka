@@ -71,7 +71,7 @@ public class StandardProgram {
             readWriteData: readWriteData,
             argumentData: argumentData ?? Data(),
             heapEmptyPagesSize: UInt32(heapEmptyPagesSize),
-            stackSize: UInt32(stackSize)
+            stackSize: UInt32(stackSize),
         )
     }
 

@@ -25,8 +25,8 @@ public struct SortedKeyValues<Key: Codable & Hashable & Comparable, Value: Codab
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: container.codingPath,
-                        debugDescription: "Array is not sorted"
-                    )
+                        debugDescription: "Array is not sorted",
+                    ),
                 )
             }
             previous = item

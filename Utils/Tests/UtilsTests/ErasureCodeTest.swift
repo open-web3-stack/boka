@@ -1,7 +1,6 @@
 import erasure_coding
 import Foundation
 import Testing
-
 @testable import Utils
 
 func createShards(from data: Data, count: Int) -> [Data] {
@@ -34,7 +33,7 @@ func createShards(from data: Data, count: Int) -> [Data] {
         (1024, 8, 14),
         (4104, 12, 18),
     ] as [(Int, Int, Int)])
-    func testEncodeRecover(testCase: (Int, Int, Int)) throws {
+    func encodeRecover(testCase: (Int, Int, Int)) throws {
         let dataLength = testCase.0
         let originalCount = testCase.1
         let recoveryCount = testCase.2
@@ -58,7 +57,7 @@ func createShards(from data: Data, count: Int) -> [Data] {
             originalCount: originalCount,
             recoveryCount: recoveryCount,
             recovery: partialRecovery,
-            shardSize: shardSize
+            shardSize: shardSize,
         )
 
         let recoveredData = recoveredShards.reduce(Data(), +)
@@ -66,7 +65,7 @@ func createShards(from data: Data, count: Int) -> [Data] {
         #expect(recoveredData == originalData)
     }
 
-    @Test func testNotEnoughShardsToRecover() throws {
+    @Test func notEnoughShardsToRecover() throws {
         let dataLength = 100
         let originalCount = 5
         let recoveryCount = 8
@@ -89,12 +88,12 @@ func createShards(from data: Data, count: Int) -> [Data] {
                 originalCount: originalCount,
                 recoveryCount: recoveryCount,
                 recovery: partialRecovery,
-                shardSize: shardSize
+                shardSize: shardSize,
             )
         }
     }
 
-    @Test func testSplitJoin() throws {
+    @Test func splitJoin() {
         let testData = Data("hello world, this is a test".utf8)
         let n = 4
 
@@ -110,7 +109,7 @@ func createShards(from data: Data, count: Int) -> [Data] {
         #expect(joined == paddedData)
     }
 
-    @Test func testTranspose() throws {
+    @Test func testTranspose() {
         let testData = [
             [1, 2, 3, 4],
             [5, 6, 7, 8],
@@ -136,7 +135,7 @@ func createShards(from data: Data, count: Int) -> [Data] {
         (4104, 12, 18), // medium
         (4104, 684, 1023), // full
     ] as [(Int, Int, Int)])
-    func testChunkReconstruct(testCase: (Int, Int, Int)) throws {
+    func chunkReconstruct(testCase: (Int, Int, Int)) throws {
         let dataLength = testCase.0
         let basicSize = testCase.1
         let originalCount = basicSize / 2
@@ -153,12 +152,12 @@ func createShards(from data: Data, count: Int) -> [Data] {
             partialRecovery.append(.init(data: recovery[i], index: UInt32(i)))
         }
         let recovered2 = try ErasureCoding.reconstruct(
-            shards: partialRecovery, basicSize: basicSize, originalCount: originalCount, recoveryCount: recoveryCount
+            shards: partialRecovery, basicSize: basicSize, originalCount: originalCount, recoveryCount: recoveryCount,
         )
         #expect(recovered2 == originalData)
     }
 
-    @Test func testRecoverWithParityOnly() throws {
+    @Test func recoverWithParityOnly() throws {
         let dataLength = 32
         let originalCount = 2
         let recoveryCount = 5
@@ -178,7 +177,7 @@ func createShards(from data: Data, count: Int) -> [Data] {
             originalCount: originalCount,
             recoveryCount: recoveryCount,
             recovery: parityOnly,
-            shardSize: shardSize
+            shardSize: shardSize,
         )
 
         let recoveredData = recovered.reduce(Data(), +)

@@ -1,7 +1,6 @@
+@testable import Codec
 import Foundation
 import Testing
-
-@testable import Codec
 
 struct UInt8Alias: CodableAlias, Codable {
     typealias T = UInt8
@@ -23,7 +22,7 @@ struct TestCodable: Codable {
 }
 
 struct CodingAsTests {
-    @Test func testCodingAs() throws {
+    @Test func codingAs() throws {
         let testCase = TestCodable(value: 0x23)
         let encoded = try JamEncoder.encode(testCase)
         #expect(encoded == Data([0xAB, 0x23]))

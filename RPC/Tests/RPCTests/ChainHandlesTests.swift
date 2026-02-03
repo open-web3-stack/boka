@@ -9,7 +9,7 @@ import XCTVapor
 public final class DummyNodeDataSource: Sendable {
     public let chainDataProvider: BlockchainDataProvider
     public init(
-        chainDataProvider: BlockchainDataProvider
+        chainDataProvider: BlockchainDataProvider,
     ) {
         self.chainDataProvider = chainDataProvider
     }

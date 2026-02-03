@@ -11,14 +11,18 @@ public protocol RequestParameter: FromJSON {
 }
 
 extension VoidRequest: RequestParameter {
-    public static var types: [Any.Type] { [] }
+    public static var types: [Any.Type] {
+        []
+    }
 }
 
 // Swift don't yet support variadic generics
 // so we need to use this workaround
 
 public struct Request1<T: FromJSON>: RequestParameter {
-    public static var types: [Any.Type] { [T.self] }
+    public static var types: [Any.Type] {
+        [T.self]
+    }
 
     public let value: T
 
@@ -37,7 +41,9 @@ public struct Request1<T: FromJSON>: RequestParameter {
 }
 
 public struct Request2<T1: FromJSON, T2: FromJSON>: RequestParameter {
-    public static var types: [Any.Type] { [T1.self, T2.self] }
+    public static var types: [Any.Type] {
+        [T1.self, T2.self]
+    }
 
     public let value: (T1, T2)
 
@@ -56,7 +62,9 @@ public struct Request2<T1: FromJSON, T2: FromJSON>: RequestParameter {
 }
 
 public struct Request3<T1: FromJSON, T2: FromJSON, T3: FromJSON>: RequestParameter {
-    public static var types: [Any.Type] { [T1.self, T2.self, T3.self] }
+    public static var types: [Any.Type] {
+        [T1.self, T2.self, T3.self]
+    }
 
     public let value: (T1, T2, T3)
 
@@ -75,7 +83,9 @@ public struct Request3<T1: FromJSON, T2: FromJSON, T3: FromJSON>: RequestParamet
 }
 
 public struct Request4<T1: FromJSON, T2: FromJSON, T3: FromJSON, T4: FromJSON>: RequestParameter {
-    public static var types: [Any.Type] { [T1.self, T2.self, T3.self, T4.self] }
+    public static var types: [Any.Type] {
+        [T1.self, T2.self, T3.self, T4.self]
+    }
 
     public let value: (T1, T2, T3, T4)
 

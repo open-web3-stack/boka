@@ -3,7 +3,7 @@ import Foundation
 
 public typealias DataPtrRepresentable = Blake2.DataPtrRepresentable
 
-// Waiting for NoncopyableGenerics to be available
+/// Waiting for NoncopyableGenerics to be available
 public protocol Hashing /*: ~Copyable */ {
     init()
     mutating func update(_ data: any DataPtrRepresentable)
@@ -24,7 +24,7 @@ extension FixedSizeData: DataPtrRepresentable {
     public typealias Ptr = UnsafeRawBufferPointer
 
     public func withPtr<R>(
-        cb: (UnsafeRawBufferPointer) throws -> R
+        cb: (UnsafeRawBufferPointer) throws -> R,
     ) rethrows -> R {
         try data.withUnsafeBytes(cb)
     }
@@ -36,7 +36,7 @@ extension Either: DataPtrRepresentable, PtrRepresentable where Left: DataPtrRepr
     public typealias Ptr = Left.Ptr
 
     public func withPtr<R>(
-        cb: (Left.Ptr) throws -> R
+        cb: (Left.Ptr) throws -> R,
     ) rethrows -> R {
         switch self {
         case let .left(left):

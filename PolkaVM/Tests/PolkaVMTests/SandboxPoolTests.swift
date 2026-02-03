@@ -24,7 +24,7 @@ struct SandboxPoolTests {
             failureTrackingWindow: 60.0,
             allowOverflowWorkers: false,
             maxOverflowWorkers: 0,
-            exhaustionPolicy: .failFast
+            exhaustionPolicy: .failFast,
         )
 
         print("\n=== TEST: Single Worker Execution ===")
@@ -33,7 +33,7 @@ struct SandboxPoolTests {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         print("Executor created")
@@ -48,7 +48,7 @@ struct SandboxPoolTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil as Data?,
-            ctx: nil as (any InvocationContext)?
+            ctx: nil as (any InvocationContext)?,
         )
         print("Result 1: \(result1.exitReason)")
         // The test program will panic with trap, which is expected
@@ -60,7 +60,7 @@ struct SandboxPoolTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil as Data?,
-            ctx: nil as (any InvocationContext)?
+            ctx: nil as (any InvocationContext)?,
         )
         print("Result 2: \(result2.exitReason)")
 
@@ -70,7 +70,7 @@ struct SandboxPoolTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil as Data?,
-            ctx: nil as (any InvocationContext)?
+            ctx: nil as (any InvocationContext)?,
         )
         print("Result 3: \(result3.exitReason)")
 
@@ -92,7 +92,7 @@ struct SandboxPoolTests {
             failureTrackingWindow: 60.0,
             allowOverflowWorkers: false,
             maxOverflowWorkers: 0,
-            exhaustionPolicy: .failFast
+            exhaustionPolicy: .failFast,
         )
 
         print("\n=== TEST: Multiple Executions Stability ===")
@@ -100,7 +100,7 @@ struct SandboxPoolTests {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         // Use a minimal but valid program: just one instruction that halts
@@ -121,7 +121,7 @@ struct SandboxPoolTests {
                     pc: 0,
                     gas: Gas(1_000_000),
                     argumentData: nil as Data?,
-                    ctx: nil as (any InvocationContext)?
+                    ctx: nil as (any InvocationContext)?,
                 )
                 print("Result: \(result.exitReason)")
                 #expect(result.exitReason == ExitReason.halt)
@@ -151,7 +151,7 @@ struct SandboxPoolTests {
             failureTrackingWindow: 60.0,
             allowOverflowWorkers: false,
             maxOverflowWorkers: 0,
-            exhaustionPolicy: .failFast
+            exhaustionPolicy: .failFast,
         )
 
         print("\n=== TEST: Small Pool (2 workers) ===")
@@ -159,7 +159,7 @@ struct SandboxPoolTests {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         // Use a minimal but valid program: just one instruction that halts
@@ -177,7 +177,7 @@ struct SandboxPoolTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([UInt8(i)]),
-                ctx: nil as (any InvocationContext)?
+                ctx: nil as (any InvocationContext)?,
             )
             print("Result: \(result.exitReason)")
             #expect(result.exitReason == ExitReason.halt)

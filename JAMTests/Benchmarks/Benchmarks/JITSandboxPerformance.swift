@@ -36,7 +36,7 @@ func jITSandboxPerformanceBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([25]),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }
@@ -53,7 +53,7 @@ func jITSandboxPerformanceBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([25]),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }
@@ -70,7 +70,7 @@ func jITSandboxPerformanceBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([25]),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }
@@ -87,7 +87,7 @@ func jITSandboxPerformanceBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([25]),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }
@@ -106,7 +106,7 @@ func jITSandboxPerformanceBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([30]),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }
@@ -123,7 +123,7 @@ func jITSandboxPerformanceBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([30]),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }
@@ -142,7 +142,7 @@ func jITSandboxPerformanceBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: nil,
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }
@@ -159,7 +159,7 @@ func jITSandboxPerformanceBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: nil,
-                ctx: nil
+                ctx: nil,
             )
             blackHole(exitReason)
         }

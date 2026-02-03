@@ -15,7 +15,7 @@ public struct AncestryItem: Codable {
 
 private let logger = Logger(label: "Runtime")
 
-// the STF
+/// the STF
 public final class Runtime {
     public enum Error: Swift.Error {
         case safroleError(SafroleError)
@@ -50,12 +50,12 @@ public final class Runtime {
 
     public let config: ProtocolConfigRef
 
-    // nil means no ancestry tracking and checking
+    /// nil means no ancestry tracking and checking
     public var ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>?
 
     public init(
         config: ProtocolConfigRef,
-        ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>? = nil
+        ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>? = nil,
     ) {
         self.config = config
         self.ancestry = ancestry
@@ -113,7 +113,7 @@ public final class Runtime {
                 try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
                     auxData: encodedHeader,
-                    signature: block.header.seal
+                    signature: block.header.seal,
                 )
             }.mapError(Error.invalidBlockSeal).get()
             guard ticket.id == vrfOutput else {
@@ -134,7 +134,7 @@ public final class Runtime {
                 return try blockAuthorKey.ietfVRFVerify(
                     vrfInputData: vrfInputData,
                     auxData: encodedHeader,
-                    signature: block.header.seal
+                    signature: block.header.seal,
                 )
             }.mapError(Error.invalidBlockSeal).get()
 
@@ -175,7 +175,7 @@ public final class Runtime {
         try await validate(
             block: validatedBlock,
             state: prevState,
-            context: context ?? .init(timeslot: block.value.header.timeslot, stateRoot: prevStateRoot)
+            context: context ?? .init(timeslot: block.value.header.timeslot, stateRoot: prevStateRoot),
         )
 
         return try await apply(block: validatedBlock, state: prevState)
@@ -210,7 +210,7 @@ public final class Runtime {
                 availableReports: availableReports,
                 timeslot: block.header.timeslot,
                 prevTimeslot: prevState.value.timeslot,
-                entropy: newState.entropyPool.t0
+                entropy: newState.entropyPool.t0,
             )
 
             newState.lastAccumulationOutputs = commitments
@@ -227,7 +227,7 @@ public final class Runtime {
                 let authorizationResult = try newState.update(
                     config: config,
                     timeslot: block.header.timeslot,
-                    auths: block.extrinsic.reports.guarantees.map { (CoreIndex($0.workReport.coreIndex), $0.workReport.authorizerHash) }
+                    auths: block.extrinsic.reports.guarantees.map { (CoreIndex($0.workReport.coreIndex), $0.workReport.authorizerHash) },
                 )
                 newState.mergeWith(postState: authorizationResult)
             } catch let error as AuthorizationError {
@@ -244,7 +244,7 @@ public final class Runtime {
                 authorIndex: block.header.authorIndex,
                 availableReports: availableReports,
                 accumulateStats: accumulateStats,
-                activeValidators: newState.currentValidators
+                activeValidators: newState.currentValidators,
             )
 
             try await newState.save()
@@ -266,12 +266,12 @@ public final class Runtime {
     public func updateRecentHistory(block: BlockRef, state newState: inout State, accumulateRoot: Data32) throws {
         let lookup: [Data32: Data32] = Dictionary(uniqueKeysWithValues: block.extrinsic.reports.guarantees.map { (
             $0.workReport.packageSpecification.workPackageHash,
-            $0.workReport.packageSpecification.segmentRoot
+            $0.workReport.packageSpecification.segmentRoot,
         ) })
         newState.recentHistory.update(
             headerHash: block.hash,
             accumulateRoot: accumulateRoot,
-            lookup: lookup
+            lookup: lookup,
         )
     }
 
@@ -281,7 +281,7 @@ public final class Runtime {
             slot: block.header.timeslot,
             entropy: Bandersnatch.getIetfSignatureOutput(signature: block.header.vrfSignature),
             offenders: newState.judgements.punishSet,
-            extrinsics: block.extrinsic.tickets
+            extrinsics: block.extrinsic.tickets,
         )
         newState.mergeWith(postState: safroleResult.state)
 
@@ -303,10 +303,10 @@ public final class Runtime {
         }
     }
 
-    // returns available reports
+    /// returns available reports
     public func updateAssurances(block: BlockRef, state newState: inout State) async throws -> [WorkReport] {
         let (
-            newReports: newReports, availableReports: availableReports
+            newReports: newReports, availableReports: availableReports,
         ) = try newState.update(
             config: config,
             timeslot: block.header.timeslot,
@@ -319,7 +319,7 @@ public final class Runtime {
 
     public func updateReports(block: BlockRef, state newState: inout State) async throws -> [Ed25519PublicKey] {
         let result = try await newState.update(
-            config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports, ancestry: ancestry
+            config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports, ancestry: ancestry,
         )
         newState.reports = result.newReports
         return result.reporters
@@ -327,7 +327,7 @@ public final class Runtime {
 
     public func updatePreimages(block: BlockRef, state newState: inout State, priorState: any Preimages) async throws {
         let res = try await newState.updatePreimages(
-            config: config, timeslot: newState.timeslot, preimages: block.extrinsic.preimages, priorState: priorState
+            config: config, timeslot: newState.timeslot, preimages: block.extrinsic.preimages, priorState: priorState,
         )
         try await newState.mergeWith(postState: res)
     }

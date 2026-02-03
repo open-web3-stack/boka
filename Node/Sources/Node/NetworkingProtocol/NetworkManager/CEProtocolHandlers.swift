@@ -123,8 +123,8 @@ public struct CEProtocolHandlers: Sendable {
                 headerHash: message.headerHash,
                 startKey: message.startKey,
                 endKey: message.endKey,
-                maxSize: message.maxSize
-            )
+                maxSize: message.maxSize,
+            ),
         )
 
         // Wait for response with timeout
@@ -133,13 +133,13 @@ public struct CEProtocolHandlers: Sendable {
                 message.headerHash,
                 message.startKey,
                 message.endKey,
-                message.maxSize
+                message.maxSize,
             ).blake2b256hash()
 
             let response = try await blockchain.waitFor(
                 RuntimeEvents.StateRequestReceivedResponse.self,
                 check: { $0.requestId == requestId },
-                timeout: 5.0
+                timeout: 5.0,
             )
 
             // Return the key-value pairs as response
@@ -170,9 +170,9 @@ public struct CEProtocolHandlers: Sendable {
             items: [
                 ExtrinsicTickets.TicketItem(
                     attempt: message.attempt,
-                    signature: message.proof
+                    signature: message.proof,
                 ),
-            ]
+            ],
         ))
         // TODO: rebroadcast to other peers after some time
         return []
@@ -183,9 +183,9 @@ public struct CEProtocolHandlers: Sendable {
             items: [
                 ExtrinsicTickets.TicketItem(
                     attempt: message.attempt,
-                    signature: message.proof
+                    signature: message.proof,
                 ),
-            ]
+            ],
         ))
         return []
     }
@@ -199,8 +199,8 @@ public struct CEProtocolHandlers: Sendable {
                     .WorkPackagesReceived(
                         coreIndex: message.coreIndex,
                         workPackage: message.workPackage.asRef(),
-                        extrinsics: message.extrinsics
-                    )
+                        extrinsics: message.extrinsics,
+                    ),
             )
         return []
     }
@@ -213,8 +213,8 @@ public struct CEProtocolHandlers: Sendable {
                     .WorkPackageBundleReceived(
                         coreIndex: message.coreIndex,
                         bundle: message.bundle,
-                        segmentsRootMappings: message.segmentsRootMappings
-                    )
+                        segmentsRootMappings: message.segmentsRootMappings,
+                    ),
             )
 
         let resp = try await blockchain.waitFor(RuntimeEvents.WorkPackageBundleReceivedResponse.self) { event in
@@ -234,8 +234,8 @@ public struct CEProtocolHandlers: Sendable {
                     .WorkReportReceived(
                         workReport: message.workReport,
                         slot: message.slot,
-                        signatures: message.signatures
-                    )
+                        signatures: message.signatures,
+                    ),
             )
 
         let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportReceivedResponse.self) { event in
@@ -258,7 +258,7 @@ public struct CEProtocolHandlers: Sendable {
     private func handleShardDistribution(_ message: ShardDistributionMessage) async throws -> [Data] {
         let receivedEvent = RuntimeEvents.ShardDistributionReceived(
             erasureRoot: message.erasureRoot,
-            shardIndex: message.shardIndex
+            shardIndex: message.shardIndex,
         )
         let requestId = try receivedEvent.generateRequestId()
 
@@ -277,7 +277,7 @@ public struct CEProtocolHandlers: Sendable {
         // Publish audit shard request event
         let receivedEvent = RuntimeEvents.AuditShardRequestReceived(
             erasureRoot: message.erasureRoot,
-            shardIndex: message.shardIndex
+            shardIndex: message.shardIndex,
         )
         blockchain.publish(event: receivedEvent)
 
@@ -288,7 +288,7 @@ public struct CEProtocolHandlers: Sendable {
             let response = try await blockchain.waitFor(
                 RuntimeEvents.AuditShardRequestReceivedResponse.self,
                 check: { $0.requestId == requestId },
-                timeout: 5.0
+                timeout: 5.0,
             )
 
             // Return the bundle shard and justification
@@ -312,7 +312,7 @@ public struct CEProtocolHandlers: Sendable {
         let receivedEvent = RuntimeEvents.SegmentShardRequestReceived(
             erasureRoot: message.erasureRoot,
             shardIndex: message.shardIndex,
-            segmentIndices: message.segmentIndices
+            segmentIndices: message.segmentIndices,
         )
         blockchain.publish(event: receivedEvent)
 
@@ -323,7 +323,7 @@ public struct CEProtocolHandlers: Sendable {
             let response = try await blockchain.waitFor(
                 RuntimeEvents.SegmentShardRequestReceivedResponse.self,
                 check: { $0.requestId == requestId },
-                timeout: 5.0
+                timeout: 5.0,
             )
 
             // Return the segment shards
@@ -345,7 +345,7 @@ public struct CEProtocolHandlers: Sendable {
         let receivedEvent = RuntimeEvents.SegmentShardRequestReceived(
             erasureRoot: message.erasureRoot,
             shardIndex: message.shardIndex,
-            segmentIndices: message.segmentIndices
+            segmentIndices: message.segmentIndices,
         )
         blockchain.publish(event: receivedEvent)
 
@@ -356,7 +356,7 @@ public struct CEProtocolHandlers: Sendable {
             let response = try await blockchain.waitFor(
                 RuntimeEvents.SegmentShardRequestReceivedResponse.self,
                 check: { $0.requestId == requestId },
-                timeout: 5.0
+                timeout: 5.0,
             )
 
             // Return the segment shards
@@ -382,8 +382,8 @@ public struct CEProtocolHandlers: Sendable {
                     .AssuranceDistributionReceived(
                         headerHash: message.headerHash,
                         bitfield: message.bitfield,
-                        signature: message.signature
-                    )
+                        signature: message.signature,
+                    ),
             )
         return []
     }
@@ -397,8 +397,8 @@ public struct CEProtocolHandlers: Sendable {
                     .PreimageAnnouncementReceived(
                         serviceID: message.serviceID,
                         hash: message.hash,
-                        preimageLength: message.preimageLength
-                    )
+                        preimageLength: message.preimageLength,
+                    ),
             )
         return []
     }
@@ -412,7 +412,7 @@ public struct CEProtocolHandlers: Sendable {
             let response = try await blockchain.waitFor(
                 RuntimeEvents.PreimageRequestReceivedResponse.self,
                 check: { $0.hash == message.hash },
-                timeout: 5.0
+                timeout: 5.0,
             )
 
             // Return the preimage
@@ -439,8 +439,8 @@ public struct CEProtocolHandlers: Sendable {
                         headerHash: message.headerHash,
                         tranche: message.tranche,
                         announcement: message.announcement,
-                        evidence: message.evidence
-                    )
+                        evidence: message.evidence,
+                    ),
             )
         return []
     }
@@ -456,8 +456,8 @@ public struct CEProtocolHandlers: Sendable {
                         validatorIndex: message.validatorIndex,
                         validity: message.validity,
                         workReportHash: message.workReportHash,
-                        signature: message.signature
-                    )
+                        signature: message.signature,
+                    ),
             )
         return []
     }

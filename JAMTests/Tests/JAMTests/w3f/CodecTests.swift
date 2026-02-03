@@ -1,10 +1,9 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct CodecTests {
     static func test(_ type: (some Codable).Type, path: String, variant: TestVariants) throws -> (JSON, JSON) {

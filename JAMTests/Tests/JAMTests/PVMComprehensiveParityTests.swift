@@ -1,10 +1,9 @@
 import Foundation
+@testable import JAMTests
 import PolkaVM
 import Testing
 import TracingUtils
 import Utils
-
-@testable import JAMTests
 
 private let logger = Logger(label: "PVMComprehensiveParityTests")
 
@@ -13,7 +12,7 @@ private let logger = Logger(label: "PVMComprehensiveParityTests")
 struct PVMComprehensiveParityTests {
     // MARK: - Fibonacci Parity Tests
 
-    @Test func parity_fibonacci_multipleInputs() async throws {
+    @Test func parity_fibonacci_multipleInputs() async {
         let config = DefaultPvmConfig()
 
         let fibonacci = Data([
@@ -42,7 +41,7 @@ struct PVMComprehensiveParityTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([input]),
-                ctx: nil
+                ctx: nil,
             )
 
             // Sandbox mode
@@ -53,19 +52,23 @@ struct PVMComprehensiveParityTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([input]),
-                ctx: nil
+                ctx: nil,
             )
 
             // Verify exit reasons match
             #expect(
                 exitReasonInterpreter == exitReasonSandbox,
-                "Fibonacci(\(input)): Exit reasons differ - interpreter=\(exitReasonInterpreter), sandbox=\(exitReasonSandbox)"
+                "Fibonacci(\(input)): Exit reasons differ - interpreter=\(exitReasonInterpreter), sandbox=\(exitReasonSandbox)",
             )
 
             // Verify outputs match
+            let outputMessage =
+                "Fibonacci(\(input)): Outputs differ - " +
+                "interpreter=\(outputInterpreter?.toHexString() ?? "nil"), " +
+                "sandbox=\(outputSandbox?.toHexString() ?? "nil")"
             #expect(
                 outputInterpreter == outputSandbox,
-                "Fibonacci(\(input)): Outputs differ - interpreter=\(outputInterpreter?.toHexString() ?? "nil"), sandbox=\(outputSandbox?.toHexString() ?? "nil")"
+                outputMessage,
             )
 
             // Verify expected output
@@ -84,12 +87,12 @@ struct PVMComprehensiveParityTests {
 
             #expect(
                 valueInterpreter == expectedOutput,
-                "Fibonacci(\(input)): Interpreter output mismatch - expected=\(expectedOutput), got=\(valueInterpreter)"
+                "Fibonacci(\(input)): Interpreter output mismatch - expected=\(expectedOutput), got=\(valueInterpreter)",
             )
 
             #expect(
                 valueSandbox == expectedOutput,
-                "Fibonacci(\(input)): Sandbox output mismatch - expected=\(expectedOutput), got=\(valueSandbox)"
+                "Fibonacci(\(input)): Sandbox output mismatch - expected=\(expectedOutput), got=\(valueSandbox)",
             )
 
             logger.info("Fibonacci(\(input)): both modes produced \(valueInterpreter)")
@@ -98,7 +101,7 @@ struct PVMComprehensiveParityTests {
 
     // MARK: - SumToN Parity Tests
 
-    @Test func parity_sumToN_wideRange() async throws {
+    @Test func parity_sumToN_wideRange() async {
         let config = DefaultPvmConfig()
 
         let sumToN = Data([
@@ -129,7 +132,7 @@ struct PVMComprehensiveParityTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([input]),
-                ctx: nil
+                ctx: nil,
             )
 
             let (exitReasonSandbox, _, outputSandbox) = await invokePVM(
@@ -139,7 +142,7 @@ struct PVMComprehensiveParityTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([input]),
-                ctx: nil
+                ctx: nil,
             )
 
             // Verify parity
@@ -168,7 +171,7 @@ struct PVMComprehensiveParityTests {
 
     // MARK: - Error Handling Parity
 
-    @Test func parity_errorHandling() async throws {
+    @Test func parity_errorHandling() async {
         let config = DefaultPvmConfig()
 
         // Use empty program which should panic in both modes
@@ -181,7 +184,7 @@ struct PVMComprehensiveParityTests {
             pc: 0,
             gas: Gas(100_000),
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
 
         let (exitReasonSandbox, _, _) = await invokePVM(
@@ -191,7 +194,7 @@ struct PVMComprehensiveParityTests {
             pc: 0,
             gas: Gas(100_000),
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
 
         // Both should panic with trap
@@ -202,7 +205,7 @@ struct PVMComprehensiveParityTests {
 
     // MARK: - Gas Exhaustion Parity
 
-    @Test func parity_gasExhaustion() async throws {
+    @Test func parity_gasExhaustion() async {
         let config = DefaultPvmConfig()
 
         let fibonacci = Data([
@@ -222,7 +225,7 @@ struct PVMComprehensiveParityTests {
             pc: 0,
             gas: limitedGas,
             argumentData: Data([25]), // Large input requiring more computation
-            ctx: nil
+            ctx: nil,
         )
 
         let (exitReasonSandbox, _, _) = await invokePVM(
@@ -232,13 +235,13 @@ struct PVMComprehensiveParityTests {
             pc: 0,
             gas: limitedGas,
             argumentData: Data([25]),
-            ctx: nil
+            ctx: nil,
         )
 
         // Both should run out of gas or fail consistently
         #expect(
             exitReasonInterpreter == exitReasonSandbox,
-            "Gas exhaustion: Exit reasons differ - interpreter=\(exitReasonInterpreter), sandbox=\(exitReasonSandbox)"
+            "Gas exhaustion: Exit reasons differ - interpreter=\(exitReasonInterpreter), sandbox=\(exitReasonSandbox)",
         )
 
         logger.info("Gas exhaustion parity: both modes handled gas limit consistently (exit reason: \(exitReasonInterpreter))")
@@ -246,7 +249,7 @@ struct PVMComprehensiveParityTests {
 
     // MARK: - Large Argument Parity
 
-    @Test func parity_largeArguments() async throws {
+    @Test func parity_largeArguments() async {
         let config = DefaultPvmConfig()
 
         let sumToN = Data([
@@ -269,7 +272,7 @@ struct PVMComprehensiveParityTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: argumentData,
-                ctx: nil
+                ctx: nil,
             )
 
             let (exitReasonSandbox, _, outputSandbox) = await invokePVM(
@@ -279,18 +282,18 @@ struct PVMComprehensiveParityTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: argumentData,
-                ctx: nil
+                ctx: nil,
             )
 
             // Both should handle large arguments identically
             #expect(
                 exitReasonInterpreter == exitReasonSandbox,
-                "Large argument (\(size) bytes): Exit reasons differ"
+                "Large argument (\(size) bytes): Exit reasons differ",
             )
 
             #expect(
                 outputInterpreter == outputSandbox,
-                "Large argument (\(size) bytes): Outputs differ"
+                "Large argument (\(size) bytes): Outputs differ",
             )
 
             logger.info("Large argument parity (\(size) bytes): both modes handled identically")
@@ -299,7 +302,7 @@ struct PVMComprehensiveParityTests {
 
     // MARK: - Comprehensive State Parity
 
-    @Test func parity_comprehensiveState() async throws {
+    @Test func parity_comprehensiveState() async {
         let config = DefaultPvmConfig()
 
         // Test that both modes produce identical state for complex computations
@@ -313,7 +316,7 @@ struct PVMComprehensiveParityTests {
                       61, 8, 0, 0, 2, 0, 51, 8, 4, 51, 7, 0, 0, 2, 0, 1, 50, 0, 73, 77, 18,
                       36, 24]),
                 Data([5]),
-                15
+                15,
             ),
             (
                 Data([0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 61, 0, 0, 0, 0, 0, 51, 128, 119, 0,
@@ -321,7 +324,7 @@ struct PVMComprehensiveParityTests {
                       152, 8, 100, 169, 40, 243, 100, 135, 51, 8, 51, 9, 61, 7, 0, 0, 2, 0,
                       51, 8, 4, 51, 7, 0, 0, 2, 0, 1, 50, 0, 73, 154, 148, 170, 130, 4, 3]),
                 Data([8]),
-                34
+                34,
             ),
         ]
 
@@ -333,7 +336,7 @@ struct PVMComprehensiveParityTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: argument,
-                ctx: nil
+                ctx: nil,
             )
 
             let (_, _, outputSandbox) = await invokePVM(
@@ -343,12 +346,12 @@ struct PVMComprehensiveParityTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: argument,
-                ctx: nil
+                ctx: nil,
             )
 
             #expect(
                 outputInterpreter == outputSandbox,
-                "Outputs differ for argument=\(argument.toHexString())"
+                "Outputs differ for argument=\(argument.toHexString())",
             )
 
             let valueInterpreter = outputInterpreter?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0

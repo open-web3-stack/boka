@@ -4,7 +4,6 @@
 // TODO: Track issue to rewrite and restore cross-mode parity tests for interpreter vs JIT compatibility
 
 import Foundation
+@testable import PolkaVM
 import Testing
 import Utils
-
-@testable import PolkaVM

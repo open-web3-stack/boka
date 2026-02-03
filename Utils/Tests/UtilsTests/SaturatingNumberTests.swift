@@ -1,10 +1,9 @@
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct SaturatingNumberTests {
-    @Test func testMoreAssignment() {
+    @Test func moreAssignment() {
         var gas = Gas(100)
         gas += Gas(2)
         #expect(gas == Gas(102))
@@ -40,7 +39,7 @@ struct SaturatingNumberTests {
         #expect(gas % 2 == Gas(0))
     }
 
-    @Test func testAdditionWithNoOverflow() {
+    @Test func additionWithNoOverflow() {
         let gas1 = Gas(100)
         let gas2 = Gas(200)
         let result = gas1 + gas2
@@ -48,14 +47,14 @@ struct SaturatingNumberTests {
         #expect(result == Gas(300))
     }
 
-    @Test func testAdditionWithOverflow() {
+    @Test func additionWithOverflow() {
         let maxGas = Gas.max
         let result = maxGas + 1
 
         #expect(result == Gas.max)
     }
 
-    @Test func testSubtractionWithNoOverflow() {
+    @Test func subtractionWithNoOverflow() {
         let gas1 = Gas(100)
         let gas2 = Gas(200)
         let result = gas1 - gas2
@@ -63,14 +62,14 @@ struct SaturatingNumberTests {
         #expect(result == Gas(-100))
     }
 
-    @Test func testSubtractionWithOverflow() {
+    @Test func subtractionWithOverflow() {
         let minGas = Gas.min
         let result = minGas - 1
 
         #expect(result == Gas.min)
     }
 
-    @Test func testMultiplicationWithNoOverflow() {
+    @Test func multiplicationWithNoOverflow() {
         let gas1 = Gas(100)
         let gas2 = Gas(200)
         let result = gas1 * gas2
@@ -78,42 +77,42 @@ struct SaturatingNumberTests {
         #expect(result == Gas(20000))
     }
 
-    @Test func testMultiplicationWithOverflow() {
+    @Test func multiplicationWithOverflow() {
         let maxGas = Gas.max
         let result = maxGas * 2
 
         #expect(result == Gas.max)
     }
 
-    @Test func testNegation() {
+    @Test func negation() {
         let gas1 = Gas(100)
         let result = -gas1
 
         #expect(result == Gas(-100))
     }
 
-    @Test func testAdditionWithOtherType() {
+    @Test func additionWithOtherType() {
         let gas1 = Gas(100)
         let result = gas1 + 1
 
         #expect(result == Gas(101))
     }
 
-    @Test func testSubtractionWithOtherType() {
+    @Test func subtractionWithOtherType() {
         let gas1 = Gas(100)
         let result = gas1 - 1
 
         #expect(result == Gas(99))
     }
 
-    @Test func testMultiplicationWithOtherType() {
+    @Test func multiplicationWithOtherType() {
         let gas1 = Gas(100)
         let result = gas1 * 2
 
         #expect(result == Gas(200))
     }
 
-    @Test func testComparison() {
+    @Test func comparison() {
         let gas1 = Gas(100)
         let gas2 = Gas(200)
         let gas3 = Gas(300)
@@ -127,7 +126,7 @@ struct SaturatingNumberTests {
         #expect(gas1 + gas2 == gas3)
     }
 
-    @Test func testDivision() {
+    @Test func division() {
         let gas1 = Gas(100)
         let gas2 = Gas(200)
         let result = gas2 / gas1
@@ -135,7 +134,7 @@ struct SaturatingNumberTests {
         #expect(result == Gas(2))
     }
 
-    @Test func testModulo() {
+    @Test func modulo() {
         let gas1 = Gas(100)
         let gas2 = Gas(200)
 

@@ -57,7 +57,7 @@ public struct WorkPackageBundleSubmissionMessage: Codable, Sendable {
         workPackage: Data,
         extrinsics: Data,
         segments: [Data4104],
-        importProofs: [Data32]
+        importProofs: [Data32],
     ) {
         self.coreIndex = coreIndex
         self.segmentsRootMappings = segmentsRootMappings
@@ -113,7 +113,7 @@ extension WorkPackageBundleSubmissionMessage: CEMessage {
         guard data.count == 5 else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "Expected 5 messages, got \(data.count)"
+                debugDescription: "Expected 5 messages, got \(data.count)",
             ))
         }
 
@@ -127,7 +127,7 @@ extension WorkPackageBundleSubmissionMessage: CEMessage {
             let segmentsRoot = try decoder1.decode(Data32.self)
             segmentsRootMappings.append(SegmentRootMapping(
                 workPackageHash: workPackageHash,
-                segmentsRoot: segmentsRoot
+                segmentsRoot: segmentsRoot,
             ))
         }
 
@@ -161,7 +161,7 @@ extension WorkPackageBundleSubmissionMessage: CEMessage {
             workPackage: workPackage,
             extrinsics: extrinsics,
             segments: segments,
-            importProofs: importProofs
+            importProofs: importProofs,
         )
     }
 }

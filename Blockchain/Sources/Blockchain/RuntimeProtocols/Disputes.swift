@@ -21,7 +21,7 @@ public struct ReportItem: Sendable, Equatable, Codable {
 
     public init(
         workReport: WorkReport,
-        timeslot: TimeslotIndex
+        timeslot: TimeslotIndex,
     ) {
         self.workReport = workReport
         self.timeslot = timeslot
@@ -36,15 +36,15 @@ public struct DisputesPostState: Sendable, Equatable {
     public var judgements: JudgementsState
     public var reports: ConfigFixedSizeArray<
         ReportItem?,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
 
     public init(
         judgements: JudgementsState,
         reports: ConfigFixedSizeArray<
             ReportItem?,
-            ProtocolConfig.TotalNumberOfCores
-        >
+            ProtocolConfig.TotalNumberOfCores,
+        >,
     ) {
         self.judgements = judgements
         self.reports = reports
@@ -55,19 +55,19 @@ public protocol Disputes {
     var judgements: JudgementsState { get }
     var reports: ConfigFixedSizeArray<
         ReportItem?,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     > { get }
     var timeslot: TimeslotIndex { get }
     var currentValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     > { get }
     var previousValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     > { get }
 
     func update(config: ProtocolConfigRef, disputes: ExtrinsicDisputes) throws(DisputesError) -> (
         state: DisputesPostState,
-        offenders: [Ed25519PublicKey]
+        offenders: [Ed25519PublicKey],
     )
 
     mutating func mergeWith(postState: DisputesPostState)
@@ -76,7 +76,7 @@ public protocol Disputes {
 extension Disputes {
     public func update(config: ProtocolConfigRef, disputes: ExtrinsicDisputes) throws(DisputesError) -> (
         state: DisputesPostState,
-        offenders: [Ed25519PublicKey]
+        offenders: [Ed25519PublicKey],
     ) {
         var newJudgements = judgements
         var newReports = reports
@@ -212,9 +212,9 @@ extension Disputes {
         return (
             state: DisputesPostState(
                 judgements: newJudgements,
-                reports: newReports
+                reports: newReports,
             ),
-            offenders: offenders
+            offenders: offenders,
         )
     }
 }

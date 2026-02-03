@@ -61,7 +61,7 @@ public class PageMap {
         pageStart: UInt32,
         pages: Int,
         bits: [UInt64],
-        singlePageChecker: (UInt32) -> Bool
+        singlePageChecker: (UInt32) -> Bool,
     ) -> (result: Bool, page: UInt32) {
         if pages == 0 {
             return (true, pageStart)
@@ -102,7 +102,7 @@ public class PageMap {
     private func modifyBitsInRange(
         startIndex: UInt32,
         pages: UInt32,
-        modifier: (Int, UInt64) -> Void
+        modifier: (Int, UInt64) -> Void,
     ) {
         let endIndex = startIndex + pages
         var currentPage = startIndex
@@ -212,7 +212,7 @@ public class PageMap {
             pageStart: pageStart,
             pages: pages,
             bits: readableBits,
-            singlePageChecker: isPageReadable
+            singlePageChecker: isPageReadable,
         )
     }
 
@@ -228,7 +228,7 @@ public class PageMap {
             pageStart: pageStart,
             pages: pages,
             bits: writableBits,
-            singlePageChecker: isPageWritable
+            singlePageChecker: isPageWritable,
         )
     }
 

@@ -32,7 +32,7 @@ public actor NetworkRequestHelper {
     /// - Throws: DataAvailabilityError if the request fails
     public func fetchFromValidator(
         validator validatorIndex: ValidatorIndex,
-        requestData: Data
+        requestData: Data,
     ) async throws -> Data {
         // Ensure network client is available
         guard let networkClient else {
@@ -267,7 +267,7 @@ public actor NetworkRequestHelper {
     /// - Throws: DataAvailabilityError if insufficient validators respond
     public func fetchFromValidatorsConcurrently(
         validators validatorIndices: [ValidatorIndex],
-        shardRequest: Data
+        shardRequest: Data,
     ) async throws -> [(validator: ValidatorIndex, data: Data)] {
         // Fetch from validators concurrently with bounded concurrency
         // We need at least minimumValidatorResponses validators to respond for successful reconstruction
@@ -278,8 +278,7 @@ public actor NetworkRequestHelper {
         let maxConcurrentTasks = min(validatorIndices.count, requiredResponses * 3)
 
         logger.debug(
-            // swiftlint:disable:next line_length
-            "Fetching from \(validatorIndices.count) validators with max \(maxConcurrentTasks) concurrent tasks (need \(requiredResponses) responses)"
+            "Fetching from \(validatorIndices.count) validators with max \(maxConcurrentTasks) concurrent tasks (need \(requiredResponses) responses)",
         )
 
         var responses: [(validator: ValidatorIndex, data: Data)] = []

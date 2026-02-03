@@ -31,7 +31,7 @@ public class Server {
         let corsConfiguration = CORSMiddleware.Configuration(
             allowedOrigin: .all,
             allowedMethods: [.GET, .POST, .PUT, .OPTIONS],
-            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin]
+            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin],
         )
         let cors = CORSMiddleware(configuration: corsConfiguration)
         // cors middleware should come before default error middleware using `at: .beginning`

@@ -1,10 +1,9 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct ErasureCodingTestcase: Codable {
     let data: Data
@@ -28,7 +27,7 @@ struct ErasureTests {
         let actualShards = try ErasureCoding.chunk(
             data: testcase.data,
             basicSize: basicSize,
-            recoveryCount: recoveryCount
+            recoveryCount: recoveryCount,
         )
 
         #expect(actualShards.count == testcase.shards.count, "Shard count mismatch")
@@ -46,7 +45,7 @@ struct ErasureTests {
             basicSize: basicSize,
             originalCount: originalCount,
             recoveryCount: recoveryCount,
-            originalLength: testcase.data.count
+            originalLength: testcase.data.count,
         )
 
         #expect(reconstructedData == testcase.data, "Reconstructed data does not match original")

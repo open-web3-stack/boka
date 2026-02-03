@@ -1,7 +1,6 @@
+@testable import Codec
 import Foundation
 import Testing
-
-@testable import Codec
 
 struct IntegerCodecTests {
     static func fixedWidthTestCasesSimple() -> [(UInt8, EncodeMethod, [UInt8])] {
@@ -72,7 +71,7 @@ struct IntegerCodecTests {
         UInt64(1) << 63 + 1,
         UInt64.max - 1,
         UInt64.max,
-    ] as[UInt64])
+    ] as [UInt64])
     func variableWidth(testCase: UInt64) {
         let array = Array(testCase.encode(method: .variableWidth))
         var slice = array[...]
@@ -103,7 +102,7 @@ struct IntegerCodecTests {
         #expect(slice3.decode(length: 2) == testCase & 0xFFFF)
     }
 
-    @Test func multipleDecodes() throws {
+    @Test func multipleDecodes() {
         var data = Data([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
         #expect(data.decode(length: 8) as UInt64? == 0x0706_0504_0302_0100)
         #expect(data.decode(length: 4) as UInt32? == 0x0B0A_0908)

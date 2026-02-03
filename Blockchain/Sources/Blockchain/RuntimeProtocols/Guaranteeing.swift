@@ -22,32 +22,32 @@ public enum GuaranteeingError: Error {
 public protocol Guaranteeing {
     var entropyPool: EntropyPool { get }
     var currentValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     > { get }
     var previousValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     > { get }
     var reports: ConfigFixedSizeArray<
         ReportItem?,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     > { get }
     var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<
             Data32,
             ProtocolConfig.Int0,
-            ProtocolConfig.MaxAuthorizationsPoolItems
+            ProtocolConfig.MaxAuthorizationsPoolItems,
         >,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     > { get }
     var recentHistory: RecentHistory { get }
     var offenders: Set<Ed25519PublicKey> { get }
     var accumulationQueue: ConfigFixedSizeArray<
         [AccumulationQueueItem],
-        ProtocolConfig.EpochLength
+        ProtocolConfig.EpochLength,
     > { get }
     var accumulationHistory: ConfigFixedSizeArray<
         SortedUniqueArray<Data32>,
-        ProtocolConfig.EpochLength
+        ProtocolConfig.EpochLength,
     > { get }
 
     func serviceAccount(index: ServiceIndex) async throws -> ServiceAccountDetails?
@@ -88,7 +88,7 @@ extension Guaranteeing {
 
     public func validateGuarantees(
         config: ProtocolConfigRef,
-        extrinsic: ExtrinsicGuarantees
+        extrinsic: ExtrinsicGuarantees,
     ) async throws(GuaranteeingError) {
         for guarantee in extrinsic.guarantees {
             var totalGasUsage = Gas(0)
@@ -124,14 +124,14 @@ extension Guaranteeing {
         config: ProtocolConfigRef,
         timeslot: TimeslotIndex,
         extrinsic: ExtrinsicGuarantees,
-        ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>?
+        ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>?,
     ) async throws(GuaranteeingError) -> (
         newReports: ConfigFixedSizeArray<
             ReportItem?,
-            ProtocolConfig.TotalNumberOfCores
+            ProtocolConfig.TotalNumberOfCores,
         >,
         reported: [WorkReport],
-        reporters: [Ed25519PublicKey]
+        reporters: [Ed25519PublicKey],
     ) {
         let coreAssignmentRotationPeriod = UInt32(config.value.coreAssignmentRotationPeriod)
 
@@ -145,7 +145,7 @@ extension Guaranteeing {
         let previousCoreAssignment = getCoreAssignment(
             config: config,
             randomness: previousRandomness,
-            timeslot: UInt32(max(0, Int(timeslot) - Int(coreAssignmentRotationPeriod)))
+            timeslot: UInt32(max(0, Int(timeslot) - Int(coreAssignmentRotationPeriod))),
         )
         let previousCoreKeys = withoutOffenders(keys: previousValidators.map(\.ed25519))
 
@@ -276,7 +276,7 @@ extension Guaranteeing {
             let coreIndex = Int(report.coreIndex)
             newReports[coreIndex] = ReportItem(
                 workReport: report,
-                timeslot: timeslot
+                timeslot: timeslot,
             )
             reported.append(report)
         }

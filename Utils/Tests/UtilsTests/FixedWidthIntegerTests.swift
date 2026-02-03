@@ -1,9 +1,8 @@
 import Testing
-
 @testable import Utils
 
 struct FixedWidthIntegerTests {
-    @Test func nextPowerOfTwo() throws {
+    @Test func nextPowerOfTwo() {
         #expect(UInt8(0).nextPowerOfTwo == nil)
         #expect(UInt8(1).nextPowerOfTwo == UInt8(1))
         #expect(UInt8(2).nextPowerOfTwo == UInt8(2))

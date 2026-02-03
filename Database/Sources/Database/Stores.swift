@@ -4,43 +4,43 @@ import RocksDBSwift
 import Utils
 
 enum StoreId: UInt8, ColumnFamilyKey {
-    // metadata and configurations
+    /// metadata and configurations
     case meta = 0
-    // blocks
-    // blockHash => blockBody
+    /// blocks
+    /// blockHash => blockBody
     case blocks = 1
-    // block indexes
-    // 0x00 + timeslot => Set<BlockHash>
-    // 0x01 + blockNumber => Set<BlockHash>
-    // 0x02 + blockHash => blockNumber
-    // 0x03 + blockHash => stateRootHash
+    /// block indexes
+    /// 0x00 + timeslot => Set<BlockHash>
+    /// 0x01 + blockNumber => Set<BlockHash>
+    /// 0x02 + blockHash => blockNumber
+    /// 0x03 + blockHash => stateRootHash
     case blockIndexes = 2
-    // state trie
-    // 0x00 + hash => trie node
-    // 0x01 + value hash => state value
+    /// state trie
+    /// 0x00 + hash => trie node
+    /// 0x01 + value hash => state value
     case state = 3
-    // ref count
-    // 0x00 + node hash => ref count
-    // 0x01 + value hash => ref count
+    /// ref count
+    /// 0x00 + node hash => ref count
+    /// 0x01 + value hash => ref count
     case stateRefs = 4
-    // guaranteedWorkReports
-    // workReportHash => guaranteedWorkReport
+    /// guaranteedWorkReports
+    /// workReportHash => guaranteedWorkReport
     case guaranteedWorkReports = 5
-    // availability metadata
-    // erasureRoot => (timestamp, pagedProofsHash, shardCount)
+    /// availability metadata
+    /// erasureRoot => (timestamp, pagedProofsHash, shardCount)
     case availabilityMetadata = 6
-    // availability segments
-    // erasureRoot || index => segmentData
+    /// availability segments
+    /// erasureRoot || index => segmentData
     case availabilitySegments = 7
-    // availability mappings
-    // 0x01 || workPackageHash => segmentsRoot
-    // 0x02 || segmentsRoot => erasureRoot
+    /// availability mappings
+    /// 0x01 || workPackageHash => segmentsRoot
+    /// 0x02 || segmentsRoot => erasureRoot
     case availabilityMappings = 8
-    // audit store entries
-    // erasureRoot => (workPackageHash, bundleSize, timestamp)
+    /// audit store entries
+    /// erasureRoot => (workPackageHash, bundleSize, timestamp)
     case availabilityAudit = 9
-    // D3L store entries
-    // erasureRoot => (segmentsRoot, segmentCount, timestamp)
+    /// D3L store entries
+    /// erasureRoot => (segmentsRoot, segmentCount, timestamp)
     case availabilityD3L = 10
 }
 

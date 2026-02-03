@@ -105,7 +105,7 @@ public class IPCServer {
     /// Handle execute request
     private func handleExecuteRequest(
         _ message: IPCMessage,
-        handler: @escaping (IPCExecuteRequest) async throws -> IPCExecuteResponse
+        handler: @escaping (IPCExecuteRequest) async throws -> IPCExecuteResponse,
     ) async {
         guard let fd = fileDescriptor else {
             return
@@ -124,7 +124,7 @@ public class IPCServer {
                 exitReason: response.toExitReason(),
                 gasUsed: response.gasUsed,
                 outputData: response.outputData,
-                errorMessage: response.errorMessage
+                errorMessage: response.errorMessage,
             )
 
             try writeData(responseData, to: fd)
@@ -137,7 +137,7 @@ public class IPCServer {
                 let errorMsg = try IPCProtocol.createErrorMessage(
                     requestId: message.requestId,
                     errorType: .execution,
-                    message: "\(error)"
+                    message: "\(error)",
                 )
                 do {
                     try writeData(errorMsg, to: fd)

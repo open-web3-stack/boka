@@ -23,7 +23,17 @@ func sandboxPoolBenchmarks() {
         61, 8, 0, 0, 2, 0, 51, 8, 4, 51, 7, 0, 0, 2, 0, 1, 50, 0, 73, 77, 18,
         36, 24,
     ])
+    registerPoolConfigurationBenchmarks(emptyProgram: emptyProgram)
+    registerPoolSizeBenchmarks(emptyProgram: emptyProgram)
+    registerConcurrentBenchmarks(fibonacciProgram: fibonacciProgram)
+    registerComparisonBenchmarks(emptyProgram: emptyProgram, fibonacciProgram: fibonacciProgram)
+    registerBatchBenchmarks(emptyProgram: emptyProgram)
+    registerThroughputBenchmarks(fibonacciProgram: fibonacciProgram)
+    registerMemoryBenchmarks(sumToNProgram: sumToNProgram)
+    registerQueueDepthBenchmarks(emptyProgram: emptyProgram)
+}
 
+private func registerPoolConfigurationBenchmarks(emptyProgram: Data) {
     // MARK: - Pool Configuration Comparisons
 
     Benchmark("pool.config.throughput.single") { benchmark in
@@ -31,7 +41,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -40,7 +50,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -51,7 +61,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -60,7 +70,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -71,7 +81,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -80,7 +90,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -91,7 +101,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -100,12 +110,14 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
     }
+}
 
+private func registerPoolSizeBenchmarks(emptyProgram: Data) {
     // MARK: - Pool Size Benchmarks
 
     Benchmark("pool.size.2.single") { benchmark in
@@ -114,7 +126,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -123,7 +135,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -135,7 +147,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -144,7 +156,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -156,7 +168,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -165,7 +177,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -177,7 +189,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -186,12 +198,14 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
     }
+}
 
+private func registerConcurrentBenchmarks(fibonacciProgram: Data) {
     // MARK: - Concurrent Execution Benchmarks
 
     Benchmark("pool.concurrent.fibonacci", configuration: .init(timeUnits: .milliseconds)) { benchmark in
@@ -199,7 +213,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -214,7 +228,7 @@ func sandboxPoolBenchmarks() {
                         pc: 0,
                         gas: Gas(1_000_000),
                         argumentData: Data([10]),
-                        ctx: nil
+                        ctx: nil,
                     )
                     blackHole(result)
                 }
@@ -223,7 +237,9 @@ func sandboxPoolBenchmarks() {
 
         benchmark.stopMeasurement()
     }
+}
 
+private func registerComparisonBenchmarks(emptyProgram: Data, fibonacciProgram: Data) {
     // MARK: - Pooled vs Non-Pooled Comparison
 
     Benchmark("pool.comparison.pooled.empty") { benchmark in
@@ -231,7 +247,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -240,7 +256,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -249,7 +265,7 @@ func sandboxPoolBenchmarks() {
     Benchmark("pool.comparison.nonpooled.empty") { benchmark in
         let executor = Executor(
             mode: .sandboxed,
-            config: DefaultPvmConfig()
+            config: DefaultPvmConfig(),
         )
 
         benchmark.startMeasurement()
@@ -258,7 +274,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -269,7 +285,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -278,7 +294,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([8]),
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -287,7 +303,7 @@ func sandboxPoolBenchmarks() {
     Benchmark("pool.comparison.nonpooled.fibonacci") { benchmark in
         let executor = Executor(
             mode: .sandboxed,
-            config: DefaultPvmConfig()
+            config: DefaultPvmConfig(),
         )
 
         benchmark.startMeasurement()
@@ -296,12 +312,14 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([8]),
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
     }
+}
 
+private func registerBatchBenchmarks(emptyProgram: Data) {
     // MARK: - Batch Performance (Key Metric!)
 
     Benchmark("pool.batch.pooled.100", configuration: .init(timeUnits: .milliseconds)) { benchmark in
@@ -309,7 +327,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -320,7 +338,7 @@ func sandboxPoolBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: nil,
-                ctx: nil
+                ctx: nil,
             )
             blackHole(result)
         }
@@ -331,7 +349,7 @@ func sandboxPoolBenchmarks() {
     Benchmark("pool.batch.nonpooled.100", configuration: .init(timeUnits: .milliseconds)) { benchmark in
         let executor = Executor(
             mode: .sandboxed,
-            config: DefaultPvmConfig()
+            config: DefaultPvmConfig(),
         )
 
         benchmark.startMeasurement()
@@ -342,14 +360,16 @@ func sandboxPoolBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: nil,
-                ctx: nil
+                ctx: nil,
             )
             blackHole(result)
         }
 
         benchmark.stopMeasurement()
     }
+}
 
+private func registerThroughputBenchmarks(fibonacciProgram: Data) {
     // MARK: - Throughput Benchmarks
 
     Benchmark("pool.throughput.pooled.fibonacci", configuration: .init(timeUnits: .milliseconds)) { benchmark in
@@ -357,7 +377,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -368,7 +388,7 @@ func sandboxPoolBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([10]),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(result)
         }
@@ -379,7 +399,7 @@ func sandboxPoolBenchmarks() {
     Benchmark("pool.throughput.nonpooled.fibonacci", configuration: .init(timeUnits: .milliseconds)) { benchmark in
         let executor = Executor(
             mode: .sandboxed,
-            config: DefaultPvmConfig()
+            config: DefaultPvmConfig(),
         )
 
         benchmark.startMeasurement()
@@ -390,14 +410,16 @@ func sandboxPoolBenchmarks() {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([10]),
-                ctx: nil
+                ctx: nil,
             )
             blackHole(result)
         }
 
         benchmark.stopMeasurement()
     }
+}
 
+private func registerMemoryBenchmarks(sumToNProgram: Data) {
     // MARK: - Memory Intensive Workloads
 
     Benchmark("pool.memory.pooled.sumToN") { benchmark in
@@ -405,7 +427,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -414,7 +436,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([50]),
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -423,7 +445,7 @@ func sandboxPoolBenchmarks() {
     Benchmark("pool.memory.nonpooled.sumToN") { benchmark in
         let executor = Executor(
             mode: .sandboxed,
-            config: DefaultPvmConfig()
+            config: DefaultPvmConfig(),
         )
 
         benchmark.startMeasurement()
@@ -432,12 +454,14 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([50]),
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
     }
+}
 
+private func registerQueueDepthBenchmarks(emptyProgram: Data) {
     // MARK: - Queue Depth Impact
 
     Benchmark("pool.queueDepth.10") { benchmark in
@@ -446,7 +470,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -455,7 +479,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -467,7 +491,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -476,7 +500,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)
@@ -488,7 +512,7 @@ func sandboxPoolBenchmarks() {
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
-            poolConfig: config
+            poolConfig: config,
         )
 
         benchmark.startMeasurement()
@@ -497,7 +521,7 @@ func sandboxPoolBenchmarks() {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
         benchmark.stopMeasurement()
         blackHole(result)

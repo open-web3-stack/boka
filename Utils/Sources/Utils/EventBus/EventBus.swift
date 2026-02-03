@@ -12,7 +12,7 @@ public protocol Subscribable: AnyObject, Sendable {
     func subscribe<T: Event>(
         _ eventType: T.Type,
         id: UniqueId,
-        handler: @escaping @Sendable (T) async throws -> Void
+        handler: @escaping @Sendable (T) async throws -> Void,
     ) async -> SubscriptionToken
 
     func unsubscribe(token: SubscriptionToken) async
@@ -22,7 +22,7 @@ extension Subscribable {
     public func subscribe<T: Event>(
         _ eventType: T.Type,
         id: UniqueId = "",
-        handler: @escaping @Sendable (T) async throws -> Void
+        handler: @escaping @Sendable (T) async throws -> Void,
     ) async -> SubscriptionToken {
         await subscribe(eventType, id: id, handler: handler)
     }
@@ -89,7 +89,7 @@ public actor EventBus: Subscribable {
     public func subscribe<T: Event>(
         _ eventType: T.Type,
         id: UniqueId = "",
-        handler: @escaping @Sendable (T) async throws -> Void
+        handler: @escaping @Sendable (T) async throws -> Void,
     ) -> SubscriptionToken {
         let key = ObjectIdentifier(eventType)
         let token = SubscriptionToken(id: id, eventTypeId: key)
@@ -167,7 +167,7 @@ public actor EventBus: Subscribable {
     private func addWaitContinuation<T: Event>(
         _ eventType: T.Type,
         check: @escaping @Sendable (T) -> Bool,
-        continuation: SafeContinuation<Event>
+        continuation: SafeContinuation<Event>,
     ) -> UniqueId {
         let key = ObjectIdentifier(eventType)
         let handler = ContinuationHandler(eventType, continuation, check)
@@ -178,7 +178,7 @@ public actor EventBus: Subscribable {
     public func waitFor<T: Event>(
         _ eventType: T.Type,
         check: @escaping @Sendable (T) -> Bool = { _ in true },
-        timeout: TimeInterval = 10
+        timeout: TimeInterval = 10,
     ) async throws -> T {
         let contId: Mutex<UniqueId?> = .init(nil)
 

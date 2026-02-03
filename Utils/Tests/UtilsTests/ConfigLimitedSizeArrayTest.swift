@@ -1,7 +1,6 @@
 import Codec
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct MinLengthNegated: ReadInt {
@@ -190,9 +189,9 @@ struct ConfigLimitedSizeArrayTests {
 
         let indexWithinLimit = value.index(0, offsetBy: 3, limitedBy: 5)
         #expect(indexWithinLimit == 3)
-        #expect(value.index(after: indexWithinLimit!) == 4)
-        #expect(value.index(before: indexWithinLimit!) == 2)
-        #expect(value.index(from: indexWithinLimit!) == 3)
+        #expect(try value.index(after: #require(indexWithinLimit)) == 4)
+        #expect(try value.index(before: #require(indexWithinLimit)) == 2)
+        #expect(try value.index(from: #require(indexWithinLimit)) == 3)
     }
 
     @Test func description() throws {

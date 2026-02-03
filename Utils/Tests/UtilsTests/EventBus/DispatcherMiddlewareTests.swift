@@ -1,7 +1,6 @@
 import bls
 import Foundation
 import Testing
-
 @testable import Utils
 
 final class MiddlewareTests {
@@ -13,7 +12,7 @@ final class MiddlewareTests {
         }
     }
 
-    @Test func testParallelDispatcher() async throws {
+    @Test func parallelDispatcher() async throws {
         let orderManager = OrderManager()
 
         let firstMiddleware = Middleware.noop
@@ -29,7 +28,7 @@ final class MiddlewareTests {
         #expect(order.count == 2)
     }
 
-    @Test func testSerialDispatcher() async throws {
+    @Test func serialDispatcher() async throws {
         let orderManager = OrderManager()
 
         let firstMiddleware = Middleware.noop

@@ -1,9 +1,8 @@
 import Foundation
+@testable import JAMTests
 import PolkaVM
 import Testing
 import TracingUtils
-
-@testable import JAMTests
 import Utils
 
 private let logger = Logger(label: "PVMInstructionTests")
@@ -15,11 +14,11 @@ private let logger = Logger(label: "PVMInstructionTests")
 struct PVMInstructionTests {
     // MARK: - Arithmetic Instructions
 
-    @Test func testAdd64_interpreter() async throws {
+    @Test func add64_interpreter() async throws {
         try await testAdd64(mode: .interpreter)
     }
 
-    @Test func testAdd64_sandbox() async throws {
+    @Test func add64_sandbox() async throws {
         try await testAdd64(mode: .sandbox)
     }
 
@@ -47,11 +46,11 @@ struct PVMInstructionTests {
 
     // MARK: - Branch Instructions
 
-    @Test func testConditionalBranch_interpreter() async throws {
+    @Test func conditionalBranch_interpreter() async throws {
         try await testConditionalBranch(mode: .interpreter)
     }
 
-    @Test func testConditionalBranch_sandbox() async throws {
+    @Test func conditionalBranch_sandbox() async throws {
         try await testConditionalBranch(mode: .sandbox)
     }
 
@@ -69,7 +68,7 @@ struct PVMInstructionTests {
             pc: 0,
             gas: Gas(100_000),
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
 
         // For now, just verify it doesn't crash
@@ -77,11 +76,11 @@ struct PVMInstructionTests {
 
     // MARK: - Load/Store Instructions
 
-    @Test func testLoadStore_interpreter() async throws {
+    @Test func loadStore_interpreter() async throws {
         try await testLoadStore(mode: .interpreter)
     }
 
-    @Test func testLoadStore_sandbox() async throws {
+    @Test func loadStore_sandbox() async throws {
         try await testLoadStore(mode: .sandbox)
     }
 
@@ -92,7 +91,7 @@ struct PVMInstructionTests {
     // MARK: - Edge Case Tests
 
     /// Test that both modes handle edge cases consistently
-    @Test func testEdgeCase_zeroGas() async throws {
+    @Test func edgeCase_zeroGas() async {
         let config = DefaultPvmConfig()
 
         // Test with zero gas - should fail immediately
@@ -103,7 +102,7 @@ struct PVMInstructionTests {
             pc: 0,
             gas: Gas(0),
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
 
         let (exitReasonSandbox, _, _) = await invokePVM(
@@ -113,7 +112,7 @@ struct PVMInstructionTests {
             pc: 0,
             gas: Gas(0),
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
 
         // Both should fail with out of gas
@@ -121,7 +120,7 @@ struct PVMInstructionTests {
         #expect(exitReasonSandbox == .outOfGas, "Sandbox should run out of gas")
     }
 
-    @Test func testEdgeCase_largeArgument() async throws {
+    @Test func edgeCase_largeArgument() async {
         let config = DefaultPvmConfig()
 
         // Test with large argument data
@@ -134,7 +133,7 @@ struct PVMInstructionTests {
             pc: 0,
             gas: Gas(100_000),
             argumentData: largeArgument,
-            ctx: nil
+            ctx: nil,
         )
 
         let (exitReasonSandbox, _, _) = await invokePVM(
@@ -144,14 +143,14 @@ struct PVMInstructionTests {
             pc: 0,
             gas: Gas(100_000),
             argumentData: largeArgument,
-            ctx: nil
+            ctx: nil,
         )
 
         // Both should handle large arguments the same way
         #expect(exitReasonInterpreter == exitReasonSandbox, "Both modes should handle large arguments identically")
     }
 
-    @Test func testEdgeCase_maxGas() async throws {
+    @Test func edgeCase_maxGas() async {
         let config = DefaultPvmConfig()
 
         // Test with very large gas value (not max to avoid overflow)
@@ -164,7 +163,7 @@ struct PVMInstructionTests {
             pc: 0,
             gas: largeGas,
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
 
         let (exitReasonSandbox, gasUsedSandbox, _) = await invokePVM(
@@ -174,7 +173,7 @@ struct PVMInstructionTests {
             pc: 0,
             gas: largeGas,
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
 
         // Both should complete and use similar amounts of gas
@@ -187,7 +186,7 @@ struct PVMInstructionTests {
     // MARK: - Comprehensive Parity Tests
 
     /// Run a comprehensive parity test across multiple scenarios
-    @Test func testComprehensiveParity_multipleScenarios() async throws {
+    @Test func comprehensiveParity_multipleScenarios() async {
         let config = DefaultPvmConfig()
 
         // Test different input values with the sumToN program
@@ -213,7 +212,7 @@ struct PVMInstructionTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([input]),
-                ctx: nil
+                ctx: nil,
             )
 
             // Run in sandbox mode
@@ -224,19 +223,23 @@ struct PVMInstructionTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([input]),
-                ctx: nil
+                ctx: nil,
             )
 
             // Verify exit reasons match
             #expect(
                 exitReasonInterpreter == exitReasonSandbox,
-                "Exit reasons differ for input=\(input): interpreter=\(exitReasonInterpreter), sandbox=\(exitReasonSandbox)"
+                "Exit reasons differ for input=\(input): interpreter=\(exitReasonInterpreter), sandbox=\(exitReasonSandbox)",
             )
 
             // Verify outputs match
+            let outputMessage =
+                "Outputs differ for input=\(input): " +
+                "interpreter=\(outputInterpreter?.toHexString() ?? "nil"), " +
+                "sandbox=\(outputSandbox?.toHexString() ?? "nil")"
             #expect(
                 outputInterpreter == outputSandbox,
-                "Outputs differ for input=\(input): interpreter=\(outputInterpreter?.toHexString() ?? "nil"), sandbox=\(outputSandbox?.toHexString() ?? "nil")"
+                outputMessage,
             )
 
             // Verify expected output
@@ -245,12 +248,12 @@ struct PVMInstructionTests {
 
             #expect(
                 valueInterpreter == expectedOutput,
-                "Interpreter output mismatch for input=\(input): expected=\(expectedOutput), got=\(valueInterpreter)"
+                "Interpreter output mismatch for input=\(input): expected=\(expectedOutput), got=\(valueInterpreter)",
             )
 
             #expect(
                 valueSandbox == expectedOutput,
-                "Sandbox output mismatch for input=\(input): expected=\(expectedOutput), got=\(valueSandbox)"
+                "Sandbox output mismatch for input=\(input): expected=\(expectedOutput), got=\(valueSandbox)",
             )
         }
     }

@@ -1,7 +1,6 @@
 import Codec
 import Foundation
 import Testing
-
 @testable import Utils
 
 extension Blake2b256 {
@@ -16,7 +15,7 @@ extension Blake2b256 {
 
 struct MerklizationTests {
     @Test
-    func testHash() throws {
+    func testHash() {
         let mmr = MMR([])
         #expect(mmr.superPeak() == Data32())
 

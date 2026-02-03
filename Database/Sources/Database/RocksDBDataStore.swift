@@ -48,7 +48,7 @@ public final actor RocksDBDataStore {
         metadata = Store<StoreId, JamCoder<Data32, AvailabilityMetadata>>(
             db: db,
             column: .availabilityMetadata,
-            coder: JamCoder(config: config)
+            coder: JamCoder(config: config),
         )
         segments = Store<StoreId, JamCoder<Data, Data>>(db: db, column: .availabilitySegments, coder: JamCoder(config: config))
         mappings = Store<StoreId, JamCoder<Data, Data32>>(db: db, column: .availabilityMappings, coder: JamCoder(config: config))
@@ -162,14 +162,14 @@ extension RocksDBDataStore {
         erasureRoot: Data32,
         segmentsRoot: Data32,
         bundleSize: Int,
-        timestamp: Date
+        timestamp: Date,
     ) async throws {
         let entry = AuditEntry(
             workPackageHash: workPackageHash,
             erasureRoot: erasureRoot,
             segmentsRoot: segmentsRoot,
             bundleSize: bundleSize,
-            timestamp: timestamp
+            timestamp: timestamp,
         )
         try audit.put(key: erasureRoot, value: entry)
         logger.debug("Stored audit entry: erasureRoot=\(erasureRoot.toHexString()), size=\(bundleSize)")
@@ -218,7 +218,7 @@ extension RocksDBDataStore {
     public func cleanupAuditEntriesIteratively(
         before cutoff: Date,
         batchSize: Int = 100,
-        processor: @Sendable ([AuditEntry]) async throws -> Bool
+        processor: @Sendable ([AuditEntry]) async throws -> Bool,
     ) async throws -> Int {
         var totalProcessed = 0
         var batch: [AuditEntry] = []
@@ -265,7 +265,7 @@ extension RocksDBDataStore {
             segmentsRoot: segmentsRoot,
             erasureRoot: erasureRoot,
             segmentCount: segmentCount,
-            timestamp: timestamp
+            timestamp: timestamp,
         )
         try d3l.put(key: erasureRoot, value: entry)
         logger.debug("Stored D³L entry: erasureRoot=\(erasureRoot.toHexString()), count=\(segmentCount)")
@@ -314,7 +314,7 @@ extension RocksDBDataStore {
     public func cleanupD3LEntriesIteratively(
         before cutoff: Date,
         batchSize: Int = 100,
-        processor: @Sendable ([D3LEntry]) async throws -> Bool
+        processor: @Sendable ([D3LEntry]) async throws -> Bool,
     ) async throws -> Int {
         var totalProcessed = 0
         var batch: [D3LEntry] = []
@@ -561,7 +561,7 @@ extension RocksDBDataStore {
             timestamp: Date(),
             pagedProofsHash: Data32(),
             pagedProofsMetadata: Data(),
-            shardCount: 0
+            shardCount: 0,
         )
     }
 
@@ -580,7 +580,7 @@ extension RocksDBDataStore {
             timestamp: Date(),
             pagedProofsHash: keyData32,
             pagedProofsMetadata: value,
-            shardCount: UInt32(value.count)
+            shardCount: UInt32(value.count),
         )
         try metadata.put(key: keyData32, value: metadataValue)
         logger.trace("Stored metadata: key=\(key.base64EncodedString()), size=\(value.count)")

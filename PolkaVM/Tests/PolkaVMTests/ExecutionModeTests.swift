@@ -1,12 +1,11 @@
 import Foundation
+@testable import PolkaVM
 import Testing
 import Utils
 
-@testable import PolkaVM
-
 /// Unit tests for ExecutionMode and PVMExecutionMode
 struct ExecutionModeTests {
-    @Test func testExecutionModeOptionSet() {
+    @Test func executionModeOptionSet() {
         // Test empty execution mode (interpreter)
         let interpreterMode = ExecutionMode()
         #expect(interpreterMode.rawValue == 0)
@@ -23,7 +22,7 @@ struct ExecutionModeTests {
         #expect(jitSandboxMode.rawValue == (1 << 0 | 1 << 1))
     }
 
-    @Test func testPVMExecutionModeEnum() {
+    @Test func pVMExecutionModeEnum() {
         // Test interpreter mode
         let interpreter = PVMExecutionMode.interpreter
         #expect(interpreter.description == "interpreter")
@@ -40,8 +39,8 @@ struct ExecutionModeTests {
         #expect(PVMExecutionMode.allCases.contains(.sandbox))
     }
 
-    @Test func testExecutionModeSendable() {
-        // ExecutionMode should be Sendable
+    @Test func executionModeSendable() {
+        /// ExecutionMode should be Sendable
         func requiresSendable(_ _: some Sendable) {}
         requiresSendable(ExecutionMode())
         requiresSendable(PVMExecutionMode.interpreter)

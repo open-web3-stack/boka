@@ -219,7 +219,7 @@ public struct StateLayer: Sendable {
         }
     }
 
-    // s
+    /// s
     public subscript(serviceAccount index: ServiceIndex, storageKey key: Data) -> StateKeys.ServiceAccountStorageKey.Value? {
         get {
             changes[StateKeys.ServiceAccountStorageKey(index: index, key: key).encode()]?.value()
@@ -229,9 +229,9 @@ public struct StateLayer: Sendable {
         }
     }
 
-    // p
+    /// p
     public subscript(
-        serviceAccount index: ServiceIndex, preimageHash hash: Data32
+        serviceAccount index: ServiceIndex, preimageHash hash: Data32,
     ) -> StateKeys.ServiceAccountPreimagesKey.Value? {
         get {
             changes[StateKeys.ServiceAccountPreimagesKey(index: index, hash: hash).encode()]?.value()
@@ -241,22 +241,22 @@ public struct StateLayer: Sendable {
         }
     }
 
-    // l
+    /// l
     public subscript(
-        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32
+        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32,
     ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
         get {
             changes[
                 StateKeys.ServiceAccountPreimageInfoKey(
-                    index: index, hash: hash, length: length
-                ).encode()
+                    index: index, hash: hash, length: length,
+                ).encode(),
             ]?.value()
         }
         set {
             changes[
                 StateKeys.ServiceAccountPreimageInfoKey(
-                    index: index, hash: hash, length: length
-                ).encode()
+                    index: index, hash: hash, length: length,
+                ).encode(),
             ] = .init(newValue)
         }
     }

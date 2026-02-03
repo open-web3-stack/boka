@@ -1,8 +1,7 @@
 import Foundation
+@testable import PolkaVM
 import Testing
 import Utils
-
-@testable import PolkaVM
 
 // MARK: - Multi-Mode PVM Test Result
 
@@ -38,7 +37,7 @@ enum MultiModePVMTest {
         gas: Gas = Gas(1_000_000),
         argumentData: Data? = nil,
         config: PvmConfig = DefaultPvmConfig(),
-        context: (any InvocationContext)? = nil
+        context: (any InvocationContext)? = nil,
     ) async -> PVMTestResult {
         // Execute the program
         let (exitReason, gasUsed, outputData) = await invokePVM(
@@ -48,7 +47,7 @@ enum MultiModePVMTest {
             pc: pc,
             gas: gas,
             argumentData: argumentData,
-            ctx: context
+            ctx: context,
         )
 
         // Calculate final gas
@@ -66,7 +65,7 @@ enum MultiModePVMTest {
                     standardProgramBlob: blob,
                     pc: pc,
                     gas: gas,
-                    argumentData: argumentData
+                    argumentData: argumentData,
                 )
                 let engine = Engine(config: config, invocationContext: context)
                 _ = await engine.execute(state: state)
@@ -90,7 +89,7 @@ enum MultiModePVMTest {
             outputData: outputData,
             finalRegisters: finalRegisters,
             finalPC: finalPC,
-            mode: mode
+            mode: mode,
         )
     }
 
@@ -112,7 +111,7 @@ enum MultiModePVMTest {
         gas: Gas,
         memory: GeneralMemory,
         registers: Registers,
-        config: PvmConfig = DefaultPvmConfig()
+        config: PvmConfig = DefaultPvmConfig(),
     ) async -> (exitReason: ExitReason, finalState: VMStateInterpreter?) {
         // Only interpreter mode supports direct state manipulation
         guard mode == .interpreter else {
@@ -126,7 +125,7 @@ enum MultiModePVMTest {
             pc: pc,
             registers: registers,
             gas: gas,
-            memory: memory
+            memory: memory,
         )
 
         let engine = Engine(config: config)
@@ -145,14 +144,14 @@ enum MultiModePVMTest {
     static func compareResults(
         _ result1: PVMTestResult,
         _ result2: PVMTestResult,
-        compareState: Bool = false
+        compareState: Bool = false,
     ) -> String? {
         var differences: [String] = []
 
         // Compare exit reasons
         if result1.exitReason != result2.exitReason {
             differences.append(
-                "Exit reason mismatch: \(result1.mode)=\(result1.exitReason) vs \(result2.mode)=\(result2.exitReason)"
+                "Exit reason mismatch: \(result1.mode)=\(result1.exitReason) vs \(result2.mode)=\(result2.exitReason)",
             )
         }
 
@@ -160,14 +159,14 @@ enum MultiModePVMTest {
         let gasDiff = abs(Int64(result1.finalGas.value) - Int64(result2.finalGas.value))
         if gasDiff > 10 {
             differences.append(
-                "Gas mismatch: \(result1.mode)=\(result1.finalGas) vs \(result2.mode)=\(result2.finalGas) (diff: \(gasDiff))"
+                "Gas mismatch: \(result1.mode)=\(result1.finalGas) vs \(result2.mode)=\(result2.finalGas) (diff: \(gasDiff))",
             )
         }
 
         // Compare output data
         if result1.outputData != result2.outputData {
             differences.append(
-                "Output mismatch: \(result1.mode)=\(result1.outputData?.toHexString() ?? "nil") vs \(result2.mode)=\(result2.outputData?.toHexString() ?? "nil")"
+                "Output mismatch: \(result1.mode)=\(result1.outputData?.toHexString() ?? "nil") vs \(result2.mode)=\(result2.outputData?.toHexString() ?? "nil")",
             )
         }
 
@@ -175,13 +174,13 @@ enum MultiModePVMTest {
         if compareState {
             if result1.finalRegisters != result2.finalRegisters {
                 differences.append(
-                    "Registers mismatch: \(result1.mode)=\(result1.finalRegisters) vs \(result2.mode)=\(result2.finalRegisters)"
+                    "Registers mismatch: \(result1.mode)=\(result1.finalRegisters) vs \(result2.mode)=\(result2.finalRegisters)",
                 )
             }
 
             if result1.finalPC != result2.finalPC {
                 differences.append(
-                    "PC mismatch: \(result1.mode)=\(result1.finalPC) vs \(result2.mode)=\(result2.finalPC)"
+                    "PC mismatch: \(result1.mode)=\(result1.finalPC) vs \(result2.mode)=\(result2.finalPC)",
                 )
             }
         }

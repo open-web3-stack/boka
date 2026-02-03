@@ -21,7 +21,7 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
             self.index = index
         }
 
-        // Encodable
+        /// Encodable
         public func encode(to encoder: Encoder) throws {
             if encoder.isJamCodec {
                 var container = encoder.unkeyedContainer()
@@ -46,7 +46,7 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
             }
         }
 
-        // Decodable
+        /// Decodable
         public init(from decoder: Decoder) throws {
             var container = try decoder.unkeyedContainer()
             let root = try container.decode(Data32.self)
@@ -62,22 +62,22 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
         }
     }
 
-    // s
+    /// s
     public var serviceIndex: ServiceIndex
 
-    // c
+    /// c
     public var codeHash: Data32
 
-    // g
+    /// g
     public var refineGasLimit: Gas
 
-    // a
+    /// a
     public var accumulateGasLimit: Gas
 
     // e: the number of data segments exported by this work item
     public var exportsCount: UInt16
 
-    // y
+    /// y
     public var payloadBlob: Data
 
     // i: a sequence of imported data segments which identify a prior exported segment through an index
@@ -94,7 +94,7 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
         accumulateGasLimit: Gas,
         inputs: [ImportedDataSegment],
         outputs: [HashAndLength],
-        exportsCount: UInt16
+        exportsCount: UInt16,
     ) {
         self.serviceIndex = serviceIndex
         self.codeHash = codeHash
@@ -118,7 +118,7 @@ extension WorkItem: Dummy {
             accumulateGasLimit: Gas(0),
             inputs: [],
             outputs: [],
-            exportsCount: 0
+            exportsCount: 0,
         )
     }
 }

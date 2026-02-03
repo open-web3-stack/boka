@@ -100,7 +100,7 @@ public class FuzzingTarget {
 
         let targetPeerInfo = FuzzPeerInfo(
             name: "boka-fuzzing-target",
-            fuzzFeatures: FEATURE_ANCESTRY | FEATURE_FORK
+            fuzzFeatures: FEATURE_ANCESTRY | FEATURE_FORK,
         )
         // our features
         let ourAncestryEnabled = (targetPeerInfo.fuzzFeatures & FEATURE_ANCESTRY) != 0

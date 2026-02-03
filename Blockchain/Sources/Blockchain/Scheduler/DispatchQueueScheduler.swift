@@ -17,7 +17,7 @@ public final class DispatchQueueScheduler: Scheduler {
         delay: TimeInterval,
         repeats: Bool,
         task: @escaping @Sendable () async -> Void,
-        onCancel: (@Sendable () -> Void)?
+        onCancel: (@Sendable () -> Void)?,
     ) -> Cancellable {
         logger.trace("scheduling task in \(delay) seconds, repeats: \(repeats)")
         let timer = DispatchSource.makeTimerSource(queue: queue)

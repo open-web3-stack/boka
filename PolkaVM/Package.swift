@@ -11,11 +11,11 @@ let package = Package(
     products: [
         .library(
             name: "PolkaVM",
-            targets: ["PolkaVM"]
+            targets: ["PolkaVM"],
         ),
         .executable(
             name: "boka-sandbox",
-            targets: ["Sandbox"]
+            targets: ["Sandbox"],
         ),
     ],
     dependencies: [
@@ -51,7 +51,7 @@ let package = Package(
                     "-Xcc", "-I../asmjit",
                     "-Xcc", "-I../Sources/CppHelper",
                 ]),
-            ]
+            ],
         ),
         .executableTarget(
             name: "Sandbox",
@@ -72,7 +72,7 @@ let package = Package(
                     "-Xcc", "-I../asmjit",
                     "-Xcc", "-I../Sources/CppHelper",
                 ]),
-            ]
+            ],
         ),
         .testTarget(
             name: "PolkaVMTests",
@@ -91,7 +91,7 @@ let package = Package(
                     "-Xcc", "-I../asmjit",
                     "-Xcc", "-I../Sources/CppHelper",
                 ]),
-            ]
+            ],
         ),
         .target(
             name: "CppHelper",
@@ -138,8 +138,8 @@ let package = Package(
                     "-Iasmjit",
                 ]),
                 .define("ASMJIT_STATIC"),
-            ]
+            ],
         ),
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageModes: [.version("6")],
 )

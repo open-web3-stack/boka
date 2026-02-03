@@ -77,8 +77,8 @@ extension Either: Codable where Left: Codable, Right: Codable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: decoder.codingPath,
-                        debugDescription: "Invalid Either: unknown variant \(variant)"
-                    )
+                        debugDescription: "Invalid Either: unknown variant \(variant)",
+                    ),
                 )
             }
         } else {
@@ -93,8 +93,8 @@ extension Either: Codable where Left: Codable, Right: Codable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: container.codingPath,
-                        debugDescription: "Invalid Either: must contain either left or right"
-                    )
+                        debugDescription: "Invalid Either: must contain either left or right",
+                    ),
                 )
             }
         }

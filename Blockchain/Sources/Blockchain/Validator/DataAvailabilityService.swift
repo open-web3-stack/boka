@@ -50,8 +50,10 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     private let shardDistributionManager: ShardDistributionManager
     private let assuranceCoordinator: AssuranceCoordinator
 
-    // Expose dataStore for testing purposes
-    public var testDataStore: DataStore { dataStore }
+    /// Expose dataStore for testing purposes
+    public var testDataStore: DataStore {
+        dataStore
+    }
 
     // MARK: - Initialization
 
@@ -62,7 +64,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         dataProvider: BlockchainDataProvider,
         dataStore: DataStore,
         erasureCodingDataStore: ErasureCodingDataStore? = nil,
-        networkClient: AvailabilityNetworkClient? = nil
+        networkClient: AvailabilityNetworkClient? = nil,
     ) async {
         self.dataProvider = dataProvider
         self.dataStore = dataStore
@@ -73,22 +75,22 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         dataAvailabilityCleaner = DataAvailabilityCleaner(erasureCodingDataStore: erasureCodingDataStore)
         networkRequestHelper = NetworkRequestHelper(
             dataProvider: dataProvider,
-            networkClient: networkClient
+            networkClient: networkClient,
         )
         workReportProcessor = WorkReportProcessor(
             dataStore: dataStore,
             erasureCodingDataStore: erasureCodingDataStore,
-            config: config
+            config: config,
         )
         shardDistributionManager = ShardDistributionManager(
             dataProvider: dataProvider,
             dataStore: dataStore,
             erasureCodingDataStore: erasureCodingDataStore,
-            config: config
+            config: config,
         )
         assuranceCoordinator = AssuranceCoordinator(
             dataProvider: dataProvider,
-            config: config
+            config: config,
         )
 
         super.init(id: "DataAvailability", config: config, eventBus: eventBus, scheduler: scheduler)
@@ -131,18 +133,18 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             try await shardDistributionManager.workReportDistribution(
                 workReport: event.workReport,
                 slot: event.slot,
-                signatures: event.signatures
+                signatures: event.signatures,
             )
             // Publish success response
             publish(RuntimeEvents.WorkReportReceivedResponse(
-                workReportHash: workReportHash
+                workReportHash: workReportHash,
             ))
         } catch {
             logger.error("Failed to handle work report: \(error)")
             // Publish error response so the protocol handler doesn't timeout
             publish(RuntimeEvents.WorkReportReceivedResponse(
                 workReportHash: workReportHash,
-                error: error
+                error: error,
             ))
         }
     }
@@ -152,21 +154,21 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         do {
             let (bundleShard, segmentShards, justification) = try await shardDistributionManager.shardDistribution(
                 erasureRoot: event.erasureRoot,
-                shardIndex: event.shardIndex
+                shardIndex: event.shardIndex,
             )
             // Publish success response
             publish(RuntimeEvents.ShardDistributionReceivedResponse(
                 requestId: requestId,
                 bundleShard: bundleShard,
                 segmentShards: segmentShards,
-                justification: justification
+                justification: justification,
             ))
         } catch {
             logger.error("Failed to handle shard distribution: \(error)")
             // Publish error response so the protocol handler doesn't timeout
             publish(RuntimeEvents.ShardDistributionReceivedResponse(
                 requestId: requestId,
-                error: error
+                error: error,
             ))
         }
     }
@@ -176,7 +178,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
         do {
             let (bundleShard, justification) = try await shardDistributionManager.processAuditShardRequest(
                 erasureRoot: event.erasureRoot,
-                shardIndex: event.shardIndex
+                shardIndex: event.shardIndex,
             )
 
             publish(RuntimeEvents.AuditShardRequestReceivedResponse(
@@ -184,14 +186,14 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
                 erasureRoot: event.erasureRoot,
                 shardIndex: event.shardIndex,
                 bundleShard: bundleShard,
-                justification: justification
+                justification: justification,
             ))
         } catch {
             logger.error("Failed to handle audit shard request: \(error)")
             // Publish error response so the protocol handler doesn't timeout
             publish(RuntimeEvents.AuditShardRequestReceivedResponse(
                 requestId: requestId,
-                error: error
+                error: error,
             ))
         }
     }
@@ -202,19 +204,19 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             let segments = try await shardDistributionManager.processSegmentShardRequest(
                 erasureRoot: event.erasureRoot,
                 shardIndex: event.shardIndex,
-                segmentIndices: event.segmentIndices
+                segmentIndices: event.segmentIndices,
             )
 
             publish(RuntimeEvents.SegmentShardRequestReceivedResponse(
                 requestId: requestId,
-                segments: segments
+                segments: segments,
             ))
         } catch {
             logger.error("Failed to handle segment shard request: \(error)")
             // Publish error response so the protocol handler doesn't timeout
             publish(RuntimeEvents.SegmentShardRequestReceivedResponse(
                 requestId: requestId,
-                error: error
+                error: error,
             ))
         }
     }
@@ -241,11 +243,11 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// Fetch segments from data store
     public func fetchSegment(
         segments: [WorkItem.ImportedDataSegment],
-        segmentsRootMappings: SegmentsRootMappings? = nil
+        segmentsRootMappings: SegmentsRootMappings? = nil,
     ) async throws -> [Data4104] {
         try await workReportProcessor.fetchSegment(
             segments: segments,
-            segmentsRootMappings: segmentsRootMappings
+            segmentsRootMappings: segmentsRootMappings,
         )
     }
 
@@ -265,7 +267,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
             segment: segment,
             index: index,
             erasureRoot: erasureRoot,
-            proof: proof
+            proof: proof,
         )
     }
 
@@ -277,44 +279,44 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// Reconstruct erasure-coded data from shards
     public func reconstructData(
         shards: [(index: UInt16, data: Data)],
-        originalLength: Int
+        originalLength: Int,
     ) async throws -> Data {
         try await workReportProcessor.reconstructData(
             shards: shards,
-            originalLength: originalLength
+            originalLength: originalLength,
         )
     }
 
     /// Reconstruct segments from erasure-coded shards
     public func reconstructSegments(
         shards: [(index: UInt16, data: Data)],
-        segmentCount: Int
+        segmentCount: Int,
     ) async throws -> [Data4104] {
         try await workReportProcessor.reconstructSegments(
             shards: shards,
-            segmentCount: segmentCount
+            segmentCount: segmentCount,
         )
     }
 
     /// Fetch data from a specific validator
     public func fetchFromValidator(
         validator validatorIndex: ValidatorIndex,
-        requestData: Data
+        requestData: Data,
     ) async throws -> Data {
         try await networkRequestHelper.fetchFromValidator(
             validator: validatorIndex,
-            requestData: requestData
+            requestData: requestData,
         )
     }
 
     /// Fetch shards from multiple validators concurrently
     public func fetchFromValidatorsConcurrently(
         validators validatorIndices: [ValidatorIndex],
-        shardRequest: Data
+        shardRequest: Data,
     ) async throws -> [(validator: ValidatorIndex, data: Data)] {
         try await networkRequestHelper.fetchFromValidatorsConcurrently(
             validators: validatorIndices,
-            shardRequest: shardRequest
+            shardRequest: shardRequest,
         )
     }
 
@@ -322,13 +324,13 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     public func workReportDistribution(
         workReport: WorkReport,
         slot: UInt32,
-        signatures: [ValidatorSignature]
+        signatures: [ValidatorSignature],
     ) async {
         do {
             try await shardDistributionManager.workReportDistribution(
                 workReport: workReport,
                 slot: slot,
-                signatures: signatures
+                signatures: signatures,
             )
         } catch {
             logger.error("Failed to distribute work report: \(error)")
@@ -338,22 +340,22 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// Validate work report signatures
     public func validateWorkReportSignatures(
         signatures: [ValidatorSignature],
-        workReportHash: Data32
+        workReportHash: Data32,
     ) async throws {
         try await shardDistributionManager.validateWorkReportSignatures(
             signatures: signatures,
-            workReportHash: workReportHash
+            workReportHash: workReportHash,
         )
     }
 
     /// Shard distribution (CE 137)
     public func shardDistribution(
         erasureRoot: Data32,
-        shardIndex: UInt16
+        shardIndex: UInt16,
     ) async throws {
         _ = try await shardDistributionManager.shardDistribution(
             erasureRoot: erasureRoot,
-            shardIndex: shardIndex
+            shardIndex: shardIndex,
         )
     }
 
@@ -361,12 +363,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     public func requestAuditShards(
         workPackageHash: Data32,
         indices: [UInt16],
-        validators: [ValidatorIndex]
+        validators: [ValidatorIndex],
     ) async throws -> [Data4104] {
         try await shardDistributionManager.requestAuditShards(
             workPackageHash: workPackageHash,
             indices: indices,
-            validators: validators
+            validators: validators,
         )
     }
 
@@ -374,12 +376,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     public func handleAuditShardRequest(
         workPackageHash: Data32,
         indices: [UInt16],
-        requester: ValidatorIndex
+        requester: ValidatorIndex,
     ) async throws -> [Data4104] {
         try await shardDistributionManager.handleAuditShardRequest(
             workPackageHash: workPackageHash,
             indices: indices,
-            requester: requester
+            requester: requester,
         )
     }
 
@@ -387,12 +389,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     public func requestSegmentShards(
         segmentsRoot: Data32,
         indices: [UInt16],
-        validators: [ValidatorIndex]
+        validators: [ValidatorIndex],
     ) async throws -> [Data4104] {
         try await shardDistributionManager.requestSegmentShards(
             segmentsRoot: segmentsRoot,
             indices: indices,
-            validators: validators
+            validators: validators,
         )
     }
 
@@ -400,12 +402,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     public func handleSegmentShardRequest(
         segmentsRoot: Data32,
         indices: [UInt16],
-        requester: ValidatorIndex
+        requester: ValidatorIndex,
     ) async throws -> [Data4104] {
         try await shardDistributionManager.handleSegmentShardRequest(
             segmentsRoot: segmentsRoot,
             indices: indices,
-            requester: requester
+            requester: requester,
         )
     }
 
@@ -413,23 +415,23 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     public func distributeAssurances(
         assurances: ExtrinsicAvailability.AssurancesList,
         parentHash: Data32,
-        validators: [ValidatorIndex]
+        validators: [ValidatorIndex],
     ) async throws -> Bool {
         try await assuranceCoordinator.distributeAssurances(
             assurances: assurances,
             parentHash: parentHash,
-            validators: validators
+            validators: validators,
         )
     }
 
     /// Verify assurances from validators
     public func verifyAssurances(
         assurances: ExtrinsicAvailability.AssurancesList,
-        parentHash: Data32
+        parentHash: Data32,
     ) async throws -> ExtrinsicAvailability.AssurancesList {
         try await assuranceCoordinator.verifyAssurances(
             assurances: assurances,
-            parentHash: parentHash
+            parentHash: parentHash,
         )
     }
 
@@ -447,10 +449,10 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
 
     /// Verify data availability for multiple work packages
     public func verifyMultipleWorkPackagesAvailability(
-        workPackageHashes: [Data32]
+        workPackageHashes: [Data32],
     ) async -> [Data32: Bool] {
         await availabilityVerification.verifyMultipleWorkPackagesAvailability(
-            workPackageHashes: workPackageHashes
+            workPackageHashes: workPackageHashes,
         )
     }
 
@@ -467,11 +469,11 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     /// Batch reconstruction with network fallback
     public func batchReconstructWithFallback(
         erasureRoots: [Data32],
-        originalLengths: [Data32: Int]
+        originalLengths: [Data32: Int],
     ) async throws -> [Data32: Data] {
         try await workReportProcessor.batchReconstructWithFallback(
             erasureRoots: erasureRoots,
-            originalLengths: originalLengths
+            originalLengths: originalLengths,
         )
     }
 
@@ -479,12 +481,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     public func fetchSegmentsWithFallback(
         erasureRoot: Data32,
         indices: [Int],
-        validators: [UInt16: NetAddr]? = nil
+        validators: [UInt16: NetAddr]? = nil,
     ) async throws -> [Data4104] {
         try await workReportProcessor.fetchSegmentsWithFallback(
             erasureRoot: erasureRoot,
             indices: indices,
-            validators: validators
+            validators: validators,
         )
     }
 
@@ -517,7 +519,7 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     public func reconstructFromLocalShards(erasureRoot: Data32, originalLength: Int) async throws -> Data {
         try await shardManager.reconstructFromLocalShards(
             erasureRoot: erasureRoot,
-            originalLength: originalLength
+            originalLength: originalLength,
         )
     }
 }

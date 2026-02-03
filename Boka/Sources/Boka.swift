@@ -52,7 +52,7 @@ struct Boka: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "JAM built with Swift",
         version: "0.0.1",
-        subcommands: [Generate.self, Fuzz.self]
+        subcommands: [Generate.self, Fuzz.self],
     )
 
     @Option(name: .shortAndLong, help: "Base path to database files.")
@@ -159,15 +159,15 @@ struct Boka: AsyncParsableCommand {
         let networkConfig = NetworkConfig(
             role: validator ? .validator : .builder,
             listenAddress: p2p,
-            key: networkKey
+            key: networkKey,
         )
 
         let eventBus = EventBus(
             eventMiddleware: .serial(
                 .log(logger: Logger(label: "EventBus")),
-                .tracing(prefix: "EventBusEvent")
+                .tracing(prefix: "EventBusEvent"),
             ),
-            handlerMiddleware: .tracing(prefix: "Handler")
+            handlerMiddleware: .tracing(prefix: "Handler"),
         )
 
         let config = Config(
@@ -177,16 +177,16 @@ struct Boka: AsyncParsableCommand {
             local: local,
             name: name,
             database: database,
-            keystoreType: keysotreType
+            keystoreType: keysotreType,
         )
 
         let node: Node = if validator {
             try await ValidatorNode(
-                config: config, genesis: chain, eventBus: eventBus, keystore: keystore
+                config: config, genesis: chain, eventBus: eventBus, keystore: keystore,
             )
         } else {
             try await Node(
-                config: config, genesis: chain, eventBus: eventBus, keystore: keystore
+                config: config, genesis: chain, eventBus: eventBus, keystore: keystore,
             )
         }
 

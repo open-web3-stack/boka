@@ -1,18 +1,17 @@
 import Foundation
 import MsQuicSwift
+@testable import Networking
 import Testing
 import Utils
 
-@testable import Networking
-
 struct PKCS12Tests {
-    @Test func invalidParseCertificate() async throws {
+    @Test func invalidParseCertificate() throws {
         #expect(throws: CryptoError.self) {
             _ = try parseCertificate(data: Data("wrong cert data".utf8), type: .p12)
         }
     }
 
-    @Test func vailidParseP12Certificate() async throws {
+    @Test func vailidParseP12Certificate() throws {
         let privateKey = try Ed25519.SecretKey(from: Data32())
         let cert = try generateSelfSignedCertificate(privateKey: privateKey)
         let (publicKey, alternativeName) = try parseCertificate(data: cert, type: .p12)
@@ -38,15 +37,15 @@ struct PKCS12Tests {
             pkcs12: cert,
             alpns: [Data("testalpn".utf8)],
             client: false,
-            settings: quicSettings
+            settings: quicSettings,
         )
 
         let listener = try QuicListener(
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
-            alpns: [Data("testalpn".utf8)]
+            listenAddress: #require(NetAddr(ipAddress: "127.0.0.1", port: 0)),
+            alpns: [Data("testalpn".utf8)],
         )
 
         let listenAddress = try listener.listenAddress()
@@ -58,33 +57,33 @@ struct PKCS12Tests {
             pkcs12: cert,
             alpns: [Data("testalpn".utf8)],
             client: true,
-            settings: quicSettings
+            settings: quicSettings,
         )
 
         let clientConnection = try QuicConnection(
             handler: clientHandler,
             registration: registration,
-            configuration: clientConfiguration
+            configuration: clientConfiguration,
         )
 
         try clientConnection.connect(to: listenAddress)
 
         try? await Task.sleep(for: .milliseconds(50))
 
-        let clientConn = clientHandler.events.value.compactMap {
+        let clientConn = try #require(clientHandler.events.value.compactMap {
             if case let .connected(connection: connection) = $0 {
                 return connection
             }
             return nil
-        }.first!
+        }.first)
         #expect(clientConn != nil)
 
-        let serverConn = serverHandler.events.value.compactMap {
+        let serverConn = try #require(serverHandler.events.value.compactMap {
             if case let .connected(connection: connection) = $0 {
                 return connection
             }
             return nil
-        }.first!
+        }.first)
         #expect(serverConn != nil)
     }
 }

@@ -8,7 +8,7 @@ struct RefCountDeltaTests {
     // MARK: - Backend refUpdate Tests
 
     @Test("InMemoryBackend handles refUpdate increments")
-    func testInMemoryRefUpdateIncrement() async throws {
+    func inMemoryRefUpdateIncrement() async throws {
         let backend = InMemoryBackend()
         let key = Data(repeating: 0xAA, count: 31)
 
@@ -28,7 +28,7 @@ struct RefCountDeltaTests {
     }
 
     @Test("InMemoryBackend handles refUpdate decrements")
-    func testInMemoryRefUpdateDecrement() async throws {
+    func inMemoryRefUpdateDecrement() async throws {
         let backend = InMemoryBackend()
         let key = Data(repeating: 0xBB, count: 31)
 
@@ -49,7 +49,7 @@ struct RefCountDeltaTests {
     }
 
     @Test("InMemoryBackend handles multiple refUpdate operations")
-    func testInMemoryMultipleRefUpdates() async throws {
+    func inMemoryMultipleRefUpdates() async throws {
         let backend = InMemoryBackend()
         let key1 = Data(repeating: 0x01, count: 31)
         let key2 = Data(repeating: 0x02, count: 31)
@@ -68,7 +68,7 @@ struct RefCountDeltaTests {
     }
 
     @Test("InMemoryBackend handles negative delta resulting in zero")
-    func testInMemoryRefUpdateToZero() async throws {
+    func inMemoryRefUpdateToZero() async throws {
         let backend = InMemoryBackend()
         let key = Data(repeating: 0xCC, count: 31)
 
@@ -87,7 +87,7 @@ struct RefCountDeltaTests {
     }
 
     @Test("InMemoryBackend handles large delta values")
-    func testInMemoryLargeDelta() async throws {
+    func inMemoryLargeDelta() async throws {
         let backend = InMemoryBackend()
         let key = Data(repeating: 0xDD, count: 31)
 
@@ -110,12 +110,12 @@ struct RefCountDeltaTests {
     // MARK: - StateTrie refUpdate Integration Tests
 
     @Test("StateTrie uses refUpdate for reference counting")
-    func testStateTrieRefUpdateIntegration() async throws {
+    func stateTrieRefUpdateIntegration() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
-            enableWriteBuffer: false // Disable buffer for direct testing
+            enableWriteBuffer: false, // Disable buffer for direct testing
         )
 
         let key1 = makeKey(1)
@@ -142,12 +142,12 @@ struct RefCountDeltaTests {
     }
 
     @Test("StateTrie decrements old root ref count")
-    func testStateTrieOldRootDecrement() async throws {
+    func stateTrieOldRootDecrement() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
-            enableWriteBuffer: false
+            enableWriteBuffer: false,
         )
 
         let key = makeKey(1)
@@ -170,12 +170,12 @@ struct RefCountDeltaTests {
     }
 
     @Test("StateTrie handles multiple save operations")
-    func testStateTrieMultipleSaves() async throws {
+    func stateTrieMultipleSaves() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
-            enableWriteBuffer: false
+            enableWriteBuffer: false,
         )
 
         let key = makeKey(1)
@@ -195,7 +195,7 @@ struct RefCountDeltaTests {
     // MARK: - Batch Operation Tests
 
     @Test("Ref update operations batch correctly")
-    func testRefUpdateBatching() async throws {
+    func refUpdateBatching() async throws {
         let backend = InMemoryBackend()
 
         let keys = (0 ..< 10).map { Data(repeating: UInt8($0), count: 31) }
@@ -216,7 +216,7 @@ struct RefCountDeltaTests {
     }
 
     @Test("Ref update operations mix with writes correctly")
-    func testRefUpdateMixedWithWrites() async throws {
+    func refUpdateMixedWithWrites() async throws {
         let backend = InMemoryBackend()
 
         let key1 = Data(repeating: 0x01, count: 31)
@@ -238,7 +238,7 @@ struct RefCountDeltaTests {
     // MARK: - Edge Cases Tests
 
     @Test("Ref update handles zero delta")
-    func testRefUpdateZeroDelta() async throws {
+    func refUpdateZeroDelta() async throws {
         let backend = InMemoryBackend()
         let key = Data(repeating: 0xEE, count: 31)
 
@@ -259,7 +259,7 @@ struct RefCountDeltaTests {
     }
 
     @Test("Ref update handles very large positive delta")
-    func testRefUpdateVeryLargePositive() async throws {
+    func refUpdateVeryLargePositive() async throws {
         let backend = InMemoryBackend()
         let key = Data(repeating: 0xFF, count: 31)
 
@@ -272,7 +272,7 @@ struct RefCountDeltaTests {
     }
 
     @Test("Ref update handles very large negative delta")
-    func testRefUpdateVeryLargeNegative() async throws {
+    func refUpdateVeryLargeNegative() async throws {
         let backend = InMemoryBackend()
         let key = Data(repeating: 0x11, count: 31)
 
@@ -292,7 +292,7 @@ struct RefCountDeltaTests {
     }
 
     @Test("Ref update handles key that doesn't exist")
-    func testRefUpdateNonExistentKey() async throws {
+    func refUpdateNonExistentKey() async throws {
         let backend = InMemoryBackend()
         let key = Data(repeating: 0x22, count: 31)
 
@@ -307,7 +307,7 @@ struct RefCountDeltaTests {
     // MARK: - Performance Tests
 
     @Test("Ref update reduces I/O operations significantly")
-    func testRefUpdatePerformanceBenefit() async throws {
+    func refUpdatePerformanceBenefit() async throws {
         let backend = InMemoryBackend()
 
         let key = Data(repeating: 0x33, count: 31)
@@ -327,7 +327,7 @@ struct RefCountDeltaTests {
     }
 
     @Test("Multiple ref updates accumulate correctly")
-    func testRefUpdateAccumulation() async throws {
+    func refUpdateAccumulation() async throws {
         let backend = InMemoryBackend()
 
         let key = Data(repeating: 0x44, count: 31)
@@ -349,12 +349,12 @@ struct RefCountDeltaTests {
     // MARK: - Deletion Tests
 
     @Test("StateTrie handles deletion with ref updates")
-    func testStateTrieDeletionRefUpdates() async throws {
+    func stateTrieDeletionRefUpdates() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
-            enableWriteBuffer: false
+            enableWriteBuffer: false,
         )
 
         let key = makeKey(1)
@@ -373,12 +373,12 @@ struct RefCountDeltaTests {
     }
 
     @Test("StateTrie handles multiple insertions and deletions")
-    func testStateTrieMultipleInsertDelete() async throws {
+    func stateTrieMultipleInsertDelete() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
-            enableWriteBuffer: false
+            enableWriteBuffer: false,
         )
 
         let key = makeKey(1)

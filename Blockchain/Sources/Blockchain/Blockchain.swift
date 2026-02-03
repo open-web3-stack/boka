@@ -16,7 +16,7 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
         config: ProtocolConfigRef,
         dataProvider: BlockchainDataProvider,
         timeProvider: TimeProvider,
-        eventBus: EventBus
+        eventBus: EventBus,
     ) async throws {
         self.dataProvider = dataProvider
         self.timeProvider = timeProvider
@@ -76,7 +76,7 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
     public func waitFor<T: Event>(
         _ eventType: T.Type,
         check: @escaping @Sendable (T) -> Bool = { _ in true },
-        timeout: TimeInterval = 10
+        timeout: TimeInterval = 10,
     ) async throws -> T {
         try await waitFor(eventType: eventType, check: check, timeout: timeout)
     }

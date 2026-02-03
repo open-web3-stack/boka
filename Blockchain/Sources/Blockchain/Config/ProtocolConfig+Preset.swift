@@ -59,7 +59,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitZoneSize: 1 << 16,
-        pvmMemoryPageSize: 1 << 12
+        pvmMemoryPageSize: 1 << 12,
     ))
 
     /// Development preset for local development
@@ -107,7 +107,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitZoneSize: 1 << 16,
-        pvmMemoryPageSize: 1 << 12
+        pvmMemoryPageSize: 1 << 12,
     ))
 
     public static let tiny = Ref(ProtocolConfig(
@@ -152,7 +152,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitZoneSize: 1 << 16,
-        pvmMemoryPageSize: 1 << 12
+        pvmMemoryPageSize: 1 << 12,
     ))
 
     public static let small = Ref(ProtocolConfig(
@@ -197,7 +197,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitZoneSize: 1 << 16,
-        pvmMemoryPageSize: 1 << 12
+        pvmMemoryPageSize: 1 << 12,
     ))
 
     public static let medium = Ref(ProtocolConfig(
@@ -242,7 +242,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitZoneSize: 1 << 16,
-        pvmMemoryPageSize: 1 << 12
+        pvmMemoryPageSize: 1 << 12,
     ))
 
     public static let large = Ref(ProtocolConfig(
@@ -287,7 +287,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitZoneSize: 1 << 16,
-        pvmMemoryPageSize: 1 << 12
+        pvmMemoryPageSize: 1 << 12,
     ))
 
     public static let xlarge = Ref(ProtocolConfig(
@@ -332,7 +332,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitZoneSize: 1 << 16,
-        pvmMemoryPageSize: 1 << 12
+        pvmMemoryPageSize: 1 << 12,
     ))
 
     public static let x2large = Ref(ProtocolConfig(
@@ -377,7 +377,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitZoneSize: 1 << 16,
-        pvmMemoryPageSize: 1 << 12
+        pvmMemoryPageSize: 1 << 12,
     ))
 
     public static let x3large = Ref(ProtocolConfig(
@@ -422,7 +422,7 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitZoneSize: 1 << 16,
-        pvmMemoryPageSize: 1 << 12
+        pvmMemoryPageSize: 1 << 12,
     ))
 
     public static let mainnet = Ref(ProtocolConfig(
@@ -467,6 +467,6 @@ extension Ref where T == ProtocolConfig {
         pvmDynamicAddressAlignmentFactor: 2,
         pvmProgramInitInputDataSize: 1 << 24,
         pvmProgramInitZoneSize: 1 << 16,
-        pvmMemoryPageSize: 1 << 12
+        pvmMemoryPageSize: 1 << 12,
     ))
 }

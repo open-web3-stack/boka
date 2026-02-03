@@ -21,8 +21,13 @@ public enum TelemetryHandlers {
         public typealias Request = VoidRequest
         public typealias Response = String
 
-        public static var method: String { "telemetry_name" }
-        public static var summary: String? { "Returns the name of the node." }
+        public static var method: String {
+            "telemetry_name"
+        }
+
+        public static var summary: String? {
+            "Returns the name of the node."
+        }
 
         private let source: TelemetryDataSource
 
@@ -39,8 +44,13 @@ public enum TelemetryHandlers {
         public typealias Request = VoidRequest
         public typealias Response = Int
 
-        public static var method: String { "telemetry_peersCount" }
-        public static var summary: String? { "Returns the number of connected peers." }
+        public static var method: String {
+            "telemetry_peersCount"
+        }
+
+        public static var summary: String? {
+            "Returns the number of connected peers."
+        }
 
         private let source: TelemetryDataSource
 
@@ -57,8 +67,13 @@ public enum TelemetryHandlers {
         public typealias Request = VoidRequest
         public typealias Response = String
 
-        public static var method: String { "telemetry_networkKey" }
-        public static var summary: String? { "Returns the Ed25519 key for p2p networks." }
+        public static var method: String {
+            "telemetry_networkKey"
+        }
+
+        public static var summary: String? {
+            "Returns the Ed25519 key for p2p networks."
+        }
 
         private let source: TelemetryDataSource
 

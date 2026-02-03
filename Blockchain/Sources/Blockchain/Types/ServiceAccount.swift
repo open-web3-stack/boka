@@ -5,34 +5,34 @@ import Utils
 public struct ServiceAccountDetails: Sendable, Equatable, Codable {
     @CodingAs<Compact<UInt8>> public var version: UInt8
 
-    // c
+    /// c
     public var codeHash: Data32
 
-    // b
+    /// b
     public var balance: Balance
 
-    // g
+    /// g
     public var minAccumlateGas: Gas
 
-    // m
+    /// m
     public var minMemoGas: Gas
 
     // o: the total number of octets used in storage
     public var totalByteLength: UInt64
 
-    // f
+    /// f
     public var gratisStorage: Balance
 
     // i: number of items in storage
     public var itemsCount: UInt32
 
-    // r
+    /// r
     public var createdAt: TimeslotIndex
 
-    // a
+    /// a
     public var lastAccAt: TimeslotIndex
 
-    // p
+    /// p
     public var parentService: ServiceIndex
 
     // t: the minimum, or threshold, balance needed for any given service account in terms of its storage footprint
@@ -65,7 +65,7 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
     public mutating func updateFootprintPreimage(
         oldValue: StateKeys.ServiceAccountPreimageInfoKey.Value?,
         newValue: StateKeys.ServiceAccountPreimageInfoKey.Value?,
-        length: UInt32
+        length: UInt32,
     ) {
         if oldValue != nil {
             // replace: no change on footprint
@@ -85,42 +85,42 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
 }
 
 public struct ServiceAccount: Sendable, Equatable, Codable {
-    // v
+    /// v
     @CodingAs<Compact<UInt8>> public var version: UInt8
 
-    // s
+    /// s
     public var storage: [Data: Data]
 
-    // p
+    /// p
     public var preimages: [Data32: Data]
 
-    // l
+    /// l
     public var preimageInfos: [
         HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>
     ]
 
-    // c
+    /// c
     public var codeHash: Data32
 
-    // b
+    /// b
     public var balance: Balance
 
-    // g
+    /// g
     public var minAccumlateGas: Gas
 
-    // m
+    /// m
     public var minMemoGas: Gas
 
-    // f
+    /// f
     public var gratisStorage: Balance
 
-    // r
+    /// r
     public var createdAt: TimeslotIndex
 
-    // a
+    /// a
     public var lastAccAt: TimeslotIndex
 
-    // p
+    /// p
     public var parentService: ServiceIndex
 
     public init(
@@ -135,7 +135,7 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
         gratisStorage: Balance,
         createdAt: TimeslotIndex,
         lastAccAt: TimeslotIndex,
-        parentService: ServiceIndex
+        parentService: ServiceIndex,
     ) {
         self.version = version
         self.storage = storage
@@ -163,7 +163,7 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
             itemsCount: itemsCount,
             createdAt: createdAt,
             lastAccAt: lastAccAt,
-            parentService: parentService
+            parentService: parentService,
         )
     }
 }
@@ -183,7 +183,7 @@ extension ServiceAccount: Dummy {
             gratisStorage: Balance(0),
             createdAt: TimeslotIndex(0),
             lastAccAt: TimeslotIndex(0),
-            parentService: ServiceIndex(0)
+            parentService: ServiceIndex(0),
         )
     }
 }

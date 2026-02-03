@@ -1,13 +1,12 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import Utils
 
-@testable import Blockchain
-
 struct DispatchQueueSchedulerTests {
     let scheduler = DispatchQueueScheduler(
         timeProvider: SystemTimeProvider(),
-        queue: .global(qos: .userInteractive) // to get higher priority so results are more deterministic
+        queue: .global(qos: .userInteractive), // to get higher priority so results are more deterministic
     )
 
     @Test func scheduleTaskWithoutDelay() async throws {
@@ -73,7 +72,7 @@ struct DispatchQueueSchedulerTests {
     //     }
     // }
 
-    @Test func cancelTask() async throws {
+    @Test func cancelTask() async {
         await withKnownIssue("unstable when cpu is busy", isIntermittent: true) {
             try await confirmation(expectedCount: 0) { confirm in
                 let cancel = scheduler.schedule(delay: 0, repeats: false) {
@@ -87,7 +86,7 @@ struct DispatchQueueSchedulerTests {
         }
     }
 
-    @Test func cancelRepeatingTask() async throws {
+    @Test func cancelRepeatingTask() async {
         await withKnownIssue("unstable when cpu is busy", isIntermittent: true) {
             try await confirmation(expectedCount: 2) { confirm in
                 let delay = 1.0

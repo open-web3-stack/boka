@@ -7,7 +7,7 @@ private final class SerialDispatcher: MiddlewareProtocol {
         self.middlewares = middlewares
     }
 
-    public func handle<T: Sendable>(_ event: T, next: @escaping MiddlewareHandler<T>) async throws {
+    func handle<T: Sendable>(_ event: T, next: @escaping MiddlewareHandler<T>) async throws {
         var next = next
         for middleware in middlewares.reversed() {
             let next2 = next
@@ -30,7 +30,7 @@ private final class ParallelDispatcher: MiddlewareProtocol {
         self.middlewares = middlewares
     }
 
-    public func handle<T: Sendable>(_ event: T, next: @escaping MiddlewareHandler<T>) async throws {
+    func handle<T: Sendable>(_ event: T, next: @escaping MiddlewareHandler<T>) async throws {
         var error = ParallelDispatcherError(errors: [])
 
         await withTaskGroup(of: (index: Int, error: Error)?.self) { group in

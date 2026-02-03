@@ -51,7 +51,7 @@ public struct SegmentRequestMessage: Codable, Sendable {
         guard totalSegments <= Self.maxSegmentsPerRequest else {
             throw SegmentRequestError.segmentIndicesExceedLimit(
                 maxAllowed: Self.maxSegmentsPerRequest,
-                actual: totalSegments
+                actual: totalSegments,
             )
         }
         self.requests = requests
@@ -60,7 +60,7 @@ public struct SegmentRequestMessage: Codable, Sendable {
     public init(segmentsRoot: Data32, segmentIndices: [UInt16]) throws {
         let request = SegmentRequest(
             segmentsRoot: segmentsRoot,
-            segmentIndices: segmentIndices
+            segmentIndices: segmentIndices,
         )
         try self.init(requests: [request])
     }
@@ -89,7 +89,7 @@ extension SegmentRequestMessage: CEMessage {
         guard data.count == 1 else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "Expected 1 message, got \(data.count)"
+                debugDescription: "Expected 1 message, got \(data.count)",
             ))
         }
 
@@ -109,7 +109,7 @@ extension SegmentRequestMessage: CEMessage {
 
             requests.append(SegmentRequest(
                 segmentsRoot: segmentsRoot,
-                segmentIndices: segmentIndices
+                segmentIndices: segmentIndices,
             ))
         }
 

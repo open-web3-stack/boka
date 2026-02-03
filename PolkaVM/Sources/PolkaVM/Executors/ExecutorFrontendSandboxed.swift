@@ -27,7 +27,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx: (any InvocationContext)?
+        ctx: (any InvocationContext)?,
     ) async -> VMExecutionResult {
         // Sandboxed mode does not support InvocationContext
         // Fall back to in-process execution when context is provided
@@ -41,7 +41,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 pc: pc,
                 gas: gas,
                 argumentData: argumentData,
-                ctx: ctx
+                ctx: ctx,
             )
         }
 
@@ -52,7 +52,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         do {
             // Spawn child process
             (handle, clientFD) = try await childProcessManager.spawnChildProcess(
-                executablePath: sandboxPath
+                executablePath: sandboxPath,
             )
 
             // Create IPC client and transfer ownership of the FD
@@ -70,7 +70,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 pc: pc,
                 gas: gas.value,
                 argumentData: argumentData,
-                executionMode: mode
+                executionMode: mode,
             )
 
             // Clean up IPC
@@ -80,14 +80,14 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
             if let handle {
                 _ = try? await childProcessManager.waitForExit(
                     handle: handle,
-                    timeout: 30.0
+                    timeout: 30.0,
                 )
             }
 
             return VMExecutionResult(
                 exitReason: result.exitReason,
                 gasUsed: Gas(result.gasUsed),
-                outputData: result.outputData
+                outputData: result.outputData,
             )
 
         } catch {
@@ -111,7 +111,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
             return VMExecutionResult(
                 exitReason: .panic(.trap),
                 gasUsed: Gas(0),
-                outputData: nil
+                outputData: nil,
             )
         }
     }

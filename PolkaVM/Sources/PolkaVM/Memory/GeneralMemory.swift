@@ -3,13 +3,13 @@ import Foundation
 /// MemoryZone is an isolated memory area, used for stack, heap, arguments, etc.
 final class MemoryZone {
     private let config: PvmConfig
-    public let startAddress: UInt32
-    public private(set) var endAddress: UInt32
+    let startAddress: UInt32
+    private(set) var endAddress: UInt32
 
     // TODO: could be optimized by using a more efficient data structure
-    public private(set) var chunks: [MemoryChunk] = []
+    private(set) var chunks: [MemoryChunk] = []
 
-    public init(startAddress: UInt32, endAddress: UInt32, chunks: [MemoryChunk]) throws(MemoryError) {
+    init(startAddress: UInt32, endAddress: UInt32, chunks: [MemoryChunk]) throws(MemoryError) {
         guard startAddress <= endAddress, (chunks.isSorted { $0.endAddress < $1.startAddress }) else {
             throw .invalidZone(startAddress)
         }
@@ -24,7 +24,7 @@ final class MemoryZone {
         config = DefaultPvmConfig()
     }
 
-    // binary search for the index containing the address or index to be inserted
+    /// binary search for the index containing the address or index to be inserted
     private func searchChunk(for address: UInt32) -> (index: Int, found: Bool) {
         var low = 0
         var high = chunks.endIndex
@@ -107,7 +107,7 @@ final class MemoryZone {
         }
     }
 
-    public func read(address: UInt32, length: Int) throws -> Data {
+    func read(address: UInt32, length: Int) throws -> Data {
         guard length > 0 else { return Data() }
         let readEnd = address &+ UInt32(length)
         guard readEnd >= address else { throw MemoryError.outOfMemory(readEnd) }
@@ -166,34 +166,34 @@ final class MemoryZone {
         return res
     }
 
-    public func write(address: UInt32, values: Data) throws {
+    func write(address: UInt32, values: Data) throws {
         try insertOrUpdate(address: address, data: values)
     }
 
-    public func incrementEnd(size increment: UInt32) throws(MemoryError) {
+    func incrementEnd(size increment: UInt32) throws(MemoryError) {
         guard endAddress <= UInt32.max - increment else {
             throw .outOfMemory(endAddress)
         }
         endAddress += increment
     }
 
-    public func zero(pageIndex: UInt32, pages: Int) throws {
+    func zero(pageIndex: UInt32, pages: Int) throws {
         try insertOrUpdate(
             address: pageIndex * UInt32(config.pvmMemoryPageSize),
-            data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize))
+            data: Data(repeating: 0, count: Int(pages * config.pvmMemoryPageSize)),
         )
     }
 }
 
 final class MemoryChunk {
-    public private(set) var startAddress: UInt32
-    public var endAddress: UInt32 {
+    private(set) var startAddress: UInt32
+    var endAddress: UInt32 {
         startAddress + UInt32(data.count)
     }
 
-    public private(set) var data: Data
+    private(set) var data: Data
 
-    public init(startAddress: UInt32, data: Data) throws(MemoryError) {
+    init(startAddress: UInt32, data: Data) throws(MemoryError) {
         let endAddress = startAddress + UInt32(data.count)
         guard startAddress <= endAddress, endAddress - startAddress >= UInt32(data.count) else {
             throw .invalidChunk(startAddress)
@@ -202,8 +202,8 @@ final class MemoryChunk {
         self.data = data
     }
 
-    // append another adjacent chunk
-    public func append(chunk: MemoryChunk) throws(MemoryError) {
+    /// append another adjacent chunk
+    func append(chunk: MemoryChunk) throws(MemoryError) {
         guard endAddress == chunk.startAddress else {
             throw .notAdjacent(chunk.startAddress)
         }
@@ -213,14 +213,14 @@ final class MemoryChunk {
         data.append(chunk.data)
     }
 
-    public func zeroExtend(until address: UInt32) throws(MemoryError) {
+    func zeroExtend(until address: UInt32) throws(MemoryError) {
         guard address <= UInt32.max else {
             throw .outOfMemory(endAddress)
         }
         data.append(Data(repeating: 0, count: Int(address - startAddress) - data.count))
     }
 
-    public func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
+    func read(address: UInt32, length: Int) throws(MemoryError) -> Data {
         guard startAddress <= address, address + UInt32(length) <= endAddress else {
             throw .exceedChunkBoundary(address)
         }
@@ -230,7 +230,7 @@ final class MemoryChunk {
         return data[offset ..< (offset + length)]
     }
 
-    public func write(address: UInt32, values: Data) throws(MemoryError) {
+    func write(address: UInt32, values: Data) throws(MemoryError) {
         guard startAddress <= address, address + UInt32(values.count) <= endAddress else {
             throw .exceedChunkBoundary(address)
         }
@@ -254,14 +254,14 @@ public final class GeneralMemory: Memory {
     private let config: PvmConfig
     public let pageMap: PageMap
 
-    // general memory has a single zone
+    /// general memory has a single zone
     private let zone: MemoryZone
 
     public init(pageMap: [(address: UInt32, length: UInt32, writable: Bool)], chunks: [(address: UInt32, data: Data)]) throws {
         let config = DefaultPvmConfig()
         self.pageMap = PageMap(
             pageMap: pageMap.map { (address: $0.address, length: $0.length, access: $0.writable ? .readWrite : .readOnly) },
-            config: config
+            config: config,
         )
 
         let memoryChunks = try chunks.map { chunk in

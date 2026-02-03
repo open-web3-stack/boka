@@ -10,7 +10,7 @@ public struct ExtrinsicDisputes: Sendable, Equatable, Codable {
             public init(
                 isValid: Bool,
                 validatorIndex: ValidatorIndex,
-                signature: Ed25519Signature
+                signature: Ed25519Signature,
             ) {
                 self.isValid = isValid
                 self.validatorIndex = validatorIndex
@@ -22,7 +22,7 @@ public struct ExtrinsicDisputes: Sendable, Equatable, Codable {
         public var epoch: EpochIndex
         public var judgements: ConfigFixedSizeArray<
             SignatureItem,
-            ProtocolConfig.TwoThirdValidatorsPlusOne
+            ProtocolConfig.TwoThirdValidatorsPlusOne,
         >
 
         public init(
@@ -30,8 +30,8 @@ public struct ExtrinsicDisputes: Sendable, Equatable, Codable {
             epoch: EpochIndex,
             judgements: ConfigFixedSizeArray<
                 SignatureItem,
-                ProtocolConfig.TwoThirdValidatorsPlusOne
-            >
+                ProtocolConfig.TwoThirdValidatorsPlusOne,
+            >,
         ) {
             self.reportHash = reportHash
             self.epoch = epoch
@@ -47,7 +47,7 @@ public struct ExtrinsicDisputes: Sendable, Equatable, Codable {
         public init(
             reportHash: Data32,
             validatorKey: Ed25519PublicKey,
-            signature: Ed25519Signature
+            signature: Ed25519Signature,
         ) {
             self.reportHash = reportHash
             self.validatorKey = validatorKey
@@ -65,7 +65,7 @@ public struct ExtrinsicDisputes: Sendable, Equatable, Codable {
             reportHash: Data32,
             vote: Bool,
             validatorKey: Ed25519PublicKey,
-            signature: Ed25519Signature
+            signature: Ed25519Signature,
         ) {
             self.reportHash = reportHash
             self.vote = vote
@@ -74,17 +74,17 @@ public struct ExtrinsicDisputes: Sendable, Equatable, Codable {
         }
     }
 
-    // v
+    /// v
     public var verdicts: [VerdictItem]
-    // c
+    /// c
     public var culprits: [CulpritItem]
-    // f
+    /// f
     public var faults: [FaultItem]
 
     public init(
         verdicts: [VerdictItem],
         culprits: [CulpritItem],
-        faults: [FaultItem]
+        faults: [FaultItem],
     ) {
         self.verdicts = verdicts
         self.culprits = culprits

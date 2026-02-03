@@ -21,7 +21,7 @@ public struct AccumulationQueueItem: Sendable, Equatable, Codable {
     }
 }
 
-// accumulation output pairing
+/// accumulation output pairing
 public struct Commitment: Hashable, Sendable, Equatable, Codable {
     public var serviceIndex: ServiceIndex
     public var hash: Data32
@@ -63,15 +63,15 @@ public struct ServicePreimagePair: Hashable, Sendable {
 }
 
 public struct AccumulationResult: Sendable {
-    // e
+    /// e
     public var state: AccumulateState
-    // t
+    /// t
     public var transfers: [DeferredTransfers]
-    // y
+    /// y
     public var commitment: Data32?
-    // u
+    /// u
     public var gasUsed: Gas
-    // p
+    /// p
     public var provide: Set<ServicePreimagePair>
 }
 
@@ -90,7 +90,7 @@ public struct AccountChanges: Sendable {
     public var altered: Set<ServiceIndex>
     public var removed: Set<ServiceIndex>
 
-    // array for apply sequential updates
+    /// array for apply sequential updates
     public var updates: [UpdateKind]
 
     public init() {
@@ -129,7 +129,7 @@ public struct AccountChanges: Sendable {
         index: ServiceIndex,
         hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value?
+        value: StateKeys.ServiceAccountPreimageInfoKey.Value?,
     ) {
         altered.insert(index)
         updates.append(.updatePreimageInfo(index, hash, length, value))
@@ -181,14 +181,14 @@ public protocol Accumulation: ServiceAccounts {
     var timeslot: TimeslotIndex { get }
     var privilegedServices: PrivilegedServices { get set }
     var validatorQueue: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     > { get set }
     var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<
             Data32,
-            ProtocolConfig.MaxAuthorizationsQueueItems
+            ProtocolConfig.MaxAuthorizationsQueueItems,
         >,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     > { get set }
     var accumulationQueue: StateKeys.AccumulationQueueKey.Value { get set }
     var accumulationHistory: StateKeys.AccumulationHistoryKey.Value { get set }
@@ -205,7 +205,7 @@ extension Accumulation {
         workReports: [WorkReport],
         service: ServiceIndex,
         alwaysAcc: [ServiceIndex: Gas],
-        timeslot: TimeslotIndex
+        timeslot: TimeslotIndex,
     ) async throws -> (ServiceIndex, AccumulationResult) {
         var gas = Gas(0)
         var arguments: [AccumulationInput] = []
@@ -242,7 +242,7 @@ extension Accumulation {
             serviceIndex: service,
             gas: gas,
             arguments: arguments,
-            timeslot: timeslot
+            timeslot: timeslot,
         )
 
         logger.debug("[∆1] service: \(service), gasUsed: \(result.gasUsed), commitment: \(String(describing: result.commitment))")
@@ -257,7 +257,7 @@ extension Accumulation {
         transfers: [DeferredTransfers],
         workReports: [WorkReport],
         alwaysAcc: [ServiceIndex: Gas],
-        timeslot: TimeslotIndex
+        timeslot: TimeslotIndex,
     ) async throws -> ParallelAccumulationOutput {
         var services = [ServiceIndex]()
         var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)] = []
@@ -288,7 +288,7 @@ extension Accumulation {
         // parallel accumulate
         let batchResults = try await withThrowingTaskGroup(
             of: (ServiceIndex, AccumulationResult).self,
-            returning: [(ServiceIndex, AccumulationResult)].self
+            returning: [(ServiceIndex, AccumulationResult)].self,
         ) { group in
             for service in uniqueServices {
                 group.addTask { [batchState] in
@@ -299,7 +299,7 @@ extension Accumulation {
                         workReports: workReports,
                         service: service,
                         alwaysAcc: alwaysAcc,
-                        timeslot: timeslot
+                        timeslot: timeslot,
                     )
                 }
             }
@@ -388,14 +388,14 @@ extension Accumulation {
         try await preimageIntegration(
             servicePreimageSet: servicePreimageSet,
             accounts: currentState.accounts,
-            timeslot: timeslot
+            timeslot: timeslot,
         )
 
         return ParallelAccumulationOutput(
             state: currentState,
             transfers: newTransfers,
             commitments: commitments,
-            gasUsed: gasUsed
+            gasUsed: gasUsed,
         )
     }
 
@@ -407,7 +407,7 @@ extension Accumulation {
         workReports: [WorkReport],
         alwaysAcc: [ServiceIndex: Gas],
         gasLimit: Gas,
-        timeslot: TimeslotIndex
+        timeslot: TimeslotIndex,
     ) async throws -> AccumulationOutput {
         var i = 0
         var sumGasRequired = Gas(0)
@@ -435,7 +435,7 @@ extension Accumulation {
                 numAccumulated: 0,
                 state: state,
                 commitments: Set(),
-                gasUsed: []
+                gasUsed: [],
             )
         } else {
             logger.debug("[∆+] can accumulate until index: \(i)")
@@ -446,7 +446,7 @@ extension Accumulation {
                 transfers: transfers,
                 workReports: Array(workReports[0 ..< i]),
                 alwaysAcc: alwaysAcc,
-                timeslot: timeslot
+                timeslot: timeslot,
             )
             let parallelGasUsed = parallelOutput.gasUsed.reduce(Gas(0)) { $0 + $1.gas }
             let transfersGas = transfers.reduce(Gas(0)) { $0 + $1.gasLimit }
@@ -457,13 +457,13 @@ extension Accumulation {
                 workReports: Array(workReports[i ..< workReports.count]),
                 alwaysAcc: [:],
                 gasLimit: gasLimit + transfersGas - parallelGasUsed,
-                timeslot: timeslot
+                timeslot: timeslot,
             )
             return AccumulationOutput(
                 numAccumulated: i + outerOutput.numAccumulated,
                 state: outerOutput.state,
                 commitments: parallelOutput.commitments.union(outerOutput.commitments),
-                gasUsed: parallelOutput.gasUsed + outerOutput.gasUsed
+                gasUsed: parallelOutput.gasUsed + outerOutput.gasUsed,
             )
         }
     }
@@ -472,7 +472,7 @@ extension Accumulation {
     private func preimageIntegration(
         servicePreimageSet: Set<ServicePreimagePair>,
         accounts: ServiceAccountsMutRef,
-        timeslot: TimeslotIndex
+        timeslot: TimeslotIndex,
     ) async throws {
         for item in servicePreimageSet {
             let serviceIndex = item.serviceIndex
@@ -481,7 +481,7 @@ extension Accumulation {
             guard let preimageInfo = try await accounts.value.get(
                 serviceAccount: serviceIndex,
                 preimageHash: preimageHash,
-                length: UInt32(preimage.count)
+                length: UInt32(preimage.count),
             ) else {
                 continue
             }
@@ -491,7 +491,7 @@ extension Accumulation {
                     serviceAccount: serviceIndex,
                     preimageHash: preimageHash,
                     length: UInt32(preimage.count),
-                    value: [timeslot]
+                    value: [timeslot],
                 )
                 accounts.set(serviceAccount: serviceIndex, preimageHash: preimageHash, value: preimage)
             }
@@ -518,9 +518,9 @@ extension Accumulation {
         }
     }
 
-    // newly available work-reports, W, are partitioned into two sequences based on the condition of having zero prerequisite work-reports
+    /// newly available work-reports, W, are partitioned into two sequences based on the condition of having zero prerequisite work-reports
     private func partitionWorkReports(
-        availableReports: [WorkReport]
+        availableReports: [WorkReport],
     ) -> (zeroPrereqReports: [WorkReport], newQueueItems: [AccumulationQueueItem]) {
         let zeroPrereqReports = availableReports.filter { report in
             report.refinementContext.prerequisiteWorkPackages.isEmpty && report.lookup.isEmpty
@@ -532,22 +532,22 @@ extension Accumulation {
         for report in queuedReports {
             newQueueItems.append(.init(
                 workReport: report,
-                dependencies: report.refinementContext.prerequisiteWorkPackages.union(report.lookup.keys)
+                dependencies: report.refinementContext.prerequisiteWorkPackages.union(report.lookup.keys),
             ))
         }
 
         editQueue(
             items: &newQueueItems,
-            accumulatedPackages: Set(accumulationHistory.array.reduce(into: Set<Data32>()) { $0.formUnion($1.array) })
+            accumulatedPackages: Set(accumulationHistory.array.reduce(into: Set<Data32>()) { $0.formUnion($1.array) }),
         )
 
         return (zeroPrereqReports, newQueueItems)
     }
 
-    // get all the work reports that can be accumulated in this block
+    /// get all the work reports that can be accumulated in this block
     private func getAllAccumulatableReports(
         availableReports: [WorkReport],
-        index: Int
+        index: Int,
     ) -> (accumulatableReports: [WorkReport], newQueueItems: [AccumulationQueueItem]) {
         let (zeroPrereqReports, newQueueItems) = partitionWorkReports(availableReports: availableReports)
 
@@ -560,12 +560,12 @@ extension Accumulation {
         return (zeroPrereqReports + getAccumulatables(items: &allQueueItems), newQueueItems)
     }
 
-    // accumulate execution
+    /// accumulate execution
     private func execution(
         config: ProtocolConfigRef,
         workReports: [WorkReport],
         state: AccumulateState,
-        timeslot: TimeslotIndex
+        timeslot: TimeslotIndex,
     ) async throws -> AccumulationOutput {
         let sumPrivilegedGas = privilegedServices.alwaysAcc.values.reduce(Gas(0)) { $0 + $1.value }
         let minTotalGas = config.value.workReportAccumulationGas * Gas(config.value.totalNumberOfCores) + sumPrivilegedGas
@@ -578,7 +578,7 @@ extension Accumulation {
             workReports: workReports,
             alwaysAcc: privilegedServices.alwaysAcc,
             gasLimit: gasLimit,
-            timeslot: timeslot
+            timeslot: timeslot,
         )
     }
 
@@ -588,7 +588,7 @@ extension Accumulation {
         availableReports: [WorkReport],
         timeslot: TimeslotIndex,
         prevTimeslot: TimeslotIndex,
-        entropy: Data32
+        entropy: Data32,
     ) async throws -> (root: Data32, [Commitment], AccumulationStats) {
         let index = Int(timeslot) %% config.value.epochLength
 
@@ -596,7 +596,7 @@ extension Accumulation {
 
         var (accumulatableReports, newQueueItems) = getAllAccumulatableReports(
             availableReports: availableReports,
-            index: index
+            index: index,
         )
 
         logger.debug("accumulatable reports: \(accumulatableReports.map(\.packageSpecification.workPackageHash))")
@@ -612,14 +612,14 @@ extension Accumulation {
             delegator: privilegedServices.delegator,
             registrar: privilegedServices.registrar,
             alwaysAcc: privilegedServices.alwaysAcc,
-            entropy: entropy
+            entropy: entropy,
         )
 
         let accumulateOutput = try await execution(
             config: config,
             workReports: accumulatableReports,
             state: initialAccState,
-            timeslot: timeslot
+            timeslot: timeslot,
         )
 
         self = accumulateOutput.state.accounts.value as! Self
@@ -632,7 +632,7 @@ extension Accumulation {
             assigners: accumulateOutput.state.assigners,
             delegator: accumulateOutput.state.delegator,
             registrar: accumulateOutput.state.registrar,
-            alwaysAcc: accumulateOutput.state.alwaysAcc
+            alwaysAcc: accumulateOutput.state.alwaysAcc,
         )
 
         // update accumulation history

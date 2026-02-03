@@ -31,7 +31,7 @@ public struct Header: Sendable, Equatable {
         public var winningTickets:
             ConfigFixedSizeArray<
                 Ticket,
-                ProtocolConfig.EpochLength
+                ProtocolConfig.EpochLength,
             >?
 
         // Hi: block author index
@@ -51,11 +51,11 @@ public struct Header: Sendable, Equatable {
             epoch: EpochMarker?,
             winningTickets: ConfigFixedSizeArray<
                 Ticket,
-                ProtocolConfig.EpochLength
+                ProtocolConfig.EpochLength,
             >?,
             authorIndex: ValidatorIndex,
             vrfSignature: BandersnatchSignature,
-            offendersMarkers: [Ed25519PublicKey]
+            offendersMarkers: [Ed25519PublicKey],
         ) {
             self.parentHash = parentHash
             self.priorStateRoot = priorStateRoot
@@ -105,13 +105,13 @@ extension Header: Codable {
                 epoch: container.decodeIfPresent(EpochMarker.self, forKey: .epoch),
                 winningTickets: container.decodeIfPresent(
                     ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>.self,
-                    forKey: .winningTickets
+                    forKey: .winningTickets,
                 ),
                 authorIndex: container.decode(ValidatorIndex.self, forKey: .authorIndex),
                 vrfSignature: container.decode(BandersnatchSignature.self, forKey: .vrfSignature),
                 offendersMarkers: container.decode([Ed25519PublicKey].self, forKey: .offendersMarkers),
             ),
-            seal: container.decode(BandersnatchSignature.self, forKey: .seal)
+            seal: container.decode(BandersnatchSignature.self, forKey: .seal),
         )
     }
 
@@ -159,7 +159,7 @@ extension Header.Unsigned: Dummy {
             winningTickets: nil,
             authorIndex: 0,
             vrfSignature: BandersnatchSignature(),
-            offendersMarkers: []
+            offendersMarkers: [],
         )
     }
 }
@@ -169,21 +169,47 @@ extension Header: Dummy {
     public static func dummy(config: Config) -> Header {
         Header(
             unsigned: Header.Unsigned.dummy(config: config),
-            seal: BandersnatchSignature()
+            seal: BandersnatchSignature(),
         )
     }
 }
 
 extension Header {
-    public var parentHash: Data32 { unsigned.parentHash }
-    public var priorStateRoot: Data32 { unsigned.priorStateRoot }
-    public var extrinsicsHash: Data32 { unsigned.extrinsicsHash }
-    public var timeslot: TimeslotIndex { unsigned.timeslot }
-    public var epoch: EpochMarker? { unsigned.epoch }
-    public var winningTickets: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>? { unsigned.winningTickets }
-    public var offendersMarkers: [Ed25519PublicKey] { unsigned.offendersMarkers }
-    public var authorIndex: ValidatorIndex { unsigned.authorIndex }
-    public var vrfSignature: BandersnatchSignature { unsigned.vrfSignature }
+    public var parentHash: Data32 {
+        unsigned.parentHash
+    }
+
+    public var priorStateRoot: Data32 {
+        unsigned.priorStateRoot
+    }
+
+    public var extrinsicsHash: Data32 {
+        unsigned.extrinsicsHash
+    }
+
+    public var timeslot: TimeslotIndex {
+        unsigned.timeslot
+    }
+
+    public var epoch: EpochMarker? {
+        unsigned.epoch
+    }
+
+    public var winningTickets: ConfigFixedSizeArray<Ticket, ProtocolConfig.EpochLength>? {
+        unsigned.winningTickets
+    }
+
+    public var offendersMarkers: [Ed25519PublicKey] {
+        unsigned.offendersMarkers
+    }
+
+    public var authorIndex: ValidatorIndex {
+        unsigned.authorIndex
+    }
+
+    public var vrfSignature: BandersnatchSignature {
+        unsigned.vrfSignature
+    }
 }
 
 extension Header: Validate {

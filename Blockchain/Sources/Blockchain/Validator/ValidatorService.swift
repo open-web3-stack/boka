@@ -20,7 +20,7 @@ public final class ValidatorService: Sendable {
         eventBus: EventBus,
         scheduler: Scheduler,
         dataProvider: BlockchainDataProvider,
-        dataStore: DataStore
+        dataStore: DataStore,
     ) async {
         self.blockchain = blockchain
 
@@ -28,19 +28,19 @@ public final class ValidatorService: Sendable {
             id: "ValidatorService",
             config: blockchain.config,
             eventBus: eventBus,
-            scheduler: scheduler
+            scheduler: scheduler,
         )
 
         safrole = await SafroleService(
             config: blockchain.config,
             eventBus: eventBus,
-            keystore: keystore
+            keystore: keystore,
         )
 
         safroleTicketPool = await SafroleTicketPoolService(
             config: blockchain.config,
             dataProvider: dataProvider,
-            eventBus: eventBus
+            eventBus: eventBus,
         )
 
         blockAuthor = await BlockAuthor(
@@ -49,7 +49,7 @@ public final class ValidatorService: Sendable {
             eventBus: eventBus,
             keystore: keystore,
             scheduler: scheduler,
-            safroleTicketPool: safroleTicketPool
+            safroleTicketPool: safroleTicketPool,
         )
 
         dataAvailability = await DataAvailabilityService(
@@ -57,7 +57,7 @@ public final class ValidatorService: Sendable {
             eventBus: eventBus,
             scheduler: scheduler,
             dataProvider: dataProvider,
-            dataStore: dataStore
+            dataStore: dataStore,
         )
 
         allServices = [
@@ -110,7 +110,7 @@ public final class ValidatorService: Sendable {
                 slot: timeslot,
                 entropy: Data32(),
                 offenders: [],
-                extrinsics: .dummy(config: config)
+                extrinsics: .dummy(config: config),
             )
 
             for service in allServices {

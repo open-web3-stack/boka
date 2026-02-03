@@ -69,7 +69,7 @@ public final class RocksDB<CFKey: ColumnFamilyKey>: Sendable {
                     &cnames,
                     &cfOptionsList,
                     &outHandles,
-                    &err
+                    &err,
                 )
             } onErr: { message throws in
                 throw Error.openFailed(message: message)
@@ -97,7 +97,7 @@ extension RocksDB {
     private static func call<R>(
         _ data: [Data],
         fn: (inout UnsafeMutablePointer<Int8>?, [(ptr: UnsafeRawPointer, count: Int)]) -> R,
-        onErr: (String) throws -> Void
+        onErr: (String) throws -> Void,
     ) throws -> R {
         var err: UnsafeMutablePointer<Int8>?
         defer {
@@ -105,7 +105,7 @@ extension RocksDB {
         }
 
         func helper(data: ArraySlice<Data>, ptr: [(ptr: UnsafeRawPointer, count: Int)]) -> Result<
-            R, Error
+            R, Error,
         > {
             if data.isEmpty {
                 return .success(fn(&err, ptr))
@@ -137,14 +137,14 @@ extension RocksDB {
     private static func call<R>(
         _ data: Data...,
         fn: (inout UnsafeMutablePointer<Int8>?, [(ptr: UnsafeRawPointer, count: Int)]) -> R,
-        onErr: (String) throws -> Void
+        onErr: (String) throws -> Void,
     ) throws -> R {
         try call(data, fn: fn, onErr: onErr)
     }
 
     private static func call<R>(
         _ data: Data...,
-        fn: ([(ptr: UnsafeRawPointer, count: Int)]) -> R
+        fn: ([(ptr: UnsafeRawPointer, count: Int)]) -> R,
     ) throws -> R {
         try call(data) { _, ptrs in
             fn(ptrs)
@@ -180,7 +180,7 @@ extension RocksDB {
                 key.count,
                 value.ptr,
                 value.count,
-                &err
+                &err,
             )
         } onErr: { message throws in
             throw Error.putFailed(message: message)
@@ -253,7 +253,7 @@ extension RocksDB {
                                     sizesPtr.baseAddress,
                                     valuesPtr.baseAddress,
                                     valuesSizesPtr.baseAddress,
-                                    errorsPtr.baseAddress
+                                    errorsPtr.baseAddress,
                                 )
                             }
                         }

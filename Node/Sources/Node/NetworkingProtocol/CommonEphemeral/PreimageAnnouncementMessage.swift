@@ -24,7 +24,7 @@ extension PreimageAnnouncementMessage: CEMessage {
         guard let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "Unexpected data \(data)"
+                debugDescription: "Unexpected data \(data)",
             ))
         }
         return try JamDecoder.decode(PreimageAnnouncementMessage.self, from: data, withConfig: config)

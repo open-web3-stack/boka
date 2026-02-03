@@ -60,7 +60,7 @@ private class EncodeContext: Encoder {
         self.data = data
     }
 
-    func container<Key>(keyedBy _: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
+    func container<Key: CodingKey>(keyedBy _: Key.Type) -> KeyedEncodingContainer<Key> {
         KeyedEncodingContainer(JamKeyedEncodingContainer<Key>(codingPath: codingPath, encoder: self))
     }
 
@@ -166,14 +166,14 @@ private struct JamKeyedEncodingContainer<K: CodingKey>: KeyedEncodingContainerPr
     mutating func encode(_: Double, forKey _: K) throws {
         throw EncodingError.invalidValue(
             Double.self,
-            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported")
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported"),
         )
     }
 
     mutating func encode(_: Float, forKey _: K) throws {
         throw EncodingError.invalidValue(
             Float.self,
-            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported")
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported"),
         )
     }
 
@@ -243,14 +243,14 @@ private struct JamKeyedEncodingContainer<K: CodingKey>: KeyedEncodingContainerPr
     mutating func encodeIfPresent(_: Double?, forKey _: K) throws {
         throw EncodingError.invalidValue(
             Double.self,
-            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported")
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported"),
         )
     }
 
     mutating func encodeIfPresent(_: Float?, forKey _: K) throws {
         throw EncodingError.invalidValue(
             Float.self,
-            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported")
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported"),
         )
     }
 
@@ -353,9 +353,7 @@ private struct JamKeyedEncodingContainer<K: CodingKey>: KeyedEncodingContainerPr
         }
     }
 
-    mutating func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type, forKey key: K) -> KeyedEncodingContainer<NestedKey>
-        where NestedKey: CodingKey
-    {
+    mutating func nestedContainer<NestedKey: CodingKey>(keyedBy _: NestedKey.Type, forKey key: K) -> KeyedEncodingContainer<NestedKey> {
         KeyedEncodingContainer(JamKeyedEncodingContainer<NestedKey>(codingPath: codingPath + [key], encoder: encoder))
     }
 
@@ -396,14 +394,14 @@ private struct JamUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     mutating func encode(_: Double) throws {
         throw EncodingError.invalidValue(
             Double.self,
-            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported")
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported"),
         )
     }
 
     mutating func encode(_: Float) throws {
         throw EncodingError.invalidValue(
             Float.self,
-            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported")
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported"),
         )
     }
 
@@ -463,7 +461,7 @@ private struct JamUnkeyedEncodingContainer: UnkeyedEncodingContainer {
         count += 1
     }
 
-    mutating func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
+    mutating func nestedContainer<NestedKey: CodingKey>(keyedBy _: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
         KeyedEncodingContainer(JamKeyedEncodingContainer<NestedKey>(codingPath: codingPath, encoder: encoder))
     }
 
@@ -536,14 +534,14 @@ private struct JamSingleValueEncodingContainer: SingleValueEncodingContainer {
     mutating func encode(_: Double) throws {
         throw EncodingError.invalidValue(
             Double.self,
-            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported")
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Double is not supported"),
         )
     }
 
     mutating func encode(_: Float) throws {
         throw EncodingError.invalidValue(
             Float.self,
-            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported")
+            EncodingError.Context(codingPath: codingPath, debugDescription: "Float is not supported"),
         )
     }
 

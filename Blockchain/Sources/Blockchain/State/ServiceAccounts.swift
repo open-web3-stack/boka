@@ -8,7 +8,7 @@ public protocol ServiceAccounts: Sendable {
     func get(serviceAccount index: ServiceIndex, storageKey key: Data) async throws -> Data?
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data?
     func get(
-        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32
+        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32,
     ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value?
 
     func historicalLookup(serviceAccount index: ServiceIndex, timeslot: TimeslotIndex, preimageHash hash: Data32) async throws -> Data?
@@ -20,7 +20,7 @@ public protocol ServiceAccounts: Sendable {
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value?
+        value: StateKeys.ServiceAccountPreimageInfoKey.Value?,
     ) async throws
 
     mutating func remove(serviceAccount index: ServiceIndex) async throws
@@ -41,7 +41,9 @@ public class ServiceAccountsMutRef: @unchecked Sendable {
     public let ref: RefMut<ServiceAccounts>
     public private(set) var changes: AccountChanges
 
-    public var value: ServiceAccounts { ref.value }
+    public var value: ServiceAccounts {
+        ref.value
+    }
 
     public init(_ accounts: ServiceAccounts) {
         ref = RefMut(accounts)
@@ -76,7 +78,7 @@ public class ServiceAccountsMutRef: @unchecked Sendable {
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-        value: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>?
+        value: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>?,
     ) async throws {
         try await ref.value.set(serviceAccount: index, preimageHash: hash, length: length, value: value)
         changes.addPreimageInfoUpdate(index: index, hash: hash, length: length, value: value)

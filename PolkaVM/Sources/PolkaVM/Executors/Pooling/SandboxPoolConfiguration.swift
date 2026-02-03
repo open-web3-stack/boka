@@ -54,7 +54,7 @@ public struct SandboxPoolConfiguration: Sendable {
         allowOverflowWorkers: Bool = false,
         maxOverflowWorkers: Int = 0,
         exhaustionPolicy: ExhaustionPolicy = .queue,
-        sandboxPath: String = "boka-sandbox"
+        sandboxPath: String = "boka-sandbox",
     ) {
         self.poolSize = poolSize
         self.maxQueueDepth = maxQueueDepth
@@ -83,7 +83,7 @@ public struct SandboxPoolConfiguration: Sendable {
             healthCheckInterval: 0.0, // Disabled for max throughput
             allowOverflowWorkers: true,
             maxOverflowWorkers: ProcessInfo.processInfo.processorCount,
-            exhaustionPolicy: .queue
+            exhaustionPolicy: .queue,
         )
     }
 
@@ -99,7 +99,7 @@ public struct SandboxPoolConfiguration: Sendable {
             healthCheckInterval: 1.0,
             allowOverflowWorkers: false,
             maxOverflowWorkers: 0,
-            exhaustionPolicy: .failFast
+            exhaustionPolicy: .failFast,
         )
     }
 
@@ -115,7 +115,7 @@ public struct SandboxPoolConfiguration: Sendable {
             healthCheckInterval: 5.0,
             allowOverflowWorkers: false,
             maxOverflowWorkers: 0,
-            exhaustionPolicy: .queue
+            exhaustionPolicy: .queue,
         )
     }
 
@@ -131,7 +131,7 @@ public struct SandboxPoolConfiguration: Sendable {
             healthCheckInterval: 1.0,
             allowOverflowWorkers: false,
             maxOverflowWorkers: 0,
-            exhaustionPolicy: .failFast
+            exhaustionPolicy: .failFast,
         )
     }
 }

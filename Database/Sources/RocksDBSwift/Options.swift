@@ -5,7 +5,9 @@ import Utils
 struct Options: ~Copyable, Sendable {
     let ptr: SafePointer
 
-    var value: OpaquePointer { ptr.value }
+    var value: OpaquePointer {
+        ptr.value
+    }
 
     init() {
         ptr = .init(ptr: rocksdb_options_create(), free: rocksdb_options_destroy)
@@ -35,7 +37,9 @@ struct Options: ~Copyable, Sendable {
 struct WriteOptions: ~Copyable, Sendable {
     let ptr: SafePointer
 
-    var value: OpaquePointer { ptr.value }
+    var value: OpaquePointer {
+        ptr.value
+    }
 
     init() {
         ptr = .init(ptr: rocksdb_writeoptions_create(), free: rocksdb_writeoptions_destroy)
@@ -45,7 +49,9 @@ struct WriteOptions: ~Copyable, Sendable {
 public struct ReadOptions: ~Copyable, Sendable {
     let ptr: SafePointer
 
-    var value: OpaquePointer { ptr.value }
+    var value: OpaquePointer {
+        ptr.value
+    }
 
     public init() {
         ptr = .init(ptr: rocksdb_readoptions_create(), free: rocksdb_readoptions_destroy)
@@ -59,7 +65,9 @@ public struct ReadOptions: ~Copyable, Sendable {
 public struct Snapshot: ~Copyable, Sendable {
     let ptr: SafePointer
 
-    var value: OpaquePointer { ptr.value }
+    var value: OpaquePointer {
+        ptr.value
+    }
 
     init(_ db: SendableOpaquePointer) {
         ptr = .init(ptr: rocksdb_create_snapshot(db.value), free: { ptr in rocksdb_release_snapshot(db.value, ptr) })
@@ -69,12 +77,14 @@ public struct Snapshot: ~Copyable, Sendable {
 public struct Iterator: ~Copyable, Sendable {
     let ptr: SafePointer
 
-    var value: OpaquePointer { ptr.value }
+    var value: OpaquePointer {
+        ptr.value
+    }
 
     init(_ db: OpaquePointer, readOptions: borrowing ReadOptions, columnFamily: OpaquePointer) {
         ptr = .init(
             ptr: rocksdb_create_iterator_cf(db, readOptions.value, columnFamily),
-            free: rocksdb_iter_destroy
+            free: rocksdb_iter_destroy,
         )
     }
 
@@ -82,7 +92,7 @@ public struct Iterator: ~Copyable, Sendable {
         key.withUnsafeBytes { rocksdb_iter_seek(ptr.value, $0.baseAddress, key.count) }
     }
 
-    // read the key-value pair at the current position
+    /// read the key-value pair at the current position
     public func read() -> (key: Data, value: Data)? {
         read { pair -> (key: Data, value: Data)? in
             guard let pair else {

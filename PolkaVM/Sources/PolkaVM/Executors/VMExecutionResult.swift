@@ -14,7 +14,7 @@ public struct VMExecutionResult: Sendable {
         gasUsed: Gas,
         outputData: Data? = nil,
         finalRegisters: Registers = Registers(),
-        finalPC: UInt32 = 0
+        finalPC: UInt32 = 0,
     ) {
         self.exitReason = exitReason
         self.gasUsed = gasUsed

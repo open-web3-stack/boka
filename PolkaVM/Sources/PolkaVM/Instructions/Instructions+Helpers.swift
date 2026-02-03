@@ -63,7 +63,7 @@ extension Instructions {
         _ data: Data,
         divideBy: UInt8 = 1,
         minus _: Int = 1,
-        startIdx: Int = 0
+        startIdx: Int = 0,
     ) throws -> (T, U) {
         let lX1 = try Int((data.at(relative: startIdx) / divideBy) & 0b111)
         let lX = min(4, lX1)

@@ -21,7 +21,7 @@ public class JamDecoder {
         _ type: T.Type,
         from data: DataInput,
         withConfig config: Any? = nil,
-        allowTrailingBytes: Bool = false
+        allowTrailingBytes: Bool = false,
     ) throws -> T {
         let decoder = JamDecoder(data: data, config: config)
         let val = try decoder.decode(type)
@@ -36,8 +36,8 @@ public class JamDecoder {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
-                    debugDescription: "Not all data was consumed"
-                )
+                    debugDescription: "Not all data was consumed",
+                ),
             )
         }
     }
@@ -101,7 +101,7 @@ private class DecodeContext: Decoder {
         self.userInfo[.isJamCodec] = true
     }
 
-    func container<Key>(keyedBy _: Key.Type) throws -> KeyedDecodingContainer<Key> where Key: CodingKey {
+    func container<Key: CodingKey>(keyedBy _: Key.Type) throws -> KeyedDecodingContainer<Key> {
         KeyedDecodingContainer(JamKeyedDecodingContainer<Key>(codingPath: codingPath, decoder: self))
     }
 
@@ -126,8 +126,8 @@ private class DecodeContext: Decoder {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath(),
-                    debugDescription: "Invalid compact value"
-                )
+                    debugDescription: "Invalid compact value",
+                ),
             )
         }
         return res
@@ -144,12 +144,11 @@ private class DecodeContext: Decoder {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: path,
-                    debugDescription: "Invalid data length"
-                )
+                    debugDescription: "Invalid data length",
+                ),
             )
         }
-        let res = try input.read(length: Int(length), codingPath: path)
-        return res
+        return try input.read(length: Int(length), codingPath: path)
     }
 
     fileprivate func decodeData(codingPath: [CodingKey]) throws -> [UInt8] {
@@ -163,8 +162,8 @@ private class DecodeContext: Decoder {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: path,
-                    debugDescription: "Invalid data length"
-                )
+                    debugDescription: "Invalid data length",
+                ),
             )
         }
         let res = try input.read(length: Int(length), codingPath: path)
@@ -178,8 +177,8 @@ private class DecodeContext: Decoder {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath,
-                    debugDescription: "Invalid array length"
-                )
+                    debugDescription: "Invalid array length",
+                ),
             )
         }
         var array = [T.Element]()
@@ -209,8 +208,8 @@ private class DecodeContext: Decoder {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath,
-                    debugDescription: "Invalid boolean value: \(byte)"
-                )
+                    debugDescription: "Invalid boolean value: \(byte)",
+                ),
             )
         }
     }
@@ -305,8 +304,7 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
     }
 
     func decode(_: UInt8.Type, forKey _: K) throws -> UInt8 {
-        let byte = try decoder.input.read(codingPath)
-        return byte
+        try decoder.input.read(codingPath)
     }
 
     func decode(_: UInt16.Type, forKey key: K) throws -> UInt16 {
@@ -336,15 +334,13 @@ private struct JamKeyedDecodingContainer<K: CodingKey>: KeyedDecodingContainerPr
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: decoder.codingPath,
-                    debugDescription: "Decode key \(key.stringValue) with invalid boolean value: \(byte)"
-                )
+                    debugDescription: "Decode key \(key.stringValue) with invalid boolean value: \(byte)",
+                ),
             )
         }
     }
 
-    func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type, forKey _: K) throws -> KeyedDecodingContainer<NestedKey>
-        where NestedKey: CodingKey
-    {
+    func nestedContainer<NestedKey: CodingKey>(keyedBy _: NestedKey.Type, forKey _: K) throws -> KeyedDecodingContainer<NestedKey> {
         KeyedDecodingContainer(JamKeyedDecodingContainer<NestedKey>(codingPath: codingPath, decoder: decoder))
     }
 
@@ -462,9 +458,7 @@ private struct JamUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         return try decoder.decode(type, key: nil)
     }
 
-    mutating func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey>
-        where NestedKey: CodingKey
-    {
+    mutating func nestedContainer<NestedKey: CodingKey>(keyedBy _: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> {
         KeyedDecodingContainer(JamKeyedDecodingContainer<NestedKey>(codingPath: codingPath, decoder: decoder))
     }
 
@@ -537,8 +531,7 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
     }
 
     func decode(_: UInt8.Type) throws -> UInt8 {
-        let byte = try decoder.input.read(codingPath)
-        return byte
+        try decoder.input.read(codingPath)
     }
 
     func decode(_: UInt16.Type) throws -> UInt16 {
@@ -557,9 +550,7 @@ private struct JamSingleValueDecodingContainer: SingleValueDecodingContainer {
         try decoder.decode(type, key: nil)
     }
 
-    func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey>
-        where NestedKey: CodingKey
-    {
+    func nestedContainer<NestedKey: CodingKey>(keyedBy _: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> {
         KeyedDecodingContainer(JamKeyedDecodingContainer<NestedKey>(codingPath: codingPath, decoder: decoder))
     }
 

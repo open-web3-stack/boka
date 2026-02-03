@@ -30,7 +30,7 @@ public protocol Scheduler: Sendable {
         delay: TimeInterval,
         repeats: Bool,
         task: @escaping @Sendable () async -> Void,
-        onCancel: (@Sendable () -> Void)?
+        onCancel: (@Sendable () -> Void)?,
     ) -> Cancellable
 }
 
@@ -40,7 +40,7 @@ extension Scheduler {
         delay: TimeInterval,
         repeats: Bool = false,
         task: @escaping @Sendable () async -> Void,
-        onCancel: (@Sendable () -> Void)? = nil
+        onCancel: (@Sendable () -> Void)? = nil,
     ) -> Cancellable {
         guard delay >= 0 else {
             logger.error("scheduling task with negative delay", metadata: ["id": "\(id)", "delay": "\(delay)", "repeats": "\(repeats)"])

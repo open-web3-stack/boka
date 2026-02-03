@@ -8,13 +8,13 @@ struct StateTrieCacheIntegrationTests {
     // MARK: - Cache Statistics Tests
 
     @Test("StateTrie with cache tracks statistics")
-    func testCacheStatistics() async throws {
+    func cacheStatistics() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: 100
+            cacheSize: 100,
         )
 
         let key = makeKey(1)
@@ -34,16 +34,16 @@ struct StateTrieCacheIntegrationTests {
         let stats = await trie.getCacheStats()
         #expect(stats != nil)
         // Cache should have tracked some activity (we can't reset stats, so we check for activity)
-        #expect(stats!.totalAccesses >= 6) // At least 5 reads + 1 miss
+        #expect(try #require(stats?.totalAccesses) >= 6) // At least 5 reads + 1 miss
     }
 
     @Test("StateTrie without cache has no statistics")
-    func testNoCacheStatistics() async throws {
+    func noCacheStatistics() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
-            enableCache: false // Cache disabled
+            enableCache: false, // Cache disabled
         )
 
         let key = makeKey(1)
@@ -61,13 +61,13 @@ struct StateTrieCacheIntegrationTests {
     // MARK: - Cache Behavior Tests
 
     @Test("StateTrie cache improves read performance")
-    func testCachePerformance() async throws {
+    func cachePerformance() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: 1000
+            cacheSize: 1000,
         )
 
         // Insert multiple values
@@ -87,18 +87,18 @@ struct StateTrieCacheIntegrationTests {
 
         let stats = await trie.getCacheStats()
         // Should have many cache hits (can't reset stats, so we check for significant activity)
-        #expect(stats!.hits >= 10)
+        #expect(try #require(stats?.hits) >= 10)
     }
 
     @Test("StateTrie cache evicts least recently used items")
-    func testCacheEviction() async throws {
+    func cacheEviction() async throws {
         let backend = InMemoryBackend()
         let cacheSize = 5
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: cacheSize
+            cacheSize: cacheSize,
         )
 
         // Insert more items than cache size
@@ -120,17 +120,17 @@ struct StateTrieCacheIntegrationTests {
 
         let stats = await trie.getCacheStats()
         // Should have cache activity
-        #expect(stats!.totalAccesses >= 6)
+        #expect(try #require(stats?.totalAccesses) >= 6)
     }
 
     @Test("StateTrie cache handles updates correctly")
-    func testCacheWithUpdates() async throws {
+    func cacheWithUpdates() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: 100
+            cacheSize: 100,
         )
 
         let key = makeKey(1)
@@ -152,13 +152,13 @@ struct StateTrieCacheIntegrationTests {
     }
 
     @Test("StateTrie cache handles deletions correctly")
-    func testCacheWithDeletions() async throws {
+    func cacheWithDeletions() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: 100
+            cacheSize: 100,
         )
 
         let key = makeKey(1)
@@ -183,14 +183,14 @@ struct StateTrieCacheIntegrationTests {
     // MARK: - Cache Size Tests
 
     @Test("StateTrie respects cache size limit")
-    func testCacheSizeLimit() async throws {
+    func cacheSizeLimit() async throws {
         let backend = InMemoryBackend()
         let cacheSize = 10
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: cacheSize
+            cacheSize: cacheSize,
         )
 
         // Insert more items than cache size
@@ -209,13 +209,13 @@ struct StateTrieCacheIntegrationTests {
     }
 
     @Test("StateTrie handles very small cache")
-    func testVerySmallCache() async throws {
+    func verySmallCache() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: 1 // Tiny cache
+            cacheSize: 1, // Tiny cache
         )
 
         let key1 = makeKey(1)
@@ -241,18 +241,18 @@ struct StateTrieCacheIntegrationTests {
         _ = try await trie.read(key: key2)
 
         let stats = await trie.getCacheStats()
-        #expect(stats!.hits >= 1)
-        #expect(stats!.misses >= 1)
+        #expect(try #require(stats?.hits) >= 1)
+        #expect(try #require(stats?.misses) >= 1)
     }
 
     @Test("StateTrie handles very large cache")
-    func testVeryLargeCache() async throws {
+    func veryLargeCache() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: 10000 // Large cache
+            cacheSize: 10000, // Large cache
         )
 
         // Insert many items
@@ -272,13 +272,13 @@ struct StateTrieCacheIntegrationTests {
         }
 
         let stats = await trie.getCacheStats()
-        #expect(stats!.hits >= 90) // Most should be hits
+        #expect(try #require(stats?.hits) >= 90) // Most should be hits
     }
 
     // MARK: - Cache and Write Buffer Integration Tests
 
     @Test("StateTrie with both cache and write buffer")
-    func testCacheAndWriteBuffer() async throws {
+    func cacheAndWriteBuffer() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
@@ -287,7 +287,7 @@ struct StateTrieCacheIntegrationTests {
             cacheSize: 100,
             enableWriteBuffer: true,
             writeBufferSize: 10,
-            writeBufferFlushInterval: 1.0
+            writeBufferFlushInterval: 1.0,
         )
 
         let key = makeKey(1)
@@ -305,7 +305,7 @@ struct StateTrieCacheIntegrationTests {
 
         let cacheStats = await trie.getCacheStats()
         #expect(cacheStats != nil)
-        #expect(cacheStats!.hits >= 5) // All should hit cache
+        #expect(try #require(cacheStats?.hits) >= 5) // All should hit cache
 
         // Write buffer should also work
         let bufferStats = await trie.getWriteBufferStats()
@@ -315,13 +315,13 @@ struct StateTrieCacheIntegrationTests {
     // MARK: - Cache Hit Rate Tests
 
     @Test("StateTrie cache hit rate improves with repeated reads")
-    func testCacheHitRate() async throws {
+    func cacheHitRate() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: 1000
+            cacheSize: 1000,
         )
 
         // Insert values
@@ -352,7 +352,7 @@ struct StateTrieCacheIntegrationTests {
     // MARK: - Cache Persistence Tests
 
     @Test("StateTrie cache doesn't persist across instances")
-    func testCacheNotPersistent() async throws {
+    func cacheNotPersistent() async throws {
         let backend = InMemoryBackend()
         let key = makeKey(1)
 
@@ -361,7 +361,7 @@ struct StateTrieCacheIntegrationTests {
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: 100
+            cacheSize: 100,
         )
 
         try await trie1.update([(key, Data("value1".utf8))])
@@ -378,7 +378,7 @@ struct StateTrieCacheIntegrationTests {
             rootHash: trie1.rootHash,
             backend: backend,
             enableCache: true,
-            cacheSize: 100
+            cacheSize: 100,
         )
 
         // Read from new trie - different cache instance
@@ -391,13 +391,13 @@ struct StateTrieCacheIntegrationTests {
     // MARK: - Memory Management Tests
 
     @Test("StateTrie cache doesn't cause memory leaks")
-    func testCacheMemoryManagement() async throws {
+    func cacheMemoryManagement() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: 100
+            cacheSize: 100,
         )
 
         // Add and remove many items
@@ -423,13 +423,13 @@ struct StateTrieCacheIntegrationTests {
     // MARK: - Concurrent Access Tests
 
     @Test("StateTrie cache handles concurrent reads")
-    func testCacheConcurrentReads() async throws {
+    func cacheConcurrentReads() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableCache: true,
-            cacheSize: 1000
+            cacheSize: 1000,
         )
 
         // Insert values

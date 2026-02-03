@@ -2,7 +2,7 @@ import Codec
 import Foundation
 import Utils
 
-// All the necessary data to audit a work package. Stored in audits DA
+/// All the necessary data to audit a work package. Stored in audits DA
 public struct WorkPackageBundle: Sendable, Equatable, Codable, Hashable {
     public var workPackage: WorkPackage
     public var extrinsics: [Data]
@@ -28,7 +28,7 @@ extension WorkPackageBundle: Dummy {
             workPackage: WorkPackage.dummy(config: config),
             extrinsics: [],
             importSegments: [],
-            justifications: []
+            justifications: [],
         )
     }
 }

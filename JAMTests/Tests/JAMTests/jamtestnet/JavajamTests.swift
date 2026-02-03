@@ -1,9 +1,8 @@
 import Blockchain
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct JavajamTests {
     @Test(.disabled(), arguments: try JamTestnet.loadTests(path: "stf/state_transitions", src: .javajam))
@@ -14,7 +13,7 @@ struct JavajamTests {
     }
 
     @Test(.disabled(), arguments: try JamTestnet.loadTests(path: "erasure_coding", src: .javajam, ext: "json"))
-    func erasureCodingTests(_ input: Testcase) async throws {
+    func erasureCodingTests(_ input: Testcase) throws {
         struct ECTestCase: Codable {
             let data: String
             let shards: [String]
@@ -27,9 +26,9 @@ struct JavajamTests {
         let testCase = try decoder.decode(ECTestCase.self, from: input.data)
 
         let originalData = if testCase.data.hasPrefix("0x") {
-            Data(fromHexString: String(testCase.data.dropFirst(2)))!
+            try #require(Data(fromHexString: String(testCase.data.dropFirst(2))))
         } else {
-            Data(fromHexString: testCase.data)!
+            try #require(Data(fromHexString: testCase.data))
         }
 
         let recoveryShards = testCase.shards.enumerated().map { index, hexString -> ErasureCoding.Shard in
@@ -47,7 +46,7 @@ struct JavajamTests {
                 shards: recoveryShards,
                 basicSize: basicSize,
                 originalCount: originalCount,
-                recoveryCount: recoveryCount
+                recoveryCount: recoveryCount,
             )
 
             #expect(recoveredData == originalData, "reconstructed data should match original data")
@@ -55,7 +54,7 @@ struct JavajamTests {
             let generatedShards = try ErasureCoding.chunk(
                 data: originalData,
                 basicSize: basicSize,
-                recoveryCount: recoveryCount
+                recoveryCount: recoveryCount,
             )
 
             #expect(generatedShards.count == recoveryCount, "should generate expected number of recovery shards")

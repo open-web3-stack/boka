@@ -1,7 +1,6 @@
 import Codec
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct ReadIntValue: ReadInt {
@@ -29,7 +28,7 @@ struct ConfigSizeBitStringTests {
         }
     }
 
-    @Test func works() throws {
+    @Test func works() {
         var value = ConfigSizeBitString<ReadIntValue>(config: 7)
         #expect(value.binaryString == "0000000")
 
@@ -123,7 +122,7 @@ struct ConfigSizeBitStringTests {
         #expect(ConfigSizeBitString<ReadIntValue>.encodeedSizeHint == nil)
     }
 
-    @Test func randomAccessCollection() throws {
+    @Test func randomAccessCollection() {
         var value = ConfigSizeBitString<ReadIntValue>(config: 8)
         let result = value.withPtr { ptr in
             ptr.reduce(0, +)

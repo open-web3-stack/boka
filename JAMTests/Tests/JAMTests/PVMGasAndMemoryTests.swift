@@ -1,9 +1,8 @@
 import Foundation
+@testable import JAMTests
 import PolkaVM
 import Testing
 import TracingUtils
-
-@testable import JAMTests
 import Utils
 
 private let logger = Logger(label: "PVMGasAndMemoryTests")
@@ -15,11 +14,11 @@ private let logger = Logger(label: "PVMGasAndMemoryTests")
 struct PVMGasAndMemoryTests {
     // MARK: - Gas Calculation Tests
 
-    @Test func testGasCalculation_interpreter() async throws {
+    @Test func gasCalculation_interpreter() async throws {
         try await testGasCalculation(mode: .interpreter)
     }
 
-    @Test func testGasCalculation_sandbox() async throws {
+    @Test func gasCalculation_sandbox() async throws {
         try await testGasCalculation(mode: .sandbox)
     }
 
@@ -42,7 +41,7 @@ struct PVMGasAndMemoryTests {
             pc: 0,
             gas: initialGas,
             argumentData: Data([10]),
-            ctx: nil
+            ctx: nil,
         )
 
         #expect(exitReason == .halt, "Program should complete successfully")
@@ -56,11 +55,11 @@ struct PVMGasAndMemoryTests {
         #expect(gasUsed.value < 50000, "Should not use excessive gas")
     }
 
-    @Test func testGasExhaustion_interpreter() async throws {
+    @Test func gasExhaustion_interpreter() async throws {
         try await testGasExhaustion(mode: .interpreter)
     }
 
-    @Test func testGasExhaustion_sandbox() async throws {
+    @Test func gasExhaustion_sandbox() async throws {
         try await testGasExhaustion(mode: .sandbox)
     }
 
@@ -85,7 +84,7 @@ struct PVMGasAndMemoryTests {
             pc: 0,
             gas: limitedGas,
             argumentData: Data([20]), // Large input to require more computation
-            ctx: nil
+            ctx: nil,
         )
 
         // Should run out of gas
@@ -94,11 +93,11 @@ struct PVMGasAndMemoryTests {
 
     // MARK: - Memory Boundary Tests
 
-    @Test func testMemoryBoundaries_interpreter() async throws {
+    @Test func memoryBoundaries_interpreter() async throws {
         try await testMemoryBoundaries(mode: .interpreter)
     }
 
-    @Test func testMemoryBoundaries_sandbox() async throws {
+    @Test func memoryBoundaries_sandbox() async throws {
         try await testMemoryBoundaries(mode: .sandbox)
     }
 
@@ -118,7 +117,7 @@ struct PVMGasAndMemoryTests {
                 pc: 0,
                 gas: Gas(100_000),
                 argumentData: argumentData,
-                ctx: nil
+                ctx: nil,
             )
 
             // All should handle arguments without crashing
@@ -128,11 +127,11 @@ struct PVMGasAndMemoryTests {
     // MARK: - Gas Consistency Tests
 
     /// Verify that gas consumption is consistent across multiple runs
-    @Test func testGasConsistency_interpreter() async throws {
+    @Test func gasConsistency_interpreter() async throws {
         try await testGasConsistency(mode: .interpreter)
     }
 
-    @Test func testGasConsistency_sandbox() async throws {
+    @Test func gasConsistency_sandbox() async throws {
         try await testGasConsistency(mode: .sandbox)
     }
 
@@ -156,7 +155,7 @@ struct PVMGasAndMemoryTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([10]),
-                ctx: nil
+                ctx: nil,
             )
             gasValues.append(gasUsed.value)
         }
@@ -166,7 +165,7 @@ struct PVMGasAndMemoryTests {
         for (index, gas) in gasValues.enumerated() {
             #expect(
                 gas == firstGas,
-                "\(mode.description) gas inconsistent across runs: run 0 used \(firstGas), run \(index) used \(gas)"
+                "\(mode.description) gas inconsistent across runs: run 0 used \(firstGas), run \(index) used \(gas)",
             )
         }
     }
@@ -174,7 +173,7 @@ struct PVMGasAndMemoryTests {
     // MARK: - Complex Program Gas Tests
 
     /// Test gas consumption for programs with different complexity
-    @Test func testGasVsComplexity() async throws {
+    @Test func gasVsComplexity() async {
         let config = DefaultPvmConfig()
 
         // Test programs of different complexities
@@ -209,7 +208,7 @@ struct PVMGasAndMemoryTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([5]),
-                ctx: nil
+                ctx: nil,
             )
 
             // Test in sandbox mode
@@ -220,14 +219,17 @@ struct PVMGasAndMemoryTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([5]),
-                ctx: nil
+                ctx: nil,
             )
 
             // Gas should be similar
             let gasDiff = abs(Int64(gasInterpreter.value) - Int64(gasSandbox.value))
+            let gasMessage =
+                "\(name): Gas consumption differs significantly between modes: " +
+                "interpreter=\(gasInterpreter), sandbox=\(gasSandbox), diff=\(gasDiff)"
             #expect(
                 gasDiff <= 20,
-                "\(name): Gas consumption differs significantly between modes: interpreter=\(gasInterpreter), sandbox=\(gasSandbox), diff=\(gasDiff)"
+                gasMessage,
             )
         }
     }
@@ -235,7 +237,7 @@ struct PVMGasAndMemoryTests {
     // MARK: - Stress Tests
 
     /// Test with programs that push memory boundaries
-    @Test func testStress_largeOutput() async throws {
+    @Test func stress_largeOutput() async {
         let config = DefaultPvmConfig()
 
         // Create a program that tries to write large output
@@ -247,7 +249,7 @@ struct PVMGasAndMemoryTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
 
         let (exitReasonSandbox, _, _) = await invokePVM(
@@ -257,7 +259,7 @@ struct PVMGasAndMemoryTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
 
         // Both should handle the stress case similarly

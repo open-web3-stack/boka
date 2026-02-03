@@ -20,15 +20,15 @@ public struct OperandTuple: Codable, Sendable {
 }
 
 public struct DeferredTransfers: Codable, Sendable {
-    // s
+    /// s
     public var sender: ServiceIndex
-    // d
+    /// d
     public var destination: ServiceIndex
-    // a
+    /// a
     public var amount: Balance
-    // m
+    /// m
     public var memo: Data128
-    // g
+    /// g
     public var gasLimit: Gas
 
     public init(sender: ServiceIndex, destination: ServiceIndex, amount: Balance, memo: Data128, gasLimit: Gas) {
@@ -60,7 +60,7 @@ public struct AccumulationInput: Sendable, Codable {
         self.deferredTransfers = deferredTransfers
     }
 
-    // Encodable
+    /// Encodable
     public func encode(to encoder: Encoder) throws {
         var container = encoder.unkeyedContainer()
         switch inputType {
@@ -73,7 +73,7 @@ public struct AccumulationInput: Sendable, Codable {
         }
     }
 
-    // Decodable
+    /// Decodable
     public init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
         let variant = try container.decode(UInt.self)
@@ -88,8 +88,8 @@ public struct AccumulationInput: Sendable, Codable {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: decoder.codingPath,
-                    debugDescription: "Invalid AccumulationInput variant: \(variant)"
-                )
+                    debugDescription: "Invalid AccumulationInput variant: \(variant)",
+                ),
             )
         }
     }
@@ -102,25 +102,25 @@ public struct AccumulateState: Sendable {
     public var accounts: ServiceAccountsMutRef
     /// i
     public var validatorQueue: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     >
     /// q
     public var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<
             Data32,
-            ProtocolConfig.MaxAuthorizationsQueueItems
+            ProtocolConfig.MaxAuthorizationsQueueItems,
         >,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
-    // m
+    /// m
     public var manager: ServiceIndex
-    // a
+    /// a
     public var assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>
-    // v
+    /// v
     public var delegator: ServiceIndex
-    // r
+    /// r
     public var registrar: ServiceIndex
-    // z
+    /// z
     public var alwaysAcc: [ServiceIndex: Gas]
 
     public var entropy: Data32 // eta'_0
@@ -135,7 +135,7 @@ public struct AccumulateState: Sendable {
             delegator: delegator,
             registrar: registrar,
             alwaysAcc: alwaysAcc,
-            entropy: entropy
+            entropy: entropy,
         )
     }
 }
@@ -159,7 +159,7 @@ public class AccumulateResultContext {
     public init(
         serviceIndex: ServiceIndex,
         state: AccumulateState,
-        nextAccountIndex: ServiceIndex
+        nextAccountIndex: ServiceIndex,
     ) {
         self.serviceIndex = serviceIndex
         self.state = state

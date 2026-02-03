@@ -20,8 +20,8 @@ public struct SortedSet<T: Codable & Hashable & Comparable>: Codable, CodableAli
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: container.codingPath,
-                        debugDescription: "Array is not sorted"
-                    )
+                        debugDescription: "Array is not sorted",
+                    ),
                 )
             }
             previous = item

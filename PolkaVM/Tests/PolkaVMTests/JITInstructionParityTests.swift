@@ -5,11 +5,10 @@
 // to identify exactly where JIT behavior diverges from interpreter.
 
 import Foundation
+@testable import PolkaVM
 import Testing
 import TracingUtils
 import Utils
-
-@testable import PolkaVM
 
 private let logger = Logger(label: "JITInstructionParityTests")
 
@@ -26,7 +25,7 @@ struct JITInstructionParityTests {
     private func compareExecution(
         instructionBytes: [UInt8],
         initialValue _: UInt64 = 0,
-        testName: String
+        testName: String,
     ) async throws {
         let config = DefaultPvmConfig()
 
@@ -41,7 +40,7 @@ struct JITInstructionParityTests {
             pc: 0,
             gas: Gas(100_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
 
         // Execute in JIT mode
@@ -52,26 +51,29 @@ struct JITInstructionParityTests {
             pc: 0,
             gas: Gas(100_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
 
         // Compare exit reasons
         #expect(
             exitReasonInterpreter == exitReasonJIT,
-            "\(testName): Exit reason mismatch - interpreter: \(exitReasonInterpreter), JIT: \(exitReasonJIT)"
+            "\(testName): Exit reason mismatch - interpreter: \(exitReasonInterpreter), JIT: \(exitReasonJIT)",
         )
 
         // Compare outputs
+        let outputMessage =
+            "\(testName): Output mismatch - interpreter: \(outputInterpreter?.toHexString() ?? "nil"), " +
+            "JIT: \(outputJIT?.toHexString() ?? "nil")"
         #expect(
             outputInterpreter == outputJIT,
-            "\(testName): Output mismatch - interpreter: \(outputInterpreter?.toHexString() ?? "nil"), JIT: \(outputJIT?.toHexString() ?? "nil")"
+            outputMessage,
         )
 
         // Compare gas usage if both executions completed successfully
         if case .halt = exitReasonInterpreter, case .halt = exitReasonJIT {
             #expect(
                 gasInterpreter == gasJIT,
-                "\(testName): Gas mismatch - interpreter: \(gasInterpreter.value), JIT: \(gasJIT.value)"
+                "\(testName): Gas mismatch - interpreter: \(gasInterpreter.value), JIT: \(gasJIT.value)",
             )
         }
     }
@@ -79,7 +81,7 @@ struct JITInstructionParityTests {
     // MARK: - Load Immediate Instructions
 
     @Test("JIT vs Interpreter: LoadImm64")
-    func testLoadImm64() async throws {
+    func loadImm64() async throws {
         // LoadImm64 r1, 0x123456789ABCDEF0
         // Opcode 0x14 (20 = loadImmU64), dest_reg=0x01, immediate=0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12
         let instruction: [UInt8] = [
@@ -87,12 +89,12 @@ struct JITInstructionParityTests {
         ]
         try await compareExecution(
             instructionBytes: instruction,
-            testName: "LoadImm64"
+            testName: "LoadImm64",
         )
     }
 
     @Test("JIT vs Interpreter: LoadImm32")
-    func testLoadImm32() async throws {
+    func loadImm32() async throws {
         // LoadImm32 r1, 0x12345678 (sign-extended)
         // Opcode 0x32, dest_reg=0x01, immediate=0x78, 0x56, 0x34, 0x12
         let instruction: [UInt8] = [
@@ -100,12 +102,12 @@ struct JITInstructionParityTests {
         ]
         try await compareExecution(
             instructionBytes: instruction,
-            testName: "LoadImm32"
+            testName: "LoadImm32",
         )
     }
 
     @Test("JIT vs Interpreter: LoadImmU32")
-    func testLoadImmU32() async throws {
+    func loadImmU32() async throws {
         // LoadImmU32 r1, 0x12345678 (zero-extended)
         // Opcode 0x31, dest_reg=0x01, immediate=0x78, 0x56, 0x34, 0x12
         let instruction: [UInt8] = [
@@ -113,7 +115,7 @@ struct JITInstructionParityTests {
         ]
         try await compareExecution(
             instructionBytes: instruction,
-            testName: "LoadImmU32"
+            testName: "LoadImmU32",
         )
     }
 
@@ -125,7 +127,7 @@ struct JITInstructionParityTests {
     // JIT should be tested with properly constructed programs using ProgramBlobBuilder.
 
     @Test("JIT vs Interpreter: Fallthrough program")
-    func testHalt() async throws {
+    func testHalt() async {
         let config = DefaultPvmConfig()
 
         // Create fallthrough program using ProgramBlobBuilder
@@ -141,7 +143,7 @@ struct JITInstructionParityTests {
             pc: 0,
             gas: Gas(100_000),
             argumentData: nil,
-            ctx: nil
+            ctx: nil,
         )
 
         // JIT should trap (execution continued past end of program)

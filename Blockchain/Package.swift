@@ -12,7 +12,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "Blockchain",
-            targets: ["Blockchain"]
+            targets: ["Blockchain"],
         ),
     ],
     dependencies: [
@@ -40,7 +40,7 @@ let package = Package(
                 .unsafeFlags([
                     "-Xcc", "-I../PolkaVM/Sources/asmjit",
                 ]),
-            ]
+            ],
         ),
         .testTarget(
             name: "BlockchainTests",
@@ -53,8 +53,8 @@ let package = Package(
                 .unsafeFlags([
                     "-Xcc", "-I../PolkaVM/Sources/asmjit",
                 ]),
-            ]
+            ],
         ),
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageModes: [.version("6")],
 )

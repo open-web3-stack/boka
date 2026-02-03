@@ -13,7 +13,7 @@ public struct AuditAnnouncementMessage: Codable, Sendable, Equatable, Hashable {
         headerHash: Data32,
         tranche: UInt8,
         announcement: Announcement,
-        evidence: Evidence
+        evidence: Evidence,
     ) {
         self.headerHash = headerHash
         self.tranche = tranche
@@ -37,7 +37,7 @@ extension AuditAnnouncementMessage: CEMessage {
         guard data.count == 2 else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "unexpected data"
+                debugDescription: "unexpected data",
             ))
         }
 
@@ -50,7 +50,7 @@ extension AuditAnnouncementMessage: CEMessage {
             headerHash: headerHash,
             tranche: tranche,
             announcement: announcement,
-            evidence: evidence
+            evidence: evidence,
         )
     }
 }

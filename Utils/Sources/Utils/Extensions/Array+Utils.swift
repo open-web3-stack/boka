@@ -45,7 +45,7 @@ extension Array {
         }
     }
 
-    // requires randomness have at least count elements
+    /// requires randomness have at least count elements
     private mutating func shuffle(randomness: some Sequence<UInt32>) {
         if count <= 1 {
             return

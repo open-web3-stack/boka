@@ -46,7 +46,7 @@ extension Preimages {
         config _: ProtocolConfigRef,
         timeslot: TimeslotIndex,
         preimages: ExtrinsicPreimages,
-        priorState: any Preimages
+        priorState: any Preimages,
     ) async throws(PreimagesError) -> PreimagesPostState {
         let preimages = preimages.preimages
         var updates: [PreimageUpdate] = []
@@ -66,7 +66,7 @@ extension Preimages {
             let requested = try? await priorState.get(
                 serviceAccount: preimage.serviceIndex,
                 preimageHash: hash,
-                length: UInt32(preimage.data.count)
+                length: UInt32(preimage.data.count),
             )
             guard let requested else {
                 throw PreimagesError.preimageNotSolicited
@@ -81,7 +81,7 @@ extension Preimages {
             let stillRequested = try? await get(
                 serviceAccount: preimage.serviceIndex,
                 preimageHash: hash,
-                length: UInt32(preimage.data.count)
+                length: UInt32(preimage.data.count),
             )
             guard let stillRequested, stillRequested.isEmpty else {
                 continue
@@ -92,7 +92,7 @@ extension Preimages {
                 hash: hash,
                 data: preimage.data,
                 length: UInt32(preimage.data.count),
-                timeslot: timeslot
+                timeslot: timeslot,
             ))
         }
 

@@ -1,7 +1,6 @@
 import bls
 import Foundation
 import Testing
-
 @testable import Utils
 
 @Suite struct BLSTests {
@@ -14,18 +13,18 @@ import Testing
         #expect(signature1.count == Int(BLS_SIGNATURE_SERIALIZED_SIZE))
 
         #expect(
-            try publicKey1.verify(signature: signature1, message: message1)
+            try publicKey1.verify(signature: signature1, message: message1),
         )
 
         let invalidMessage = Data("testUnknown".utf8)
         #expect(
-            try !publicKey1.verify(signature: signature1, message: invalidMessage)
+            try !publicKey1.verify(signature: signature1, message: invalidMessage),
         )
 
         var invalidSignature = signature1
         invalidSignature.replaceSubrange(0 ... 1, with: [2, 3])
         #expect(
-            try !publicKey1.verify(signature: invalidSignature, message: message1)
+            try !publicKey1.verify(signature: invalidSignature, message: message1),
         )
 
         let bls2 = try BLS.SecretKey(from: Data32.random())
@@ -34,23 +33,23 @@ import Testing
         let signature2 = try bls2.sign(message: message2)
 
         #expect(
-            try publicKey2.verify(signature: signature2, message: message2)
+            try publicKey2.verify(signature: signature2, message: message2),
         )
 
         #expect(
             try BLS.aggregateVerify(
                 message: message1,
                 signatures: [signature1],
-                publicKeys: [publicKey1]
-            )
+                publicKeys: [publicKey1],
+            ),
         )
 
         #expect(
             try !BLS.aggregateVerify(
                 message: message2,
                 signatures: [signature1],
-                publicKeys: [publicKey1]
-            )
+                publicKeys: [publicKey1],
+            ),
         )
 
         let bls3 = try BLS.SecretKey(from: Data32.random())
@@ -61,8 +60,8 @@ import Testing
             try BLS.aggregateVerify(
                 message: message1,
                 signatures: [signature1, signature3],
-                publicKeys: [publicKey1, publicKey3]
-            )
+                publicKeys: [publicKey1, publicKey3],
+            ),
         )
     }
 

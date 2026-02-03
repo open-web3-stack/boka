@@ -35,7 +35,7 @@ public struct SandboxWorkerStatistics: Sendable {
         totalExecutionTime: TimeInterval = 0,
         currentExecutionCount: Int = 0,
         isBusy: Bool = false,
-        health: WorkerHealth = .healthy
+        health: WorkerHealth = .healthy,
     ) {
         self.totalExecutions = totalExecutions
         self.successfulExecutions = successfulExecutions
@@ -104,7 +104,7 @@ public struct SandboxPoolStatistics: Sendable {
         uptime: TimeInterval = 0,
         isHealthy: Bool = true,
         averageQueueWaitTime: TimeInterval = 0,
-        workerFailureRate: Double = 0
+        workerFailureRate: Double = 0,
     ) {
         self.totalWorkers = totalWorkers
         self.activeWorkers = activeWorkers

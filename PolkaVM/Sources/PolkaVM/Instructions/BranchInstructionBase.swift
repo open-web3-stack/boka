@@ -9,7 +9,9 @@ protocol Branch: Instruction {
 }
 
 extension Branch {
-    public func _executeImpl(context _: ExecutionContext) throws -> ExecOutcome { .continued }
+    public func _executeImpl(context _: ExecutionContext) throws -> ExecOutcome {
+        .continued
+    }
 
     public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
         let condition = condition(state: context.state)
@@ -26,7 +28,7 @@ extension Branch {
     }
 }
 
-// for branch in A.5.8
+/// for branch in A.5.8
 protocol BranchInstructionBase<Compare>: Branch {
     associatedtype Compare: BranchCompare
 
@@ -51,7 +53,7 @@ extension BranchInstructionBase {
     }
 }
 
-// for branch in A.5.11
+/// for branch in A.5.11
 protocol BranchInstructionBase2<Compare>: Branch {
     associatedtype Compare: BranchCompare
 

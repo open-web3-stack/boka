@@ -1,11 +1,9 @@
 import Foundation
-import Testing
-import Utils
-
-import TracingUtils
-
 @testable import JAMTests
 @testable import PolkaVM
+import Testing
+import TracingUtils
+import Utils
 
 private let logger = Logger(label: "PVMMultiModeTests")
 
@@ -20,11 +18,11 @@ struct PVMMultiModeTests {
     ///
     /// This test uses the sumToN program which is already available in InvokePVMTest
     /// and can run in both modes.
-    @Test func testSumToN_interpreter() async throws {
+    @Test func sumToN_interpreter() async throws {
         try await testSumToN(mode: .interpreter)
     }
 
-    @Test func testSumToN_sandbox() async throws {
+    @Test func sumToN_sandbox() async throws {
         try await testSumToN(mode: .sandbox)
     }
 
@@ -46,7 +44,7 @@ struct PVMMultiModeTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([5]),
-            ctx: nil
+            ctx: nil,
         )
 
         let value = output?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
@@ -61,11 +59,11 @@ struct PVMMultiModeTests {
 
     // MARK: - Fibonacci Tests
 
-    @Test func testFibonacci_interpreter() async throws {
+    @Test func fibonacci_interpreter() async throws {
         try await testFibonacci(mode: .interpreter)
     }
 
-    @Test func testFibonacci_sandbox() async throws {
+    @Test func fibonacci_sandbox() async throws {
         try await testFibonacci(mode: .sandbox)
     }
 
@@ -87,7 +85,7 @@ struct PVMMultiModeTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([8]),
-            ctx: nil
+            ctx: nil,
         )
 
         let value = output?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
@@ -102,11 +100,11 @@ struct PVMMultiModeTests {
 
     // MARK: - Empty Program Tests
 
-    @Test func testEmptyProgram_interpreter() async throws {
+    @Test func emptyProgram_interpreter() async throws {
         try await testEmptyProgram(mode: .interpreter)
     }
 
-    @Test func testEmptyProgram_sandbox() async throws {
+    @Test func emptyProgram_sandbox() async throws {
         try await testEmptyProgram(mode: .sandbox)
     }
 
@@ -122,7 +120,7 @@ struct PVMMultiModeTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
 
         #expect(exitReason == .panic(.trap), "Expected panic for empty program in \(mode.description) mode")
@@ -132,7 +130,7 @@ struct PVMMultiModeTests {
     // MARK: - Gas Consumption Parity Tests
 
     /// Verify that gas consumption is consistent between modes
-    @Test func testGasParity_sumToN() async throws {
+    @Test func gasParity_sumToN() async {
         let sumToN = Data([
             0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 46, 0, 0, 0, 0, 0, 38, 128, 119, 0,
             51, 8, 0, 100, 121, 40, 3, 0, 200, 137, 8, 149, 153, 255, 86, 9, 250,
@@ -151,7 +149,7 @@ struct PVMMultiModeTests {
             pc: 0,
             gas: inputGas,
             argumentData: Data([5]),
-            ctx: nil
+            ctx: nil,
         )
 
         // Run in sandbox mode
@@ -162,21 +160,24 @@ struct PVMMultiModeTests {
             pc: 0,
             gas: inputGas,
             argumentData: Data([5]),
-            ctx: nil
+            ctx: nil,
         )
 
         // Gas consumption should be similar (allow small differences for mode overhead)
         let gasDiff = abs(Int64(gasUsedInterpreter.value) - Int64(gasUsedSandbox.value))
+        let gasMessage =
+            "Gas consumption differs significantly between modes: " +
+            "interpreter=\(gasUsedInterpreter), sandbox=\(gasUsedSandbox), diff=\(gasDiff)"
         #expect(
             gasDiff <= 10,
-            "Gas consumption differs significantly between modes: interpreter=\(gasUsedInterpreter), sandbox=\(gasUsedSandbox), diff=\(gasDiff)"
+            gasMessage,
         )
     }
 
     // MARK: - Output Parity Tests
 
     /// Verify that program output is identical between modes
-    @Test func testOutputParity_fibonacci() async throws {
+    @Test func outputParity_fibonacci() async {
         let fibonacci = Data([
             0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 61, 0, 0, 0, 0, 0, 51, 128, 119, 0,
             51, 8, 1, 51, 9, 1, 40, 3, 0, 149, 119, 255, 81, 7, 12, 100, 138, 200,
@@ -195,7 +196,7 @@ struct PVMMultiModeTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([input]),
-            ctx: nil
+            ctx: nil,
         )
 
         // Run in sandbox mode
@@ -206,13 +207,16 @@ struct PVMMultiModeTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([input]),
-            ctx: nil
+            ctx: nil,
         )
 
         // Outputs should be identical
+        let outputMessage =
+            "Output differs between modes: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), " +
+            "sandbox=\(outputSandbox?.toHexString() ?? "nil")"
         #expect(
             outputInterpreter == outputSandbox,
-            "Output differs between modes: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), sandbox=\(outputSandbox?.toHexString() ?? "nil")"
+            outputMessage,
         )
     }
 }

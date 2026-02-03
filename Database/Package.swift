@@ -12,7 +12,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "Database",
-            targets: ["Database"]
+            targets: ["Database"],
         ),
     ],
     dependencies: [
@@ -32,7 +32,7 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ]
+            ],
         ),
         .target(
             name: "RocksDBSwift",
@@ -46,11 +46,11 @@ let package = Package(
                 .linkedLibrary("bz2"),
                 .linkedLibrary("zstd"),
                 .linkedLibrary("lz4"),
-            ]
+            ],
         ),
         .systemLibrary(
             name: "rocksdb",
-            path: "Sources"
+            path: "Sources",
         ),
         .testTarget(
             name: "DatabaseTests",
@@ -60,15 +60,15 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ]
+            ],
         ),
         .testTarget(
             name: "RocksDBSwiftTests",
             dependencies: [
                 "RocksDBSwift",
                 .product(name: "Testing", package: "swift-testing"),
-            ]
+            ],
         ),
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageModes: [.version("6")],
 )

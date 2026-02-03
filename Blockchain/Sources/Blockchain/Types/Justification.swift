@@ -44,8 +44,8 @@ extension Justification: Codable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: decoder.codingPath,
-                        debugDescription: "Invalid Justification variant: \(variant)"
-                    )
+                        debugDescription: "Invalid Justification variant: \(variant)",
+                    ),
                 )
             }
         } else {
@@ -63,8 +63,8 @@ extension Justification: Codable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: container.codingPath,
-                        debugDescription: "Could not decode Justification"
-                    )
+                        debugDescription: "Could not decode Justification",
+                    ),
                 )
             }
         }

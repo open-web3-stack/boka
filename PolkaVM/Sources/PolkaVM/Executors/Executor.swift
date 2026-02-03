@@ -26,7 +26,7 @@ public final class Executor: @unchecked Sendable {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx: (any InvocationContext)?
+        ctx: (any InvocationContext)?,
     ) async -> VMExecutionResult {
         print("[DEBUG] Executor.execute() called, frontend type: \(type(of: frontend))")
         return await frontend.execute(
@@ -35,7 +35,7 @@ public final class Executor: @unchecked Sendable {
             pc: pc,
             gas: gas,
             argumentData: argumentData,
-            ctx: ctx
+            ctx: ctx,
         )
     }
 }

@@ -30,11 +30,11 @@ public final class QuicConnection: Sendable {
         storage.read { $0?.registration.api }
     }
 
-    // create new connection from local
+    /// create new connection from local
     public init(
         handler: QuicEventHandler,
         registration: QuicRegistration,
-        configuration: QuicConfiguration
+        configuration: QuicConfiguration,
     ) throws(QuicError) {
         id = "QuicConnection".uniqueId
         logger = Logger(label: id)
@@ -48,7 +48,7 @@ public final class QuicConnection: Sendable {
                 registrationPtr,
                 callback,
                 nil,
-                &ptr
+                &ptr,
             )
         }
 
@@ -58,18 +58,18 @@ public final class QuicConnection: Sendable {
             handle: handle,
             registration: registration,
             configuration: configuration,
-            state: .opened
+            state: .opened,
         ))
 
         handle.connection = self
     }
 
-    // wrapping a remote connection initiated by peer
+    /// wrapping a remote connection initiated by peer
     init(
         handler: QuicEventHandler,
         registration: QuicRegistration,
         configuration: QuicConfiguration,
-        connection: HQUIC
+        connection: HQUIC,
     ) throws(QuicError) {
         id = "QuicConnection".uniqueId
         logger = Logger(label: id)
@@ -81,7 +81,7 @@ public final class QuicConnection: Sendable {
             handle: handle,
             registration: registration,
             configuration: configuration,
-            state: .started
+            state: .started,
         ))
 
         handle.connection = self
@@ -116,7 +116,7 @@ public final class QuicConnection: Sendable {
                     storage2.handle.ptr,
                     storage2.configuration.ptr,
                     QUIC_ADDRESS_FAMILY(QUIC_ADDRESS_FAMILY_UNSPEC),
-                    host, port
+                    host, port,
                 )
             }
             storage2.state = .started
@@ -143,7 +143,7 @@ public final class QuicConnection: Sendable {
                 api.pointee.ConnectionShutdown(
                     storage2.handle.ptr,
                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                    errorCode.code
+                    errorCode.code,
                 )
             }
             storage = nil
@@ -171,7 +171,7 @@ public final class QuicConnection: Sendable {
                 ptr,
                 UInt32(QUIC_PARAM_CONN_REMOTE_ADDRESS),
                 &size,
-                &addr
+                &addr,
             )
         }
         if res == nil {
@@ -181,9 +181,9 @@ public final class QuicConnection: Sendable {
     }
 }
 
-// Not sendable. msquic ensures callbacks for a connection are always delivered serially
-// https://github.com/microsoft/msquic/blob/main/docs/API.md#execution-mode
-// This is retained by the msquic connection as it has to outlive the connection
+/// Not sendable. msquic ensures callbacks for a connection are always delivered serially
+/// https://github.com/microsoft/msquic/blob/main/docs/API.md#execution-mode
+/// This is retained by the msquic connection as it has to outlive the connection
 private class ConnectionHandle {
     let logger: Logger
     let ptr: OpaquePointer
@@ -202,7 +202,7 @@ private class ConnectionHandle {
             api.pointee.SetCallbackHandler(
                 ptr,
                 handlerPtr,
-                Unmanaged.passRetained(self).toOpaque() // !! retain +1
+                Unmanaged.passRetained(self).toOpaque(), // !! retain +1
             )
         }
     }
@@ -243,7 +243,7 @@ private class ConnectionHandle {
                 if let connection {
                     connection.handler.shutdownInitiated(
                         connection,
-                        reason: .transport(status: QuicStatus(rawValue: evtData.Status), code: QuicErrorCode(evtData.ErrorCode))
+                        reason: .transport(status: QuicStatus(rawValue: evtData.Status), code: QuicErrorCode(evtData.ErrorCode)),
                     )
                 }
             }
@@ -293,7 +293,7 @@ private class ConnectionHandle {
 private func connectionCallback(
     connection _: OpaquePointer?,
     context: UnsafeMutableRawPointer?,
-    event: UnsafeMutablePointer<QUIC_CONNECTION_EVENT>?
+    event: UnsafeMutablePointer<QUIC_CONNECTION_EVENT>?,
 ) -> UInt32 {
     let handle = Unmanaged<ConnectionHandle>.fromOpaque(context!)
         .takeUnretainedValue()

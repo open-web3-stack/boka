@@ -13,14 +13,14 @@ public class ValidatorNode: Node {
         genesis: Genesis,
         eventBus: EventBus,
         keystore: KeyStore,
-        scheduler: Scheduler = DispatchQueueScheduler(timeProvider: SystemTimeProvider())
+        scheduler: Scheduler = DispatchQueueScheduler(timeProvider: SystemTimeProvider()),
     ) async throws {
         try await super.init(
             config: config,
             genesis: genesis,
             eventBus: eventBus,
             keystore: keystore,
-            scheduler: scheduler
+            scheduler: scheduler,
         )
 
         let validator = await ValidatorService(
@@ -29,7 +29,7 @@ public class ValidatorNode: Node {
             eventBus: eventBus,
             scheduler: scheduler,
             dataProvider: dataProvider,
-            dataStore: dataStore
+            dataStore: dataStore,
         )
         self.validator = validator
 

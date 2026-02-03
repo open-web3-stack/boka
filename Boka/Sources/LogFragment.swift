@@ -2,7 +2,7 @@ import ConsoleKit
 import Logging
 
 private struct SourceLocationFragment: LoggerFragment {
-    public func write(_ record: inout LogRecord, to output: inout FragmentOutput) {
+    func write(_ record: inout LogRecord, to output: inout FragmentOutput) {
         output += "(\(record.file):\(record.line))".consoleText(ConsoleStyle(color: .brightBlack))
         output.needsSeparator = true
     }

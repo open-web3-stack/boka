@@ -8,7 +8,7 @@ public func repeatUntil<T>(
     _ repeatFn: () async -> T,
     withCondition: (T) -> Bool,
     timeout: TimeInterval = 10,
-    sleep: TimeInterval = 0.01
+    sleep: TimeInterval = 0.01,
 ) async throws -> T {
     let start = Date()
     while true {
@@ -27,7 +27,7 @@ public func repeatUntil<T>(
 public func repeatUntil<T>(
     _ repeatFn: () async -> T?,
     timeout: TimeInterval = 5,
-    sleep: TimeInterval = 0.05
+    sleep: TimeInterval = 0.05,
 ) async throws -> T {
     let start = Date()
     while true {
@@ -46,7 +46,7 @@ public func repeatUntil<T>(
 public func repeatUntil(
     _ repeatFn: () async -> Bool,
     timeout: TimeInterval = 10,
-    sleep: TimeInterval = 0.01
+    sleep: TimeInterval = 0.01,
 ) async throws {
     let start = Date()
     while true {

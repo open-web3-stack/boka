@@ -53,8 +53,7 @@ public final class AccumulateContext: InvocationContext {
         case Bless.identifier:
             return await Bless(x: context.x).call(config: config, state: state)
         case Assign.identifier:
-            let res = await Assign(x: context.x).call(config: config, state: state)
-            return res
+            return await Assign(x: context.x).call(config: config, state: state)
         case Designate.identifier:
             return await Designate(x: context.x).call(config: config, state: state)
         case Checkpoint.identifier:
@@ -86,11 +85,11 @@ public final class AccumulateContext: InvocationContext {
         }
     }
 
-    // a check function to find the first such index in this sequence which does not already represent a service
+    /// a check function to find the first such index in this sequence which does not already represent a service
     public static func check(
         i: ServiceIndex,
         accounts: ServiceAccountsRef,
-        config: ProtocolConfigRef
+        config: ProtocolConfigRef,
     ) async throws -> ServiceIndex {
         if try await accounts.value.get(serviceAccount: i) == nil {
             return i

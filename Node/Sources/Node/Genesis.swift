@@ -58,7 +58,7 @@ extension Genesis {
                 bootnodes: [],
                 genesisHeader: JamEncoder.encode(block.value.header),
                 genesisState: kv,
-                protocolParameters: config.value.encoded
+                protocolParameters: config.value.encoded,
             )
         case let .file(path):
             let data = try readFile(from: path)

@@ -114,7 +114,7 @@ public actor ShardManager {
 
         return try await ecStore.reconstructFromLocalShards(
             erasureRoot: erasureRoot,
-            originalLength: originalLength
+            originalLength: originalLength,
         )
     }
 }

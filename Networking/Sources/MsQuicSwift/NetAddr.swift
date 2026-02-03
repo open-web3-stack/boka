@@ -60,12 +60,11 @@ extension NetAddr: CustomStringConvertible {
         guard success == 1 else {
             return "::dead:beef"
         }
-        let ipAddr = withUnsafePointer(to: buffer.Address) { ptr in
+        return withUnsafePointer(to: buffer.Address) { ptr in
             ptr.withMemoryRebound(to: CChar.self, capacity: Int(64)) { ptr in
                 String(cString: ptr, encoding: .utf8)!
             }
         }
-        return ipAddr
     }
 }
 

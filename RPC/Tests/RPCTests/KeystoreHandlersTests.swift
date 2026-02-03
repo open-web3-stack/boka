@@ -1,11 +1,10 @@
 import Blockchain
+@testable import RPC
 import Testing
 import TracingUtils
+@testable import Utils
 import Vapor
 import XCTVapor
-
-@testable import RPC
-@testable import Utils
 
 actor DummyKeystoreDataSource {
     var createdKeys: [PubKeyItem] = []
@@ -13,18 +12,18 @@ actor DummyKeystoreDataSource {
 }
 
 extension DummyKeystoreDataSource: KeystoreDataSource {
-    public func create(keyType: KeyGenType) async throws -> PubKeyItem {
+    func create(keyType: KeyGenType) async throws -> PubKeyItem {
         let key = "dummyKey_\(keyType.rawValue)"
         let pubKeyItem = PubKeyItem(key: key, type: keyType.rawValue)
         createdKeys.append(pubKeyItem)
         return pubKeyItem
     }
 
-    public func listKeys() async throws -> [PubKeyItem] {
+    func listKeys() async throws -> [PubKeyItem] {
         createdKeys
     }
 
-    public func has(keyType _: KeyGenType, with publicKey: Data) async throws -> Bool {
+    func has(keyType _: KeyGenType, with publicKey: Data) async throws -> Bool {
         createdKeys.contains { $0.key == String(data: publicKey, encoding: .utf8) }
     }
 }

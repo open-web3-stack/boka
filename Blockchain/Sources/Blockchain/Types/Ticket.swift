@@ -1,9 +1,9 @@
 import Utils
 
 public struct Ticket: Sendable, Equatable, Codable {
-    // y
+    /// y
     public var id: Data32
-    // r
+    /// r
     public var attempt: TicketIndex
 }
 

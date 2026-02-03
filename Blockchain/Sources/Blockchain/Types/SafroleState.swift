@@ -1,35 +1,35 @@
 import Utils
 
 public struct SafroleState: Sendable, Equatable, Codable {
-    // γk
+    /// γk
     public var nextValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     >
 
-    // γz
+    /// γz
     public var ticketsVerifier: BandersnatchRingVRFRoot
 
-    // γs
+    /// γs
     public var ticketsOrKeys: SafroleTicketsOrKeys
 
-    // γa
+    /// γa
     public var ticketsAccumulator: ConfigLimitedSizeArray<
         Ticket,
         ProtocolConfig.Int0,
-        ProtocolConfig.EpochLength
+        ProtocolConfig.EpochLength,
     >
 
     public init(
         nextValidators: ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
         >,
         ticketsVerifier: BandersnatchRingVRFRoot,
         ticketsOrKeys: SafroleTicketsOrKeys,
         ticketsAccumulator: ConfigLimitedSizeArray<
             Ticket,
             ProtocolConfig.Int0,
-            ProtocolConfig.EpochLength
-        >
+            ProtocolConfig.EpochLength,
+        >,
     ) {
         self.nextValidators = nextValidators
         self.ticketsVerifier = ticketsVerifier
@@ -45,7 +45,7 @@ extension SafroleState: Dummy {
             nextValidators: ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config)),
             ticketsVerifier: BandersnatchRingVRFRoot(),
             ticketsOrKeys: .right(ConfigFixedSizeArray(config: config, defaultValue: BandersnatchPublicKey())),
-            ticketsAccumulator: ConfigLimitedSizeArray(config: config)
+            ticketsAccumulator: ConfigLimitedSizeArray(config: config),
         )
     }
 }

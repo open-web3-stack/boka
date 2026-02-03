@@ -10,7 +10,7 @@ public struct GuaranteedWorkReport: Sendable, Equatable, Codable, Hashable {
     public init(
         workReport: WorkReport,
         slot: UInt32,
-        signatures: [ValidatorSignature]
+        signatures: [ValidatorSignature],
     ) {
         self.workReport = workReport
         self.slot = slot
@@ -30,7 +30,7 @@ extension GuaranteedWorkReport: Dummy {
         GuaranteedWorkReport(
             workReport: WorkReport.dummy(config: config),
             slot: 0,
-            signatures: []
+            signatures: [],
         )
     }
 }

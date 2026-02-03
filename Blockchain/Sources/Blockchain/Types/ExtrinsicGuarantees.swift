@@ -1,16 +1,16 @@
 import Utils
 
-// EG
+/// EG
 public struct ExtrinsicGuarantees: Sendable, Equatable, Codable {
     public struct IndexAndSignature: Sendable, Equatable, Codable {
-        // v
+        /// v
         public var index: ValidatorIndex
-        // s
+        /// s
         public var signature: Ed25519Signature
 
         public init(
             index: ValidatorIndex,
-            signature: Ed25519Signature
+            signature: Ed25519Signature,
         ) {
             self.index = index
             self.signature = signature
@@ -18,15 +18,15 @@ public struct ExtrinsicGuarantees: Sendable, Equatable, Codable {
     }
 
     public struct GuaranteeItem: Sendable, Equatable, Codable {
-        // w
+        /// w
         public var workReport: WorkReport
-        // t
+        /// t
         public var timeslot: TimeslotIndex
-        // a
+        /// a
         public var credential: LimitedSizeArray<
             IndexAndSignature,
             ConstInt2,
-            ConstInt3
+            ConstInt3,
         >
 
         public init(
@@ -35,8 +35,8 @@ public struct ExtrinsicGuarantees: Sendable, Equatable, Codable {
             credential: LimitedSizeArray<
                 IndexAndSignature,
                 ConstInt2,
-                ConstInt3
-            >
+                ConstInt3,
+            >,
         ) {
             self.workReport = workReport
             self.timeslot = timeslot
@@ -47,13 +47,13 @@ public struct ExtrinsicGuarantees: Sendable, Equatable, Codable {
     public typealias GuaranteesList = ConfigLimitedSizeArray<
         GuaranteeItem,
         ProtocolConfig.Int0,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
 
     public var guarantees: GuaranteesList
 
     public init(
-        guarantees: GuaranteesList
+        guarantees: GuaranteesList,
     ) {
         self.guarantees = guarantees
     }

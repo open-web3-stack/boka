@@ -33,7 +33,7 @@ public final class StandardMemory: Memory {
         MemoryZone(
             startAddress: readOnlyZone.startAddress,
             endAddress: readOnlyZone.endAddress,
-            data: readOnlyZone.data
+            data: readOnlyZone.data,
         )
     }
 
@@ -42,7 +42,7 @@ public final class StandardMemory: Memory {
         MemoryZone(
             startAddress: heapZone.startAddress,
             endAddress: heapZone.endAddress,
-            data: heapZone.data
+            data: heapZone.data,
         )
     }
 
@@ -51,7 +51,7 @@ public final class StandardMemory: Memory {
         MemoryZone(
             startAddress: stackZone.startAddress,
             endAddress: stackZone.endAddress,
-            data: stackZone.data
+            data: stackZone.data,
         )
     }
 
@@ -60,7 +60,7 @@ public final class StandardMemory: Memory {
         MemoryZone(
             startAddress: argumentZone.startAddress,
             endAddress: argumentZone.endAddress,
-            data: argumentZone.data
+            data: argumentZone.data,
         )
     }
 
@@ -114,25 +114,25 @@ public final class StandardMemory: Memory {
         readOnlyZone = Zone(
             startAddress: ZZ,
             endAddress: ZZ + P(readOnlyLen, config),
-            data: readOnlyData
+            data: readOnlyData,
         )
 
         heapZone = Zone(
             startAddress: heapStart,
             endAddress: heapStart + heapDataPagesLen + heapEmptyPagesSize,
-            data: readWriteData
+            data: readWriteData,
         )
 
         stackZone = Zone(
             startAddress: stackStartAddr,
             endAddress: UInt32(config.pvmProgramInitStackBaseAddress),
-            data: Data()
+            data: Data(),
         )
 
         argumentZone = Zone(
             startAddress: UInt32(config.pvmProgramInitInputStartAddress),
             endAddress: UInt32(config.pvmProgramInitInputStartAddress) + P(argumentDataLen, config),
-            data: argumentData
+            data: argumentData,
         )
 
         pageMap = PageMap(pageMap: [

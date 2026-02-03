@@ -17,10 +17,10 @@ final class VMStateJIT: VMState, @unchecked Sendable {
     private let jitGasPtr: UnsafeMutablePointer<UInt64>
     private let programCode: ProgramCode
 
-    // Track current program counter
+    /// Track current program counter
     private var pcValue: UInt32
 
-    // Memory view instances - created lazily for efficiency
+    /// Memory view instances - created lazily for efficiency
     private lazy var readonlyMemoryView: ReadonlyMemory = {
         do {
             return try createReadonlyMemoryView()
@@ -47,7 +47,7 @@ final class VMStateJIT: VMState, @unchecked Sendable {
         jitRegistersPtr: UnsafeMutablePointer<UInt64>,
         jitGasPtr: UnsafeMutablePointer<UInt64>,
         programCode: ProgramCode,
-        initialPC: UInt32
+        initialPC: UInt32,
     ) {
         self.jitMemoryBasePtr = jitMemoryBasePtr
         self.jitMemorySize = jitMemorySize
@@ -115,7 +115,7 @@ final class VMStateJIT: VMState, @unchecked Sendable {
         generalMemoryView
     }
 
-    // Create a memory view that directly accesses the JIT-managed memory
+    /// Create a memory view that directly accesses the JIT-managed memory
     private func createReadonlyMemoryView() throws -> ReadonlyMemory {
         try ReadonlyMemory(createGeneralMemoryView())
     }
@@ -131,7 +131,7 @@ final class VMStateJIT: VMState, @unchecked Sendable {
         // Create a GeneralMemory instance with the page map and data chunks
         return try GeneralMemory(
             pageMap: pageMap,
-            chunks: [(0, memoryData)]
+            chunks: [(0, memoryData)],
         )
     }
 

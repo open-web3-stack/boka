@@ -1,17 +1,17 @@
 import Foundation
 
 struct IntegerEncoder<T: UnsignedInteger>: Sequence {
-    public typealias Element = UInt8
+    typealias Element = UInt8
 
     private var value: T
     private let method: EncodeMethod
 
-    public init(value: T, method: EncodeMethod) {
+    init(value: T, method: EncodeMethod) {
         self.value = value
         self.method = method
     }
 
-    public func makeIterator() -> Iterator {
+    func makeIterator() -> Iterator {
         Iterator(value: value, method: method)
     }
 
@@ -27,15 +27,14 @@ struct IntegerEncoder<T: UnsignedInteger>: Sequence {
             position = 0
         }
 
-        public mutating func next() -> UInt8? {
+        mutating func next() -> UInt8? {
             defer { position += 1 }
             switch method {
             case let .fixedWidth(width):
                 guard position < width else {
                     return nil
                 }
-                let byte = UInt8(value >> (position * 8) & 0xFF)
-                return byte
+                return UInt8(value >> (position * 8) & 0xFF)
             case .variableWidth:
                 if value == 0 {
                     return position == 0 ? 0 : nil
@@ -59,8 +58,7 @@ struct IntegerEncoder<T: UnsignedInteger>: Sequence {
                     return nil
                 }
 
-                let byte = UInt8(value >> ((position - 1) * 8) & 0xFF)
-                return byte
+                return UInt8(value >> ((position - 1) * 8) & 0xFF)
             }
         }
     }

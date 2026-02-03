@@ -6,15 +6,15 @@ import TracingUtils
 import Utils
 
 public enum StreamStatus: Sendable {
-    // bidirection open
+    /// bidirection open
     case open
-    // remote to local channel closed
+    /// remote to local channel closed
     case sendOnly
-    // local to remote channel closed
+    /// local to remote channel closed
     case receiveOnly
-    // stream completely closed
+    /// stream completely closed
     case closed
-    // stream aborted
+    /// stream aborted
     case aborted
 }
 
@@ -81,11 +81,11 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
     let connectionId: UniqueId
     let kind: Handler.PresistentHandler.StreamKind?
 
-    public var id: UniqueId {
+    var id: UniqueId {
         stream.id
     }
 
-    public private(set) var status: StreamStatus {
+    private(set) var status: StreamStatus {
         get {
             _status.value
         }
@@ -103,7 +103,7 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         sender = StreamSender(stream: stream, status: .open)
     }
 
-    public func send(message: Handler.PresistentHandler.Message) async throws {
+    func send(message: Handler.PresistentHandler.Message) async throws {
         let data = try message.encode()
         for chunk in data {
             try await send(message: chunk, finish: false)
@@ -131,7 +131,7 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         status == .closed || status == .aborted
     }
 
-    // send message with length prefix
+    /// send message with length prefix
     func send(message: Data, finish: Bool = false) async throws {
         try await sender.send(message: message, finish: finish)
     }
@@ -158,8 +158,8 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         }
     }
 
-    // initiate stream close
-    public func close(abort: Bool = false) {
+    /// initiate stream close
+    func close(abort: Bool = false) {
         if ended {
             logger.warning("Trying to close stream \(id) in status \(status)")
             return
@@ -171,7 +171,7 @@ final class Stream<Handler: StreamHandler>: Sendable, StreamProtocol {
         try? stream.shutdown(errorCode: code)
     }
 
-    // remote initiated close
+    /// remote initiated close
     func closed(abort: Bool = false) {
         status = abort ? .aborted : .closed
         channel.close()

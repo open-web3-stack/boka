@@ -51,8 +51,8 @@ extension Evidence: Codable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: decoder.codingPath,
-                        debugDescription: "Invalid Evidence variant: \(variant)"
-                    )
+                        debugDescription: "Invalid Evidence variant: \(variant)",
+                    ),
                 )
             }
         } else {
@@ -67,8 +67,8 @@ extension Evidence: Codable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: container.codingPath,
-                        debugDescription: "No valid Evidence variant found"
-                    )
+                        debugDescription: "No valid Evidence variant found",
+                    ),
                 )
             }
         }

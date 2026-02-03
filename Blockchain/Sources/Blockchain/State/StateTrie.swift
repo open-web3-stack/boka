@@ -18,7 +18,7 @@ private struct TrieNode {
     let isNew: Bool
     let rawValue: Data?
 
-    // Constructor for loading from storage (65-byte format: [type][left-32][right-32])
+    /// Constructor for loading from storage (65-byte format: [type][left-32][right-32])
     init(hash: Data32, data: Data, isNew: Bool = false) {
         self.hash = hash
         self.isNew = isNew
@@ -31,7 +31,7 @@ private struct TrieNode {
         right = Data32(data[relative: 33 ..< 65])! // bytes 33-64
     }
 
-    // Constructor for pure trie operations
+    /// Constructor for pure trie operations
     private init(left: Data32, right: Data32, type: TrieNodeType, isNew: Bool, rawValue: Data?) {
         hash = Self.calculateHash(left: left, right: right, type: type)
         self.left = left // Store original data
@@ -41,7 +41,7 @@ private struct TrieNode {
         self.rawValue = rawValue
     }
 
-    // JAM spec compliant hash calculation
+    /// JAM spec compliant hash calculation
     private static func calculateHash(left: Data32, right: Data32, type: TrieNodeType) -> Data32 {
         switch type {
         case .branch:
@@ -60,7 +60,7 @@ private struct TrieNode {
         }
     }
 
-    // New 65-byte storage format: [type:1][left:32][right:32]
+    /// New 65-byte storage format: [type:1][left:32][right:32]
     var storageData: Data {
         var data = Data(capacity: 65)
         data.append(type.rawValue)
@@ -149,7 +149,7 @@ public actor StateTrie {
         cacheSize: Int = 1000,
         enableWriteBuffer: Bool = true,
         writeBufferSize: Int = 1000,
-        writeBufferFlushInterval: TimeInterval = 1.0
+        writeBufferFlushInterval: TimeInterval = 1.0,
     ) {
         self.rootHash = rootHash
         self.backend = backend
@@ -159,7 +159,7 @@ public actor StateTrie {
         self.enableWriteBuffer = enableWriteBuffer
         writeBuffer = enableWriteBuffer ? WriteBuffer(
             maxBufferSize: writeBufferSize,
-            flushInterval: writeBufferFlushInterval
+            flushInterval: writeBufferFlushInterval,
         ) : nil
     }
 
@@ -584,7 +584,7 @@ public actor StateTrie {
     }
 
     private func insert(
-        hash: Data32, key: Data31, value: Data, depth: UInt8
+        hash: Data32, key: Data31, value: Data, depth: UInt8,
     ) async throws -> Data32 {
         guard let parent = try await get(hash: hash) else {
             let node = TrieNode.leaf(key: key, value: value)
@@ -627,7 +627,7 @@ public actor StateTrie {
         if existingKeyBit == newKeyBit {
             // need to go deeper
             let childNodeHash = try await insertLeafNode(
-                existing: existing, newKey: newKey, newValue: newValue, depth: depth + 1
+                existing: existing, newKey: newKey, newValue: newValue, depth: depth + 1,
             )
             let newBranch = if existingKeyBit {
                 TrieNode.branch(left: Data32(), right: childNodeHash)

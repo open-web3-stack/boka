@@ -1,9 +1,8 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import TracingUtils
 import Utils
-
-@testable import Blockchain
 
 /// Unit tests for DataAvailabilityService that focus on individual components
 /// without requiring full integration setup
@@ -87,7 +86,7 @@ struct DataAvailabilityServiceTests {
 
         let currentTimestamp = Date()
         let cutoffDate = currentTimestamp.addingTimeInterval(
-            -TimeInterval(retentionEpochs) * epochDuration
+            -TimeInterval(retentionEpochs) * epochDuration,
         )
 
         // Verify cutoff is in the past
@@ -106,7 +105,7 @@ struct DataAvailabilityServiceTests {
 
         let currentTimestamp = Date()
         let cutoffDate = currentTimestamp.addingTimeInterval(
-            -TimeInterval(retentionEpochs) * epochDuration
+            -TimeInterval(retentionEpochs) * epochDuration,
         )
 
         // Verify cutoff is in the past
@@ -179,7 +178,7 @@ struct DataAvailabilityServiceTests {
         let stats = (
             auditCount: 10,
             d3lCount: 5,
-            totalSegments: 1000
+            totalSegments: 1000,
         )
 
         #expect(stats.auditCount == 10)

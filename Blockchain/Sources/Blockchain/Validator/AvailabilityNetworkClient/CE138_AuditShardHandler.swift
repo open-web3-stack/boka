@@ -24,19 +24,19 @@ public enum CE138Handler {
         network: any AvailabilityNetworkProtocol,
         erasureRoot: Data32,
         shardIndex: UInt16,
-        from assurerAddress: NetAddr
+        from assurerAddress: NetAddr,
     ) async throws -> (Data, AvailabilityJustification) {
         logger.debug(
             """
             Fetching audit shard \(shardIndex) from \(assurerAddress)
-            """
+            """,
         )
 
         let responseData = try await sendAuditShardRequest(
             network: network,
             to: assurerAddress,
             erasureRoot: erasureRoot,
-            shardIndex: shardIndex
+            shardIndex: shardIndex,
         )
 
         let response = try ShardResponse.decode(responseData)
@@ -52,7 +52,7 @@ public enum CE138Handler {
         logger.info(
             """
             Successfully fetched audit shard \(shardIndex) from \(assurerAddress)
-            """
+            """,
         )
 
         return (response.bundleShard, justification)
@@ -71,12 +71,12 @@ public enum CE138Handler {
         network: any AvailabilityNetworkProtocol,
         to address: NetAddr,
         erasureRoot: Data32,
-        shardIndex: UInt16
+        shardIndex: UInt16,
     ) async throws -> Data {
         let requestData = try ShardRequest(
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
-            segmentIndices: nil
+            segmentIndices: nil,
         ).encode()
 
         // Send the request via network

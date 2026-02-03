@@ -1,22 +1,21 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import Utils
-
-@testable import Blockchain
 
 /// Comprehensive unit tests for LRUCache
 struct LRUCacheTests {
     // MARK: - Basic Operations Tests
 
     @Test("LRU cache initializes with correct capacity")
-    func testInitialization() async throws {
+    func initialization() {
         let cache = LRUCache<String, Int>(capacity: 10)
         #expect(cache.stats.capacity == 10)
         #expect(cache.size == 0)
     }
 
     @Test("LRU cache adds and retrieves values")
-    func testPutAndGet() async throws {
+    func putAndGet() {
         let cache = LRUCache<String, Int>(capacity: 10)
         cache.put("key1", value: 100)
 
@@ -25,14 +24,14 @@ struct LRUCacheTests {
     }
 
     @Test("LRU cache returns nil for non-existent keys")
-    func testGetNonExistent() async throws {
+    func getNonExistent() {
         let cache = LRUCache<String, Int>(capacity: 10)
         let result = cache.get("nonexistent")
         #expect(result == nil)
     }
 
     @Test("LRU cache updates existing keys")
-    func testUpdateExisting() async throws {
+    func updateExisting() {
         let cache = LRUCache<String, Int>(capacity: 10)
         cache.put("key1", value: 100)
         cache.put("key1", value: 200)
@@ -45,7 +44,7 @@ struct LRUCacheTests {
     // MARK: - Eviction Tests
 
     @Test("LRU cache evicts least recently used item when capacity exceeded")
-    func testEviction() async throws {
+    func eviction() {
         let cache = LRUCache<Int, String>(capacity: 3)
 
         // Fill cache to capacity
@@ -68,7 +67,7 @@ struct LRUCacheTests {
     }
 
     @Test("LRU cache evicts in correct order")
-    func testEvictionOrder() async throws {
+    func evictionOrder() {
         let cache = LRUCache<Int, Int>(capacity: 3)
 
         cache.put(1, value: 1)
@@ -91,7 +90,7 @@ struct LRUCacheTests {
     }
 
     @Test("LRU cache updates recency on get")
-    func testGetUpdatesRecency() async throws {
+    func getUpdatesRecency() {
         let cache = LRUCache<Int, String>(capacity: 3)
 
         cache.put(1, value: "one")
@@ -112,7 +111,7 @@ struct LRUCacheTests {
     // MARK: - Delete Tests
 
     @Test("LRU cache deletes items")
-    func testDelete() async throws {
+    func delete() {
         let cache = LRUCache<String, Int>(capacity: 10)
         cache.put("key1", value: 100)
         cache.put("key2", value: 200)
@@ -125,7 +124,7 @@ struct LRUCacheTests {
     }
 
     @Test("LRU cache handles deleting non-existent keys")
-    func testDeleteNonExistent() async throws {
+    func deleteNonExistent() {
         let cache = LRUCache<String, Int>(capacity: 10)
         cache.put("key1", value: 100)
 
@@ -136,7 +135,7 @@ struct LRUCacheTests {
     }
 
     @Test("LRU cache clears all items")
-    func testClear() async throws {
+    func clear() {
         let cache = LRUCache<Int, String>(capacity: 10)
 
         for i in 0 ..< 5 {
@@ -155,7 +154,7 @@ struct LRUCacheTests {
     // MARK: - Contains Tests
 
     @Test("LRU cache checks if key exists")
-    func testContains() async throws {
+    func testContains() {
         let cache = LRUCache<String, Int>(capacity: 10)
 
         #expect(cache.contains("key1") == false)
@@ -169,7 +168,7 @@ struct LRUCacheTests {
     // MARK: - Edge Cases Tests
 
     @Test("LRU cache handles capacity of 1")
-    func testCapacityOne() async throws {
+    func capacityOne() {
         let cache = LRUCache<Int, String>(capacity: 1)
 
         cache.put(1, value: "one")
@@ -183,7 +182,7 @@ struct LRUCacheTests {
     }
 
     @Test("LRU cache handles same key-value updates without affecting eviction")
-    func testUpdateDoesNotAffectEviction() async throws {
+    func updateDoesNotAffectEviction() {
         let cache = LRUCache<Int, String>(capacity: 3)
 
         cache.put(1, value: "one")
@@ -203,7 +202,7 @@ struct LRUCacheTests {
     }
 
     @Test("LRU cache handles rapid insertions and deletions")
-    func testRapidOperations() async throws {
+    func rapidOperations() {
         let cache = LRUCache<Int, Int>(capacity: 5)
 
         // Insert many items
@@ -225,7 +224,7 @@ struct LRUCacheTests {
     // MARK: - Statistics Tests
 
     @Test("LRU cache tracks size and capacity correctly")
-    func testStatistics() async throws {
+    func statistics() {
         let cache = LRUCache<Int, String>(capacity: 5)
 
         // Add some items
@@ -241,7 +240,7 @@ struct LRUCacheTests {
     }
 
     @Test("LRU cache updates size on eviction")
-    func testEvictionStatistics() async throws {
+    func evictionStatistics() {
         let cache = LRUCache<Int, String>(capacity: 2)
 
         cache.put(1, value: "one")
@@ -256,7 +255,7 @@ struct LRUCacheTests {
     // MARK: - Memory Management Tests
 
     @Test("LRU cache prevents retain cycles")
-    func testNoRetainCycles() async throws {
+    func noRetainCycles() {
         // This test verifies that weak references prevent retain cycles
         // If there were retain cycles, memory would grow unbounded
 

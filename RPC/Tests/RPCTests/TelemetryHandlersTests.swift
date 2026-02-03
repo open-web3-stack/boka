@@ -1,11 +1,10 @@
 import Blockchain
+@testable import RPC
 import Testing
 import TracingUtils
+@testable import Utils
 import Vapor
 import XCTVapor
-
-@testable import RPC
-@testable import Utils
 
 struct TelemetryDummySource: TelemetryDataSource {
     func name() async throws -> String {
@@ -28,7 +27,7 @@ final class TelemetryHandlersTests {
         app = Application(.testing)
 
         let rpcController = JSONRPCController(
-            handlers: TelemetryHandlers.getHandlers(source: TelemetryDummySource())
+            handlers: TelemetryHandlers.getHandlers(source: TelemetryDummySource()),
         )
         try app.register(collection: rpcController)
     }

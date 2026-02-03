@@ -10,6 +10,6 @@ protocol ExecutorFrontend {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx: (any InvocationContext)?
+        ctx: (any InvocationContext)?,
     ) async -> VMExecutionResult
 }

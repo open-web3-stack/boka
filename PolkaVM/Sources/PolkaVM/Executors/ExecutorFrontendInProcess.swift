@@ -23,7 +23,7 @@ public final class ExecutorFrontendInProcess: ExecutorFrontend {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx: (any InvocationContext)?
+        ctx: (any InvocationContext)?,
     ) async -> VMExecutionResult {
         await backend.execute(
             config: config,
@@ -31,7 +31,7 @@ public final class ExecutorFrontendInProcess: ExecutorFrontend {
             pc: pc,
             gas: gas,
             argumentData: argumentData,
-            ctx: ctx
+            ctx: ctx,
         )
     }
 }

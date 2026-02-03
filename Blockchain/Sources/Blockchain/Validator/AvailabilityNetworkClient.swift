@@ -35,7 +35,7 @@ public actor AvailabilityNetworkClient {
 
     public init(
         config: ProtocolConfigRef,
-        erasureCoding: ErasureCodingService
+        erasureCoding: ErasureCodingService,
     ) {
         self.config = config
         self.erasureCoding = erasureCoding
@@ -62,7 +62,7 @@ public actor AvailabilityNetworkClient {
             ce147=\(config.ce147Timeout)s, ce138=\(config.ce138Timeout)s, \
             ce139=\(config.ce139Timeout)s, ce140=\(config.ce140Timeout)s, \
             ce148=\(config.ce148Timeout)s
-            """
+            """,
         )
     }
 
@@ -82,7 +82,7 @@ public actor AvailabilityNetworkClient {
     public func fetchAuditShard(
         erasureRoot: Data32,
         shardIndex: UInt16,
-        from assurerAddress: NetAddr
+        from assurerAddress: NetAddr,
     ) async throws -> (Data, AvailabilityJustification) {
         guard let network else {
             logger.error("Network not set - call setNetwork() first")
@@ -92,14 +92,14 @@ public actor AvailabilityNetworkClient {
         logger.debug(
             """
             Fetching audit shard \(shardIndex) from \(assurerAddress)
-            """
+            """,
         )
 
         // Build request
         let requestData = try ShardRequest(
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
-            segmentIndices: nil
+            segmentIndices: nil,
         ).encode()
 
         // Use request helpers for deduplication and metrics
@@ -107,7 +107,7 @@ public actor AvailabilityNetworkClient {
             to: assurerAddress,
             requestType: .auditShard,
             data: requestData,
-            network: network
+            network: network,
         )
 
         let response = try ShardResponse.decode(responseData)
@@ -123,7 +123,7 @@ public actor AvailabilityNetworkClient {
         logger.info(
             """
             Successfully fetched audit shard \(shardIndex) from \(assurerAddress)
-            """
+            """,
         )
 
         return (response.bundleShard, justification)
@@ -147,7 +147,7 @@ public actor AvailabilityNetworkClient {
         erasureRoot: Data32,
         shardIndex: UInt16,
         segmentIndices: [UInt16],
-        from assurerAddress: NetAddr
+        from assurerAddress: NetAddr,
     ) async throws -> [Data] {
         // Delegate to CESegmentShardHandler
         guard let network else {
@@ -160,7 +160,7 @@ public actor AvailabilityNetworkClient {
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
             segmentIndices: segmentIndices,
-            from: assurerAddress
+            from: assurerAddress,
         )
     }
 
@@ -182,7 +182,7 @@ public actor AvailabilityNetworkClient {
         erasureRoot: Data32,
         shardIndex: UInt16,
         segmentIndices: [UInt16],
-        from assurerAddress: NetAddr
+        from assurerAddress: NetAddr,
     ) async throws -> ([Data], [AvailabilityJustification]) {
         // Delegate to CESegmentShardHandler
         guard let network else {
@@ -195,7 +195,7 @@ public actor AvailabilityNetworkClient {
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
             segmentIndices: segmentIndices,
-            from: assurerAddress
+            from: assurerAddress,
         )
     }
 
@@ -217,7 +217,7 @@ public actor AvailabilityNetworkClient {
     public func fetchSegments(
         segmentsRoot: Data32,
         segmentIndices: [UInt16],
-        from guarantorAddress: NetAddr
+        from guarantorAddress: NetAddr,
     ) async throws -> ([Data4104], [[Data32]]) {
         // Delegate to CE148Handler
         guard let network else {
@@ -229,7 +229,7 @@ public actor AvailabilityNetworkClient {
             network: network,
             segmentsRoot: segmentsRoot,
             segmentIndices: segmentIndices,
-            from: guarantorAddress
+            from: guarantorAddress,
         )
     }
 
@@ -246,7 +246,7 @@ public actor AvailabilityNetworkClient {
     /// - Throws: AvailabilityNetworkingError if request fails
     public func fetchBundle(
         erasureRoot: Data32,
-        from guarantorAddress: NetAddr
+        from guarantorAddress: NetAddr,
     ) async throws -> Data {
         guard let network else {
             logger.error("Network not set - call setNetwork() first")
@@ -256,7 +256,7 @@ public actor AvailabilityNetworkClient {
         return try await CE147Handler.fetchBundle(
             erasureRoot: erasureRoot,
             from: guarantorAddress,
-            network: network
+            network: network,
         )
     }
 
@@ -282,7 +282,7 @@ public actor AvailabilityNetworkClient {
         validators: [UInt16: NetAddr],
         coreIndex: UInt16,
         totalValidators: UInt16,
-        requiredShards: Int = 342
+        requiredShards: Int = 342,
     ) async throws -> [UInt16: Data] {
         guard let network else {
             logger.error("Network not set - call setNetwork() first")
@@ -296,7 +296,7 @@ public actor AvailabilityNetworkClient {
                 let requestData = try ShardRequest(
                     erasureRoot: erasureRoot,
                     shardIndex: shardIndex,
-                    segmentIndices: []
+                    segmentIndices: [],
                 ).encode()
 
                 let responseData = try await network.send(to: address, data: requestData)
@@ -319,7 +319,7 @@ public actor AvailabilityNetworkClient {
             maxConcurrentRequests: maxConcurrentRequests,
             requestTimeout: requestTimeout,
             shardAssignment: shardAssignment,
-            fetchOperation: fetchOperation
+            fetchOperation: fetchOperation,
         )
     }
 }

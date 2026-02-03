@@ -99,7 +99,6 @@ public class Engine {
 
     private func getInstructionName(_ inst: any Instruction) -> String {
         let typeName = String(describing: type(of: inst))
-        let cleanName = typeName.replacingOccurrences(of: "Instructions::", with: "")
-        return cleanName
+        return typeName.replacingOccurrences(of: "Instructions::", with: "")
     }
 }

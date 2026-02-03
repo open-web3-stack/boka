@@ -10,16 +10,16 @@ import Utils
 final class JITCompiler {
     private let logger = Logger(label: "JITCompiler")
 
-    // Runtime context wrapper for type-safe C++ interop
-    // Each JITCompiler instance has its own isolated RuntimeContext
-    // This makes C++ completely thread-agnostic - no global state, no locks needed
+    /// Runtime context wrapper for type-safe C++ interop
+    /// Each JITCompiler instance has its own isolated RuntimeContext
+    /// This makes C++ completely thread-agnostic - no global state, no locks needed
     private let runtimeContext: JITRuntimeContext
 
     init() {
         runtimeContext = JITRuntimeContext()
     }
 
-    // Errors that can occur during JIT compilation
+    /// Errors that can occur during JIT compilation
     enum CompilationError: Error, Equatable {
         case invalidBlob
         case compilationFailed(Int32)
@@ -28,7 +28,7 @@ final class JITCompiler {
         case exportFailed(Int32)
         case metadataStorageFailed(Int32)
 
-        // Equatable conformance
+        /// Equatable conformance
         static func == (lhs: CompilationError, rhs: CompilationError) -> Bool {
             switch (lhs, rhs) {
             case (.invalidBlob, .invalidBlob),
@@ -64,7 +64,7 @@ final class JITCompiler {
         targetArchitecture: JITPlatform,
         jitMemorySize: UInt32,
         skipTable: [UInt32], // NEW: skip table for variable-length instructions
-        bitmask: Data // NEW: bitmask for instruction boundary validation
+        bitmask: Data, // NEW: bitmask for instruction boundary validation
     ) throws -> UnsafeMutableRawPointer {
         logger.debug("Starting JIT compilation. Blob size: \(blob.count), Initial PC: \(initialPC), Target: \(targetArchitecture)")
 
@@ -119,7 +119,7 @@ final class JITCompiler {
                     skipTable,
                     skipTable.count,
                     bitmaskBytes, bitmask.count,
-                    &compiledFuncPtr
+                    &compiledFuncPtr,
                 )
             }
 
@@ -138,7 +138,7 @@ final class JITCompiler {
                     skipTable,
                     skipTable.count,
                     bitmaskBytes, bitmask.count,
-                    &compiledFuncPtr
+                    &compiledFuncPtr,
                 )
             }
         }
@@ -174,17 +174,17 @@ final class JITCompiler {
 
 extension JITCompiler {
     /// Compiled code information for export
-    public struct CompiledCodeInfo {
-        public let functionPtr: UnsafeRawPointer
-        public let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
-        public let dispatcherTableSize: Int
-        public let hasDispatcherTable: Bool
+    struct CompiledCodeInfo {
+        let functionPtr: UnsafeRawPointer
+        let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+        let dispatcherTableSize: Int
+        let hasDispatcherTable: Bool
 
-        public init(
+        init(
             functionPtr: UnsafeRawPointer,
             dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?,
             dispatcherTableSize: Int,
-            hasDispatcherTable: Bool
+            hasDispatcherTable: Bool,
         ) {
             self.functionPtr = functionPtr
             self.dispatcherTable = dispatcherTable
@@ -200,9 +200,9 @@ extension JITCompiler {
     /// - Parameter functionPtr: Compiled function pointer
     /// - Returns: CompiledCodeInfo containing metadata
     /// - Throws: CompilationError if info cannot be retrieved
-    public static func getCompiledCodeInfo(
+    static func getCompiledCodeInfo(
         context: JITRuntimeContext,
-        functionPtr: UnsafeRawPointer
+        functionPtr: UnsafeRawPointer,
     ) throws -> CompiledCodeInfo {
         var dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
         var dispatcherTableSize: size_t = 0
@@ -213,7 +213,7 @@ extension JITCompiler {
             UnsafeMutableRawPointer(mutating: functionPtr),
             &dispatcherTable,
             &dispatcherTableSize,
-            &hasDispatcherTable
+            &hasDispatcherTable,
         )
 
         guard result == 0 else {
@@ -224,7 +224,7 @@ extension JITCompiler {
             functionPtr: functionPtr,
             dispatcherTable: dispatcherTable,
             dispatcherTableSize: Int(dispatcherTableSize),
-            hasDispatcherTable: hasDispatcherTable != 0
+            hasDispatcherTable: hasDispatcherTable != 0,
         )
     }
 
@@ -236,15 +236,15 @@ extension JITCompiler {
     ///   - functionPtr: Compiled function pointer
     ///   - codeSize: Size of compiled code
     /// - Throws: CompilationError if metadata cannot be stored
-    public static func setCompiledCodeMetadata(
+    static func setCompiledCodeMetadata(
         bytecodeHash: UInt64,
         functionPtr: UnsafeRawPointer,
-        codeSize: Int
+        codeSize: Int,
     ) throws {
         let result = CppHelper.setCompiledCodeMetadata(
             bytecodeHash,
             UnsafeMutableRawPointer(mutating: functionPtr),
-            size_t(codeSize)
+            size_t(codeSize),
         )
 
         guard result == 0 else {

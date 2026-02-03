@@ -4,11 +4,10 @@
 // Test utilities for executing and verifying individual JIT-compiled instructions
 
 import Foundation
+@testable import PolkaVM
 import Testing
 import TracingUtils
 import Utils
-
-@testable import PolkaVM
 
 // MARK: - Logger
 
@@ -60,7 +59,7 @@ enum ProgramBlobBuilder {
         readOnlyData: Data = Data(),
         readWriteData: Data = Data(),
         heapPages: UInt16 = 0,
-        stackSize: UInt32 = 0
+        stackSize: UInt32 = 0,
     ) -> Data {
         var blob = Data()
 
@@ -74,7 +73,7 @@ enum ProgramBlobBuilder {
         // 7. codeLength (4 bytes, little endian)
         // 8. programCode
 
-        // Write UInt32 as 3 bytes in little-endian order
+        /// Write UInt32 as 3 bytes in little-endian order
         func writeUInt24(_ value: UInt32) {
             var v = value.littleEndian
             withUnsafeBytes(of: &v) {
@@ -84,7 +83,7 @@ enum ProgramBlobBuilder {
             }
         }
 
-        // Write UInt16 as 2 bytes in little-endian order
+        /// Write UInt16 as 2 bytes in little-endian order
         func writeUInt16(_ value: UInt16) {
             var v = value.littleEndian
             withUnsafeBytes(of: &v) {
@@ -93,7 +92,7 @@ enum ProgramBlobBuilder {
             }
         }
 
-        // Write UInt32 as 4 bytes in little-endian order
+        /// Write UInt32 as 4 bytes in little-endian order
         func writeUInt32(_ value: UInt32) {
             var v = value.littleEndian
             withUnsafeBytes(of: &v) {
@@ -237,7 +236,7 @@ enum ProgramBlobBuilder {
     /// - Returns: Complete program blob with jump table
     static func createProgramWithJumpTable(
         instructions: [[UInt8]],
-        jumpTable: [UInt64: Int]
+        jumpTable: [UInt64: Int],
     ) -> Data {
         var blob = Data()
 
@@ -349,7 +348,7 @@ enum ProgramBlobBuilder {
     private static func calculateInstructionSize(
         _ opcode: UInt8,
         instructionBytes: [UInt8],
-        pc: Int
+        pc: Int,
     ) -> Int {
         // Fixed-size instructions (1 byte) - per spec/pvm.tex
         if [0x00, 0x01].contains(opcode) { // Trap, Halt
@@ -513,7 +512,7 @@ enum JITInstructionExecutor {
         gas: Gas = Gas(1_000_000),
         argumentData: Data? = nil,
         config: PvmConfig = DefaultPvmConfig(),
-        context: (any InvocationContext)? = nil
+        context: (any InvocationContext)? = nil,
     ) async -> JITTestResult {
         // Execute in JIT mode using Executor directly to get register state
         // CRITICAL: We don't use invokePVM here because it doesn't return register state
@@ -525,7 +524,7 @@ enum JITInstructionExecutor {
             pc: pc,
             gas: gas,
             argumentData: argumentData,
-            ctx: context
+            ctx: context,
         )
 
         let finalGas = gas - result.gasUsed
@@ -536,7 +535,7 @@ enum JITInstructionExecutor {
             outputData: result.outputData,
             finalRegisters: result.finalRegisters,
             finalPC: result.finalPC,
-            executionMode: executionMode
+            executionMode: executionMode,
         )
     }
 
@@ -548,7 +547,7 @@ enum JITInstructionExecutor {
     /// - Returns: JITTestResult with execution details
     static func executeSingleInstruction(
         _ instructionBytes: [UInt8],
-        gas: Gas = Gas(1_000_000)
+        gas: Gas = Gas(1_000_000),
     ) async -> JITTestResult {
         let blob = ProgramBlobBuilder.createSingleInstructionProgram(instructionBytes)
         return await execute(blob: blob, gas: gas)
@@ -562,7 +561,7 @@ enum JITInstructionExecutor {
     /// - Returns: JITTestResult with execution details
     static func executeMultipleInstructions(
         _ instructionBytes: [[UInt8]],
-        gas: Gas = Gas(1_000_000)
+        gas: Gas = Gas(1_000_000),
     ) async -> JITTestResult {
         let blob = ProgramBlobBuilder.createMultiInstructionProgram(instructionBytes)
         return await execute(blob: blob, gas: gas)
@@ -578,11 +577,11 @@ enum JITInstructionExecutor {
     static func executeWithJumpTable(
         instructions: [[UInt8]],
         jumpTable: [UInt64: Int],
-        gas: Gas = Gas(1_000_000)
+        gas: Gas = Gas(1_000_000),
     ) async -> JITTestResult {
         let blob = ProgramBlobBuilder.createProgramWithJumpTable(
             instructions: instructions,
-            jumpTable: jumpTable
+            jumpTable: jumpTable,
         )
         return await execute(blob: blob, gas: gas)
     }
@@ -604,7 +603,7 @@ enum JITParityComparator {
         blob: Data,
         testName _: String,
         gas: Gas = Gas(1_000_000),
-        argumentData: Data? = nil
+        argumentData: Data? = nil,
     ) async -> (interpreterResult: JITTestResult, jitResult: JITTestResult, differences: String?) {
         let config = DefaultPvmConfig()
 
@@ -616,7 +615,7 @@ enum JITParityComparator {
             pc: 0,
             gas: gas,
             argumentData: argumentData,
-            ctx: nil
+            ctx: nil,
         )
 
         // Execute in JIT mode using Executor directly to get register state
@@ -628,7 +627,7 @@ enum JITParityComparator {
             pc: 0,
             gas: gas,
             argumentData: argumentData,
-            ctx: nil
+            ctx: nil,
         )
         let exitReasonJIT = jitVMResult.exitReason
         let gasUsedJIT = jitVMResult.gasUsed
@@ -644,7 +643,7 @@ enum JITParityComparator {
                 standardProgramBlob: blob,
                 pc: 0,
                 gas: gas,
-                argumentData: argumentData
+                argumentData: argumentData,
             )
             let engine = Engine(config: config)
             _ = await engine.execute(state: state)
@@ -661,7 +660,7 @@ enum JITParityComparator {
             outputData: outputInterpreter,
             finalRegisters: interpreterRegisters,
             finalPC: interpreterPC,
-            executionMode: []
+            executionMode: [],
         )
 
         let jitResult = JITTestResult(
@@ -670,7 +669,7 @@ enum JITParityComparator {
             outputData: outputJIT,
             finalRegisters: jitRegisters,
             finalPC: jitPC,
-            executionMode: .jit
+            executionMode: .jit,
         )
 
         // Compare results
@@ -678,7 +677,7 @@ enum JITParityComparator {
 
         if exitReasonInterpreter != exitReasonJIT {
             differences.append(
-                "Exit reason: interpreter=\(exitReasonInterpreter), jit=\(exitReasonJIT)"
+                "Exit reason: interpreter=\(exitReasonInterpreter), jit=\(exitReasonJIT)",
             )
         }
 
@@ -693,14 +692,14 @@ enum JITParityComparator {
 
         if outputInterpreter != outputJIT {
             differences.append(
-                "Output: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), jit=\(outputJIT?.toHexString() ?? "nil")"
+                "Output: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), jit=\(outputJIT?.toHexString() ?? "nil")",
             )
         }
 
         // Compare registers
         if interpreterRegisters != jitRegisters {
             differences.append(
-                "Registers mismatch: interpreter=\(interpreterRegisters), jit=\(jitRegisters)"
+                "Registers mismatch: interpreter=\(interpreterRegisters), jit=\(jitRegisters)",
             )
         }
 
@@ -717,13 +716,13 @@ enum JITParityComparator {
     static func compareSingleInstruction(
         _ instructionBytes: [UInt8],
         testName: String,
-        gas: Gas = Gas(1_000_000)
+        gas: Gas = Gas(1_000_000),
     ) async -> (interpreterResult: JITTestResult, jitResult: JITTestResult, differences: String?) {
         let blob = ProgramBlobBuilder.createSingleInstructionProgram(instructionBytes)
         return await compare(
             blob: blob,
             testName: testName,
-            gas: gas
+            gas: gas,
         )
     }
 }
@@ -737,13 +736,18 @@ enum JITTestAssertions {
         _ result: JITTestResult,
         _ index: Registers.Index,
         equals expected: UInt64,
-        sourceLocation: Testing.SourceLocation = #_sourceLocation
+        sourceLocation: Testing.SourceLocation = #_sourceLocation,
     ) {
         let actual = result.finalRegisters[index]
+        let expectedHex = String(format: "%016X", expected)
+        let actualHex = String(format: "%016X", actual)
+        let message =
+            "Register w\(index.value) mismatch: expected \(expected) (0x\(expectedHex)), " +
+            "got \(actual) (0x\(actualHex))"
         #expect(
             actual == expected,
-            "Register w\(index.value) mismatch: expected \(expected) (0x\(String(format: "%016X", expected))), got \(actual) (0x\(String(format: "%016X", actual)))",
-            sourceLocation: sourceLocation
+            message,
+            sourceLocation: sourceLocation,
         )
     }
 
@@ -751,7 +755,7 @@ enum JITTestAssertions {
     static func assertRegisters(
         _ result: JITTestResult,
         _ values: [(Registers.Index, UInt64)],
-        sourceLocation: Testing.SourceLocation = #_sourceLocation
+        sourceLocation: Testing.SourceLocation = #_sourceLocation,
     ) {
         for (index, expected) in values {
             assertRegister(result, index, equals: expected, sourceLocation: sourceLocation)
@@ -762,12 +766,12 @@ enum JITTestAssertions {
     static func assertExitReason(
         _ result: JITTestResult,
         equals expected: ExitReason,
-        sourceLocation: Testing.SourceLocation = #_sourceLocation
+        sourceLocation: Testing.SourceLocation = #_sourceLocation,
     ) {
         #expect(
             result.exitReason == expected,
             "Exit reason mismatch: expected \(expected), got \(result.exitReason)",
-            sourceLocation: sourceLocation
+            sourceLocation: sourceLocation,
         )
     }
 
@@ -776,7 +780,7 @@ enum JITTestAssertions {
         _ result: JITTestResult,
         expected: Gas,
         tolerance: Gas = Gas(10),
-        sourceLocation: Testing.SourceLocation = #_sourceLocation
+        sourceLocation: Testing.SourceLocation = #_sourceLocation,
     ) {
         let gasConsumed = expected - result.finalGas
         let toleranceDiff = abs(Int64(gasConsumed.value) - Int64(expected.value))
@@ -784,7 +788,7 @@ enum JITTestAssertions {
         #expect(
             toleranceDiff <= tolerance.value,
             "Gas consumed mismatch: expected ~\(expected), got \(gasConsumed) (diff: \(toleranceDiff))",
-            sourceLocation: sourceLocation
+            sourceLocation: sourceLocation,
         )
     }
 
@@ -792,12 +796,12 @@ enum JITTestAssertions {
     static func assertOutput(
         _ result: JITTestResult,
         equals expected: Data?,
-        sourceLocation: Testing.SourceLocation = #_sourceLocation
+        sourceLocation: Testing.SourceLocation = #_sourceLocation,
     ) {
         #expect(
             result.outputData == expected,
             "Output mismatch: expected \(expected?.toHexString() ?? "nil"), got \(result.outputData?.toHexString() ?? "nil")",
-            sourceLocation: sourceLocation
+            sourceLocation: sourceLocation,
         )
     }
 }

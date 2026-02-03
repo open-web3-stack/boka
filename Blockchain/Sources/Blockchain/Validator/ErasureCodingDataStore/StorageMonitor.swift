@@ -25,7 +25,7 @@ public actor StorageMonitor {
     public init(
         dataStore: any DataStoreProtocol,
         filesystemStore: FilesystemDataStore,
-        cleanupService: DataStoreCleanup
+        cleanupService: DataStoreCleanup,
     ) {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
@@ -53,7 +53,7 @@ public actor StorageMonitor {
             d3lStoreBytes: d3lShardBytes,
             entryCount: entryCount,
             auditEntryCount: auditEntries.count,
-            d3lEntryCount: d3lEntries.count
+            d3lEntryCount: d3lEntries.count,
         )
     }
 
@@ -67,7 +67,7 @@ public actor StorageMonitor {
     /// - Returns: Cleanup progress and statistics
     public func incrementalCleanup(
         batchSize: Int = 100,
-        retentionEpochs: UInt32 = 6
+        retentionEpochs: UInt32 = 6,
     ) async throws -> IncrementalCleanupProgress {
         let epochDuration: TimeInterval = 600 // 10 minutes per epoch
         let cutoffDate = Date().addingTimeInterval(-TimeInterval(retentionEpochs) * epochDuration)
@@ -94,7 +94,7 @@ public actor StorageMonitor {
             processedEntries: deletedCount,
             remainingEntries: max(0, totalCount - deletedCount),
             bytesReclaimed: bytesReclaimed,
-            isComplete: totalCount <= batchSize
+            isComplete: totalCount <= batchSize,
         )
     }
 
@@ -125,7 +125,7 @@ public actor StorageMonitor {
         // Process audit entries first (they're older and smaller)
         _ = try await dataStore.cleanupAuditEntriesIteratively(
             before: Date(),
-            batchSize: 50 // Smaller batch size to limit memory usage
+            batchSize: 50, // Smaller batch size to limit memory usage
         ) { batch in
             // Sort batch by timestamp (oldest first) within this batch only
             let sortedBatch = batch.sorted { $0.timestamp < $1.timestamp }
@@ -153,7 +153,7 @@ public actor StorageMonitor {
                         """
                         Aggressive cleanup: deleted audit entry \(entry.erasureRoot), \
                         freed \(size) bytes (total: \(updated)/\(targetBytes))
-                        """
+                        """,
                     )
                 } catch {
                     logger.warning("Failed to delete audit entry \(entry.erasureRoot): \(error)")
@@ -174,7 +174,7 @@ public actor StorageMonitor {
 
         _ = try await dataStore.cleanupD3LEntriesIteratively(
             before: Date(),
-            batchSize: 50 // Smaller batch size to limit memory usage
+            batchSize: 50, // Smaller batch size to limit memory usage
         ) { batch in
             // Sort batch by timestamp (oldest first) within this batch only
             let sortedBatch = batch.sorted { $0.timestamp < $1.timestamp }
@@ -202,7 +202,7 @@ public actor StorageMonitor {
                         """
                         Aggressive cleanup: deleted D³L entry \(entry.erasureRoot), \
                         freed \(size) bytes (total: \(updated)/\(targetBytes))
-                        """
+                        """,
                     )
                 } catch {
                     logger.warning("Failed to delete D³L entry \(entry.erasureRoot): \(error)")

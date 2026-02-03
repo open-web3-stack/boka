@@ -3,7 +3,7 @@ import Testing
 
 struct CompactTests {
     @Test
-    func testUInt8Compact() throws {
+    func uInt8Compact() throws {
         let value: UInt8 = 255
         let compact = Compact(alias: value)
 
@@ -14,7 +14,7 @@ struct CompactTests {
     }
 
     @Test
-    func testUInt16Compact() throws {
+    func uInt16Compact() throws {
         let value: UInt16 = 65535
         let compact = Compact(alias: value)
 
@@ -25,7 +25,7 @@ struct CompactTests {
     }
 
     @Test
-    func testUInt32Compact() throws {
+    func uInt32Compact() throws {
         let value: UInt32 = 4_294_967_295
         let compact = Compact(alias: value)
 
@@ -36,7 +36,7 @@ struct CompactTests {
     }
 
     @Test
-    func testUInt64Compact() throws {
+    func uInt64Compact() throws {
         let value: UInt64 = 1_234_567_890
         let compact = Compact(alias: value)
 
@@ -47,7 +47,7 @@ struct CompactTests {
     }
 
     @Test
-    func testUIntCompact() throws {
+    func uIntCompact() throws {
         let value: UInt = 987_654_321
         let compact = Compact(alias: value)
 
@@ -58,7 +58,7 @@ struct CompactTests {
     }
 
     @Test
-    func testValueOutOfRangeError() throws {
+    func valueOutOfRangeError() throws {
         // Test decoding a value that's too large for UInt8
         let largeValue: UInt = 256
         let compact = Compact(alias: largeValue)
@@ -71,7 +71,7 @@ struct CompactTests {
     }
 
     @Test
-    func testValueOutOfRangeErrorDetails() throws {
+    func valueOutOfRangeErrorDetails() throws {
         // Test decoding a value that's too large for UInt8
         let largeValue: UInt = 256
         let compact = Compact(alias: largeValue)
@@ -93,7 +93,7 @@ struct CompactTests {
     }
 
     @Test
-    func testCompactEncodingErrorDirectly() throws {
+    func compactEncodingErrorDirectly() {
         // Test CompactEncodingError types directly
         let outOfRangeError = CompactEncodingError.valueOutOfRange(value: "256", sourceType: "UInt", targetType: "UInt8")
         #expect(outOfRangeError.description.contains("Value 256"))
@@ -103,7 +103,7 @@ struct CompactTests {
             value: "123",
             fromType: "String",
             toType: "UInt",
-            reason: "invalid format"
+            reason: "invalid format",
         )
         #expect(conversionError.description.contains("Failed to convert"))
         #expect(conversionError.description.contains("invalid format"))
@@ -124,12 +124,12 @@ struct CompactTests {
     }
 
     @Test
-    func testCodingAsPropertyWrapper() throws {
+    func codingAsPropertyWrapper() throws {
         let original = TestPrivilegedServices(
             manager: 1,
             assigners: [2, 3, 4],
             delegator: 5,
-            alwaysAcc: [1: 1000, 2: 2000, 3: 3000]
+            alwaysAcc: [1: 1000, 2: 2000, 3: 3000],
         )
 
         let encoded = try JamEncoder.encode(original)
@@ -142,7 +142,7 @@ struct CompactTests {
     }
 
     @Test
-    func testZeroValues() throws {
+    func zeroValues() throws {
         let zeroUInt8 = Compact(alias: UInt8(0))
         let zeroUInt32 = Compact(alias: UInt32(0))
 
@@ -157,7 +157,7 @@ struct CompactTests {
     }
 
     @Test
-    func testMaxValues() throws {
+    func maxValues() throws {
         let maxUInt8 = Compact(alias: UInt8.max)
         let maxUInt16 = Compact(alias: UInt16.max)
 

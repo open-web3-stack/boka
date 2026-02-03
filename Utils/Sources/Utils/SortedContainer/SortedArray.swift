@@ -45,8 +45,8 @@ public struct SortedArray<T: Comparable>: SortedContainer {
         try array.removeAll(where: predicate)
     }
 
-    // mutate access to underlying array directly
-    // this is unsafe and should be used with care
+    /// mutate access to underlying array directly
+    /// this is unsafe and should be used with care
     public var unsafeArrayAccess: [T] {
         _read { yield array }
         _modify { yield &array }

@@ -1,12 +1,11 @@
 import Foundation
+@testable import PolkaVM
 import Testing
 import Utils
 
-@testable import PolkaVM
-
 /// Unit tests for ExitReason
 struct ExitReasonTests {
-    @Test func testExitReasonHalt() {
+    @Test func exitReasonHalt() {
         let halt = ExitReason.halt
         switch halt {
         case .halt:
@@ -16,7 +15,7 @@ struct ExitReasonTests {
         }
     }
 
-    @Test func testExitReasonOutOfGas() {
+    @Test func exitReasonOutOfGas() {
         let outOfGas = ExitReason.outOfGas
         switch outOfGas {
         case .outOfGas:
@@ -26,7 +25,7 @@ struct ExitReasonTests {
         }
     }
 
-    @Test func testExitReasonPanic() {
+    @Test func exitReasonPanic() {
         let trap = ExitReason.panic(.trap)
         switch trap {
         case .panic(.trap):
@@ -44,7 +43,7 @@ struct ExitReasonTests {
         }
     }
 
-    @Test func testExitReasonEquality() {
+    @Test func exitReasonEquality() {
         let halt1 = ExitReason.halt
         let halt2 = ExitReason.halt
         let outOfGas = ExitReason.outOfGas
@@ -53,15 +52,15 @@ struct ExitReasonTests {
         #expect(halt1 != outOfGas)
     }
 
-    @Test func testExitReasonSendable() {
-        // ExitReason should be Sendable
+    @Test func exitReasonSendable() {
+        /// ExitReason should be Sendable
         func requiresSendable(_ _: some Sendable) {}
         requiresSendable(ExitReason.halt)
         requiresSendable(ExitReason.outOfGas)
         requiresSendable(ExitReason.panic(.trap))
     }
 
-    @Test func testAllPanicReasons() {
+    @Test func allPanicReasons() {
         // Test various panic reasons
         let panicReasons: [ExitReason.PanicReason] = [
             .trap,

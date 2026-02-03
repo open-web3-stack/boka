@@ -6,11 +6,11 @@ private struct IdCancellable: Hashable, Sendable {
     let id: UniqueId
     let cancellable: Cancellable?
 
-    public func hash(into hasher: inout Hasher) {
+    func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
 
-    public static func == (lhs: IdCancellable, rhs: IdCancellable) -> Bool {
+    static func == (lhs: IdCancellable, rhs: IdCancellable) -> Bool {
         lhs.id == rhs.id
     }
 }
@@ -46,7 +46,7 @@ public class ServiceBase2: ServiceBase, @unchecked Sendable {
         id: UniqueId,
         delay: TimeInterval,
         repeats: Bool = false,
-        task: @escaping @Sendable () async -> Void
+        task: @escaping @Sendable () async -> Void,
     ) -> Cancellable {
         let cancellables = cancellables
         let cancellable = scheduler.schedule(id: id, delay: delay, repeats: repeats) {

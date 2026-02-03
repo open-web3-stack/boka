@@ -12,7 +12,9 @@ extension StateKey {
         Value.self
     }
 
-    public static var optional: Bool { false }
+    public static var optional: Bool {
+        false
+    }
 }
 
 private func constructKey(_ idx: UInt8) -> Data31 {
@@ -81,9 +83,9 @@ public enum StateKeys {
             ConfigLimitedSizeArray<
                 Data32,
                 ProtocolConfig.Int0,
-                ProtocolConfig.MaxAuthorizationsPoolItems
+                ProtocolConfig.MaxAuthorizationsPoolItems,
             >,
-            ProtocolConfig.TotalNumberOfCores
+            ProtocolConfig.TotalNumberOfCores,
         >
 
         public init() {}
@@ -97,9 +99,9 @@ public enum StateKeys {
         public typealias Value = ConfigFixedSizeArray<
             ConfigFixedSizeArray<
                 Data32,
-                ProtocolConfig.MaxAuthorizationsQueueItems
+                ProtocolConfig.MaxAuthorizationsQueueItems,
             >,
-            ProtocolConfig.TotalNumberOfCores
+            ProtocolConfig.TotalNumberOfCores,
         >
 
         public init() {}
@@ -152,7 +154,7 @@ public enum StateKeys {
     public struct ValidatorQueueKey: StateKey {
         public typealias Value = ConfigFixedSizeArray<
             ValidatorKey,
-            ProtocolConfig.TotalNumberOfValidators
+            ProtocolConfig.TotalNumberOfValidators,
         >
 
         public init() {}
@@ -165,7 +167,7 @@ public enum StateKeys {
     public struct CurrentValidatorsKey: StateKey {
         public typealias Value = ConfigFixedSizeArray<
             ValidatorKey,
-            ProtocolConfig.TotalNumberOfValidators
+            ProtocolConfig.TotalNumberOfValidators,
         >
 
         public init() {}
@@ -178,7 +180,7 @@ public enum StateKeys {
     public struct PreviousValidatorsKey: StateKey {
         public typealias Value = ConfigFixedSizeArray<
             ValidatorKey,
-            ProtocolConfig.TotalNumberOfValidators
+            ProtocolConfig.TotalNumberOfValidators,
         >
 
         public init() {}
@@ -191,7 +193,7 @@ public enum StateKeys {
     public struct ReportsKey: StateKey {
         public typealias Value = ConfigFixedSizeArray<
             ReportItem?,
-            ProtocolConfig.TotalNumberOfCores
+            ProtocolConfig.TotalNumberOfCores,
         >
 
         public init() {}
@@ -234,7 +236,7 @@ public enum StateKeys {
     public struct AccumulationQueueKey: StateKey {
         public typealias Value = ConfigFixedSizeArray<
             [AccumulationQueueItem],
-            ProtocolConfig.EpochLength
+            ProtocolConfig.EpochLength,
         >
 
         public init() {}
@@ -247,7 +249,7 @@ public enum StateKeys {
     public struct AccumulationHistoryKey: StateKey {
         public typealias Value = ConfigFixedSizeArray<
             SortedUniqueArray<Data32>,
-            ProtocolConfig.EpochLength
+            ProtocolConfig.EpochLength,
         >
 
         public init() {}
@@ -269,7 +271,9 @@ public enum StateKeys {
 
     public struct ServiceAccountKey: StateKey {
         public typealias Value = ServiceAccountDetails
-        public static var optional: Bool { true }
+        public static var optional: Bool {
+            true
+        }
 
         public var index: ServiceIndex
 
@@ -284,7 +288,9 @@ public enum StateKeys {
 
     public struct ServiceAccountStorageKey: StateKey {
         public typealias Value = Data
-        public static var optional: Bool { true }
+        public static var optional: Bool {
+            true
+        }
 
         public var index: ServiceIndex
         public var key: Data
@@ -301,7 +307,9 @@ public enum StateKeys {
 
     public struct ServiceAccountPreimagesKey: StateKey {
         public typealias Value = Data
-        public static var optional: Bool { true }
+        public static var optional: Bool {
+            true
+        }
 
         public var index: ServiceIndex
         public var hash: Data32
@@ -318,7 +326,9 @@ public enum StateKeys {
 
     public struct ServiceAccountPreimageInfoKey: StateKey {
         public typealias Value = LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>
-        public static var optional: Bool { true }
+        public static var optional: Bool {
+            true
+        }
 
         public var index: ServiceIndex
         public var hash: Data32

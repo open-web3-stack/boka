@@ -14,7 +14,7 @@ public struct SafeContinuation<T: Sendable>: Sendable {
 
     public init(
         onSuccess: @escaping @Sendable (T) -> Void,
-        onFailure: @escaping @Sendable (Error) -> Void
+        onFailure: @escaping @Sendable (Error) -> Void,
     ) {
         self.onSuccess = onSuccess
         self.onFailure = onFailure
@@ -31,7 +31,7 @@ public struct SafeContinuation<T: Sendable>: Sendable {
 
 public func withCheckedContinuationTimeout<T: Sendable>(
     seconds timeout: TimeInterval,
-    operation: @escaping @Sendable (SafeContinuation<T>) -> Void
+    operation: @escaping @Sendable (SafeContinuation<T>) -> Void,
 ) async throws -> T {
     try await withCheckedThrowingContinuation { originalContinuation in
         let hasResumed = Atomic<Bool>(false)
@@ -57,7 +57,7 @@ public func withCheckedContinuationTimeout<T: Sendable>(
             },
             onFailure: { error in
                 resumeOnce(.failure(error))
-            }
+            },
         )
 
         operation(safe)

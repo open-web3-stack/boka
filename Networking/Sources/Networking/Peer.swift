@@ -51,7 +51,7 @@ public struct PeerOptions<Handler: StreamHandler>: Sendable {
         ephemeralStreamHandler: Handler.EphemeralHandler,
         serverSettings: QuicSettings = .defaultSettings,
         clientSettings: QuicSettings = .defaultSettings,
-        peerSettings: PeerSettings = .defaultSettings
+        peerSettings: PeerSettings = .defaultSettings,
     ) {
         self.role = role
         self.listenAddress = listenAddress
@@ -90,13 +90,13 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         let registration = try QuicRegistration()
         let serverConfiguration = try QuicConfiguration(
             registration: registration, pkcs12: pkcs12, alpns: allAlpns, client: false,
-            settings: options.serverSettings
+            settings: options.serverSettings,
         )
 
         let clientAlpn = alpns[options.role]!
         let clientConfiguration = try QuicConfiguration(
             registration: registration, pkcs12: pkcs12, alpns: [clientAlpn], client: true,
-            settings: options.clientSettings
+            settings: options.clientSettings,
         )
 
         publicKey = options.secretKey.publicKey.data.data
@@ -109,7 +109,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             publicKey: publicKey,
             clientConfiguration: clientConfiguration,
             persistentStreamHandler: options.persistentStreamHandler,
-            ephemeralStreamHandler: options.ephemeralStreamHandler
+            ephemeralStreamHandler: options.ephemeralStreamHandler,
         )
 
         listener = try QuicListener(
@@ -117,7 +117,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
             registration: registration,
             configuration: serverConfiguration,
             listenAddress: options.listenAddress,
-            alpns: allAlpns
+            alpns: allAlpns,
         )
 
         logger.debug(
@@ -126,7 +126,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
                 "listenAddress": "\(options.listenAddress)",
                 "role": "\(options.role)",
                 "publicKey": "\(options.secretKey.publicKey.data.toHexString())",
-            ]
+            ],
         )
     }
 
@@ -152,13 +152,13 @@ public final class Peer<Handler: StreamHandler>: Sendable {
                         "address": "\(address)",
                         "role": "\(role)",
                         "initiatedByLocal": "true",
-                    ]
+                    ],
                 )
 
                 let quicConn = try QuicConnection(
                     handler: PeerEventHandler(self.impl),
                     registration: self.impl.clientConfiguration.registration,
-                    configuration: self.impl.clientConfiguration
+                    configuration: self.impl.clientConfiguration,
                 )
                 try quicConn.connect(to: address)
                 let conn = Connection(
@@ -166,7 +166,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
                     impl: self.impl,
                     role: role,
                     remoteAddress: address,
-                    initiatedByLocal: true
+                    initiatedByLocal: true,
                 )
                 connections.byAddr[address] = conn
                 connections.byId[conn.id] = conn
@@ -185,7 +185,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
     }
 
     public func broadcast(
-        kind: Handler.PresistentHandler.StreamKind, message: Handler.PresistentHandler.Message
+        kind: Handler.PresistentHandler.StreamKind, message: Handler.PresistentHandler.Message,
     ) {
         guard let messageData = try? message.encode() else {
             impl.logger.warning(
@@ -193,7 +193,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
                 metadata: [
                     "messageType": "\(type(of: message))",
                     "error": "Encoding failure",
-                ]
+                ],
             )
             return
         }
@@ -222,7 +222,7 @@ public final class Peer<Handler: StreamHandler>: Sendable {
                                 "kind": "\(kind)",
                                 "message": "\(messageData)",
                                 "error": "\(error)",
-                            ]
+                            ],
                         )
                     }
                 }
@@ -230,8 +230,8 @@ public final class Peer<Handler: StreamHandler>: Sendable {
         }
     }
 
-    // there should be only one connection per peer
-    // exclude closed connections
+    /// there should be only one connection per peer
+    /// exclude closed connections
     public var peersCount: Int {
         impl.connections.read { $0.byId.count { $0.value.isClosed == false } }
     }
@@ -274,7 +274,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
         publicKey: Data,
         clientConfiguration: QuicConfiguration,
         persistentStreamHandler: Handler.PresistentHandler,
-        ephemeralStreamHandler: Handler.EphemeralHandler
+        ephemeralStreamHandler: Handler.EphemeralHandler,
     ) {
         self.logger = logger
         self.role = role
@@ -295,7 +295,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     func addConnection(_ connection: QuicConnection, addr: NetAddr, role: PeerRole) -> Bool {
         connections.write { connections in
             if role == .builder {
-                let currentCount = connections.byAddr.values.filter { $0.role == role }.count
+                let currentCount = connections.byAddr.values.count(where: { $0.role == role })
                 if currentCount >= self.settings.maxBuilderConnections {
                     if let conn = connections.byAddr.values.filter({ $0.role == .builder })
                         .sorted(by: { $0.getLastActive() < $1.getLastActive() }).first
@@ -306,7 +306,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                                 "address": "\(conn.remoteAddress)",
                                 "connectionId": "\(conn.id)",
                                 "lastActive": "\(conn.getLastActive())",
-                            ]
+                            ],
                         )
                         conn.close(abort: false)
                     } else {
@@ -321,7 +321,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                     metadata: [
                         "address": "\(addr)",
                         "role": "\(role)",
-                    ]
+                    ],
                 )
                 return false
             }
@@ -330,7 +330,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 impl: self,
                 role: role,
                 remoteAddress: addr,
-                initiatedByLocal: false
+                initiatedByLocal: false,
             )
             connections.byAddr[addr] = conn
             connections.byId[connection.id] = conn
@@ -349,7 +349,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 "attempt": "\(state.attempt + 1)/\(maxRetryAttempts)",
                 "delay": "\(state.delay)s",
                 "role": "\(role)",
-            ]
+            ],
         )
         guard state.attempt < maxRetryAttempts else {
             logger.warning(
@@ -358,7 +358,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                     "address": "\(address)",
                     "maxAttempts": "\(maxRetryAttempts)",
                     "role": "\(role)",
-                ]
+                ],
             )
             return
         }
@@ -372,14 +372,14 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 if connections.byAddr[address] != nil {
                     logger.debug(
                         "Skipping reconnection - already connected",
-                        metadata: ["address": "\(address)", "role": "\(role)"]
+                        metadata: ["address": "\(address)", "role": "\(role)"],
                     )
                     return
                 }
                 let quicConn = try QuicConnection(
                     handler: PeerEventHandler(self),
                     registration: clientConfiguration.registration,
-                    configuration: clientConfiguration
+                    configuration: clientConfiguration,
                 )
                 try quicConn.connect(to: address)
                 let conn = Connection(
@@ -387,7 +387,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                     impl: self,
                     role: role,
                     remoteAddress: address,
-                    initiatedByLocal: true
+                    initiatedByLocal: true,
                 )
                 connections.byAddr[address] = conn
                 connections.byId[conn.id] = conn
@@ -402,7 +402,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 metadata: [
                     "connectionId": "\(connection.id)",
                     "streamKind": "\(kind)",
-                ]
+                ],
             )
             return
         }
@@ -418,7 +418,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                 "streamKind": "\(kind)",
                 "attempt": "\(state.attempt + 1)/\(maxRetryAttempts)",
                 "delay": "\(state.delay)s",
-            ]
+            ],
         )
         guard state.attempt < maxRetryAttempts else {
             logger.warning(
@@ -427,7 +427,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                     "connectionId": "\(connection.id)",
                     "streamKind": "\(kind)",
                     "maxAttempts": "\(maxRetryAttempts)",
-                ]
+                ],
             )
             return
         }
@@ -444,7 +444,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                     metadata: [
                         "connectionId": "\(connection.id)",
                         "streamKind": "\(kind)",
-                    ]
+                    ],
                 )
                 try connection.createPreistentStream(kind: kind)
             } catch {
@@ -454,7 +454,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                         "connectionId": "\(connection.id)",
                         "streamKind": "\(kind)",
                         "error": "\(error)",
-                    ]
+                    ],
                 )
                 reopenUpStream(connection: connection, kind: kind)
             }
@@ -466,7 +466,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             if streams[stream.id] != nil {
                 self.logger.warning(
                     "Stream already exists",
-                    metadata: ["streamId": "\(stream.id)"]
+                    metadata: ["streamId": "\(stream.id)"],
                 )
             }
             streams[stream.id] = stream
@@ -497,7 +497,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     "connectionId": "\(connection.id)",
                     "remoteAddress": "\(addr)",
                     "negotiatedAlpn": "\(String(data: info.negotiatedAlpn, encoding: .utf8) ?? info.negotiatedAlpn.toDebugHexString())",
-                ]
+                ],
             )
             return .code(.alpnNegFailure)
         }
@@ -508,7 +508,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "connectionId": "\(connection.id)",
                 "remoteAddress": "\(addr)",
                 "role": "\(role)",
-            ]
+            ],
         )
 
         if impl.addConnection(connection, addr: addr, role: role) {
@@ -518,7 +518,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     "connectionId": "\(connection.id)",
                     "remoteAddress": "\(addr)",
                     "role": "\(role)",
-                ]
+                ],
             )
             return .code(.success)
         } else {
@@ -528,7 +528,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     "connectionId": "\(connection.id)",
                     "remoteAddress": "\(addr)",
                     "role": "\(role)",
-                ]
+                ],
             )
             return .code(.connectionRefused)
         }
@@ -540,7 +540,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "Missing certificate in connection",
                 metadata: [
                     "connectionId": "\(connection.id)",
-                ]
+                ],
             )
             return .code(.requiredCert)
         }
@@ -554,7 +554,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "Attempt to open connection not in registry",
                 metadata: [
                     "connectionId": "\(connection.id)",
-                ]
+                ],
             )
             return .code(.connectionRefused)
         }
@@ -568,7 +568,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     "publicKey": "\(publicKey.toHexString())",
                     "alternativeName": "\(alternativeName)",
                     "remoteAddress": "\(conn.remoteAddress)",
-                ]
+                ],
             )
 
             if publicKey == impl.publicKey {
@@ -578,7 +578,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     metadata: [
                         "connectionId": "\(connection.id)",
                         "remoteAddress": "\(conn.remoteAddress)",
-                    ]
+                    ],
                 )
                 return .code(.connectionRefused)
             }
@@ -600,7 +600,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                                 "publicKey": "\(publicKey.toHexString())",
                                 "remoteAddress": "\(conn.remoteAddress)",
                                 "existingConnectionId": "\(existingConnection.id)",
-                            ]
+                            ],
                         )
                         connections.byPublicKey[publicKey] = conn
                         existingConnection.close()
@@ -613,7 +613,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                                 "connectionId": "\(connection.id)",
                                 "publicKey": "\(publicKey.toHexString())",
                                 "remoteAddress": "\(conn.remoteAddress)",
-                            ]
+                            ],
                         )
                         // Mark the connection state so streams won't be processed
                         conn.closing()
@@ -632,7 +632,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     "connectionId": "\(connection.id)",
                     "error": "\(error)",
                     "remoteAddress": "\(conn.remoteAddress)",
-                ]
+                ],
             )
             return .code(.badCert)
         }
@@ -647,7 +647,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "Connection established but missing in registry",
                 metadata: [
                     "connectionId": "\(connection.id)",
-                ]
+                ],
             )
             return
         }
@@ -659,7 +659,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     "connectionId": "\(connection.id)",
                     "remoteAddress": "\(conn.remoteAddress)",
                     "initiatedByLocal": "\(conn.initiatedByLocal)",
-                ]
+                ],
             )
             return
         }
@@ -670,7 +670,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "connectionId": "\(connection.id)",
                 "remoteAddress": "\(conn.remoteAddress)",
                 "initiatedByLocal": "\(conn.initiatedByLocal)",
-            ]
+            ],
         )
 
         impl.reconnectStates.write { reconnectStates in
@@ -683,7 +683,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 metadata: [
                     "connectionId": "\(connection.id)",
                     "remoteAddress": "\(conn.remoteAddress)",
-                ]
+                ],
             )
             for kind in Handler.PresistentHandler.StreamKind.allCases {
                 do {
@@ -696,7 +696,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                             "kind": "\(kind)",
                             "error": "\(error)",
                             "remoteAddress": "\(conn.remoteAddress)",
-                        ]
+                        ],
                     )
                     try? connection.shutdown(errorCode: QuicErrorCode(ConnectionErrorCode.protocolError.rawValue))
                     break
@@ -710,7 +710,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             "Connection shutdown complete",
             metadata: [
                 "connectionId": "\(connection.id)",
-            ]
+            ],
         )
         let conn = impl.connections.read { connections in
             connections.byId[connection.id]
@@ -737,7 +737,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     metadata: [
                         "error": "\(error)",
                         "address": "\(address)",
-                    ]
+                    ],
                 )
             }
         }
@@ -750,7 +750,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "connectionId": "\(connection.id)",
                 "reason": "\(reason)",
                 "willReconnect": "\(shouldReconnect(basedOn: reason))",
-            ]
+            ],
         )
         if shouldReconnect(basedOn: reason) {
             impl.connections.write { connections in
@@ -797,7 +797,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     "connectionId": "\(connection.id)",
                     "streamId": "\(stream.id)",
                     "remoteAddress": "\(conn.remoteAddress)",
-                ]
+                ],
             )
 
             conn.streamStarted(stream: stream)
@@ -811,7 +811,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 metadata: [
                     "connectionId": "\(connection.id)",
                     "streamId": "\(stream.id)",
-                ]
+                ],
             )
         }
     }
@@ -850,7 +850,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                     "Stream closed but connection is missing",
                     metadata: [
                         "streamId": "\(stream.id)",
-                    ]
+                    ],
                 )
             }
         } else {
@@ -858,7 +858,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                 "Stream closed but stream is missing from registry",
                 metadata: [
                     "streamId": "\(quicStream.id)",
-                ]
+                ],
             )
         }
     }

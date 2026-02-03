@@ -1,9 +1,8 @@
 import Testing
-
 @testable import Utils
 
 struct IntUtilsTests {
-    @Test func mod() throws {
+    @Test func mod() {
         #expect((1 %% 5) == 1)
         #expect((0 %% 5) == 0)
         #expect((-1 %% 5) == 4)

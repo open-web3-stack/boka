@@ -8,7 +8,7 @@ import TracingUtils
 public func parse(from: String) -> (
     filters: [String: Logger.Level],
     defaultLevel: Logger.Level,
-    minimalLevel: Logger.Level
+    minimalLevel: Logger.Level,
 )? {
     var defaultLevel: Logger.Level?
     var lowestLevel = Logger.Level.critical
@@ -36,7 +36,7 @@ public func parse(from: String) -> (
     return (
         filters: filters,
         defaultLevel: defaultLevel ?? .info,
-        minimalLevel: min(lowestLevel, defaultLevel ?? .info)
+        minimalLevel: min(lowestLevel, defaultLevel ?? .info),
     )
 }
 
@@ -70,7 +70,7 @@ public enum Tracing {
                 level: minimalLevel,
                 metadataProvider: metadataProvider,
                 defaultLevel: defaultLevel,
-                filters: filters
+                filters: filters,
             )
         }, metadataProvider: .otel)
 

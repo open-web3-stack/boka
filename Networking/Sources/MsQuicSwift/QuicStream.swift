@@ -18,10 +18,10 @@ public final class QuicStream: Sendable {
     private let storage: ThreadSafeContainer<Storage?>
     fileprivate let handler: QuicEventHandler
 
-    // create new stream from local
+    /// create new stream from local
     init(
         connection: QuicConnection,
-        handler: QuicEventHandler
+        handler: QuicEventHandler,
     ) throws(QuicError) {
         id = "QuicStream".uniqueId
         logger = Logger(label: id)
@@ -36,7 +36,7 @@ public final class QuicStream: Sendable {
                 connection.ptr, QUIC_STREAM_OPEN_FLAG_NONE,
                 handler,
                 nil,
-                &ptr
+                &ptr,
             )
         }
 
@@ -48,18 +48,18 @@ public final class QuicStream: Sendable {
 
         storage = .init(.init(
             handle: handle,
-            connection: connection
+            connection: connection,
         ))
 
         handle.stream = self
     }
 
-    // wrapping a remote stream initiated by peer
+    /// wrapping a remote stream initiated by peer
     init(
         api: QuicAPI,
         connection: QuicConnection,
         stream: HQUIC,
-        handler: QuicEventHandler
+        handler: QuicEventHandler,
     ) {
         id = "QuicStream".uniqueId
         logger = Logger(label: id)
@@ -69,7 +69,7 @@ public final class QuicStream: Sendable {
 
         storage = .init(.init(
             handle: handle,
-            connection: connection
+            connection: connection,
         ))
 
         handle.stream = self
@@ -86,7 +86,7 @@ public final class QuicStream: Sendable {
                 api.pointee.StreamShutdown(
                     storage2.handle.ptr,
                     errorCode == .success ? QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL : QUIC_STREAM_SHUTDOWN_FLAG_ABORT,
-                    errorCode.code
+                    errorCode.code,
                 )
             }
 
@@ -110,7 +110,7 @@ public final class QuicStream: Sendable {
 
             let sendBufferRaw = UnsafeMutableRawPointer.allocate( // !! allocate
                 byteCount: MemoryLayout<QUIC_BUFFER>.size + messageLength,
-                alignment: MemoryLayout<QUIC_BUFFER>.alignment
+                alignment: MemoryLayout<QUIC_BUFFER>.alignment,
             )
 
             let sendBuffer = sendBufferRaw.assumingMemoryBound(to: QUIC_BUFFER.self)
@@ -144,9 +144,9 @@ public final class QuicStream: Sendable {
     }
 }
 
-// Not sendable. msquic ensures callbacks for a connection are always delivered serially
-// https://github.com/microsoft/msquic/blob/main/docs/API.md#execution-mode
-// This is retained by the msquic stream as it has to outlive the stream
+/// Not sendable. msquic ensures callbacks for a connection are always delivered serially
+/// https://github.com/microsoft/msquic/blob/main/docs/API.md#execution-mode
+/// This is retained by the msquic stream as it has to outlive the stream
 private class StreamHandle {
     let logger: Logger
     let ptr: OpaquePointer
@@ -165,7 +165,7 @@ private class StreamHandle {
             api.pointee.SetCallbackHandler(
                 ptr,
                 handlerPtr,
-                Unmanaged.passRetained(self).toOpaque() // !! retain +1
+                Unmanaged.passRetained(self).toOpaque(), // !! retain +1
             )
         }
     }
@@ -223,7 +223,7 @@ private class StreamHandle {
                 stream.handler.closed(
                     stream,
                     status: .init(rawValue: evtData.ConnectionCloseStatus),
-                    code: .init(evtData.ConnectionErrorCode)
+                    code: .init(evtData.ConnectionErrorCode),
                 )
             }
 
@@ -246,7 +246,7 @@ private class StreamHandle {
 private func streamCallback(
     stream _: OpaquePointer?,
     context: UnsafeMutableRawPointer?,
-    event: UnsafeMutablePointer<QUIC_STREAM_EVENT>?
+    event: UnsafeMutablePointer<QUIC_STREAM_EVENT>?,
 ) -> UInt32 {
     let handle = Unmanaged<StreamHandle>.fromOpaque(context!)
         .takeUnretainedValue()

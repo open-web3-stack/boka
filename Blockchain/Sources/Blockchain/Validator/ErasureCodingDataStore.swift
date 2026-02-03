@@ -59,7 +59,7 @@ public actor ErasureCodingDataStore {
         dataStore: any DataStoreProtocol,
         filesystemStore: FilesystemDataStore,
         config: ProtocolConfigRef,
-        networkClient: AvailabilityNetworkClient? = nil
+        networkClient: AvailabilityNetworkClient? = nil,
     ) {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
@@ -73,39 +73,39 @@ public actor ErasureCodingDataStore {
         pagedProofsGenerator = PagedProofsGenerator(config: config)
         cleanupService = DataStoreCleanup(
             dataStore: dataStore,
-            filesystemStore: filesystemStore
+            filesystemStore: filesystemStore,
         )
         storageMonitor = StorageMonitor(
             dataStore: dataStore,
             filesystemStore: filesystemStore,
-            cleanupService: cleanupService
+            cleanupService: cleanupService,
         )
         storageMonitoring = StorageMonitoring(storageMonitor: storageMonitor)
         shardRetrieval = ShardRetrieval(
             dataStore: dataStore,
             filesystemStore: filesystemStore,
-            segmentCache: segmentCache
+            segmentCache: segmentCache,
         )
         reconstructionService = ReconstructionService(
             dataStore: dataStore,
-            erasureCoding: erasureCoding
+            erasureCoding: erasureCoding,
         )
         auditBundleStore = AuditBundleStore(
             dataStore: dataStore,
             filesystemStore: filesystemStore,
-            erasureCoding: erasureCoding
+            erasureCoding: erasureCoding,
         )
         d3lSegmentStore = D3LSegmentStore(
             dataStore: dataStore,
             filesystemStore: filesystemStore,
             erasureCoding: erasureCoding,
-            pagedProofsGenerator: pagedProofsGenerator
+            pagedProofsGenerator: pagedProofsGenerator,
         )
         batchOperations = BatchOperations(
             dataStore: dataStore,
             d3lStore: d3lSegmentStore,
             shardRetrieval: shardRetrieval,
-            reconstructionService: reconstructionService
+            reconstructionService: reconstructionService,
         )
     }
 
@@ -137,12 +137,12 @@ public actor ErasureCodingDataStore {
     public func storeAuditBundle(
         bundle: Data,
         workPackageHash: Data32,
-        segmentsRoot: Data32
+        segmentsRoot: Data32,
     ) async throws -> Data32 {
         try await auditBundleStore.storeBundle(
             bundle: bundle,
             workPackageHash: workPackageHash,
-            segmentsRoot: segmentsRoot
+            segmentsRoot: segmentsRoot,
         )
     }
 
@@ -161,12 +161,12 @@ public actor ErasureCodingDataStore {
     public func storeExportedSegments(
         segments: [Data4104],
         workPackageHash: Data32,
-        segmentsRoot: Data32
+        segmentsRoot: Data32,
     ) async throws -> Data32 {
         try await d3lSegmentStore.storeSegments(
             segments: segments,
             workPackageHash: workPackageHash,
-            segmentsRoot: segmentsRoot
+            segmentsRoot: segmentsRoot,
         )
     }
 
@@ -215,14 +215,14 @@ public actor ErasureCodingDataStore {
         pageIndex: Int,
         localIndex: Int,
         proof: [Data32],
-        segmentsRoot: Data32
+        segmentsRoot: Data32,
     ) async throws -> Bool {
         await pagedProofsGenerator.verifyProof(
             segment: segment,
             pageIndex: pageIndex,
             localIndex: localIndex,
             proof: proof,
-            segmentsRoot: segmentsRoot
+            segmentsRoot: segmentsRoot,
         )
     }
 
@@ -270,11 +270,11 @@ public actor ErasureCodingDataStore {
     /// Delegates to StorageMonitor
     public func incrementalCleanup(
         batchSize: Int = 100,
-        retentionEpochs: UInt32 = 6
+        retentionEpochs: UInt32 = 6,
     ) async throws -> IncrementalCleanupProgress {
         try await storageMonitor.incrementalCleanup(
             batchSize: batchSize,
-            retentionEpochs: retentionEpochs
+            retentionEpochs: retentionEpochs,
         )
     }
 
@@ -451,7 +451,7 @@ public actor ErasureCodingDataStore {
         indices: [Int],
         validators: [UInt16: NetAddr]? = nil,
         coreIndex _: UInt16 = 0,
-        totalValidators _: UInt16 = 1023
+        totalValidators _: UInt16 = 1023,
     ) async throws -> [Data4104] {
         // Try local storage first
         do {
@@ -544,7 +544,7 @@ public actor ErasureCodingDataStore {
     public func reconstructFromLocalShards(erasureRoot: Data32, originalLength: Int) async throws -> Data {
         try await reconstructionService.reconstructFromLocalShards(
             erasureRoot: erasureRoot,
-            originalLength: originalLength
+            originalLength: originalLength,
         )
     }
 
@@ -565,7 +565,7 @@ public actor ErasureCodingDataStore {
         originalLengths: [Data32: Int],
         validators: [UInt16: NetAddr]? = nil,
         coreIndex: UInt16 = 0,
-        totalValidators: UInt16 = 1023
+        totalValidators: UInt16 = 1023,
     ) async throws -> [Data32: Data] {
         try await batchOperations.batchReconstruct(
             erasureRoots: erasureRoots,
@@ -574,7 +574,7 @@ public actor ErasureCodingDataStore {
             fetchStrategy: fetchStrategy,
             validators: validators,
             coreIndex: coreIndex,
-            totalValidators: totalValidators
+            totalValidators: totalValidators,
         )
     }
 }
@@ -690,7 +690,7 @@ public struct CleanupMetrics: Sendable {
         bytesReclaimedLastRun: Int,
         cleanupDuration: TimeInterval,
         totalEntriesDeleted: Int,
-        totalBytesReclaimed: Int
+        totalBytesReclaimed: Int,
     ) {
         self.lastCleanupTime = lastCleanupTime
         self.entriesDeletedLastRun = entriesDeletedLastRun
@@ -713,7 +713,7 @@ public struct CleanupState: Sendable, Codable {
         auditCleanupEpoch: UInt32 = 0,
         d3lCleanupEpoch: UInt32 = 0,
         lastCleanupTime: Date = .distantPast,
-        isInProgress: Bool = false
+        isInProgress: Bool = false,
     ) {
         self.auditCleanupEpoch = auditCleanupEpoch
         self.d3lCleanupEpoch = d3lCleanupEpoch

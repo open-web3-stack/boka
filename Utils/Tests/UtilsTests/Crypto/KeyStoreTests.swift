@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-
 @testable import Utils
 
 final class KeyStoreTests {
@@ -34,7 +33,7 @@ final class KeyStoreTests {
         let secretKey = try await keyStore.add(Bandersnatch.self, seed: seed)
         let retrievedKey = await keyStore.get(Bandersnatch.self, publicKey: secretKey.publicKey)
         #expect(retrievedKey != nil)
-        #expect(retrievedKey!.publicKey == secretKey.publicKey)
+        #expect(retrievedKey?.publicKey == secretKey.publicKey)
 
         let randomSecretKey = try await InMemoryKeyStore().add(Bandersnatch.self, seed: Data32.random())
         let retrievedRandomKey = await keyStore.get(Bandersnatch.self, publicKey: randomSecretKey.publicKey)

@@ -9,7 +9,7 @@ import Utils
 struct OpenRPC: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "OpenRPC tools",
-        subcommands: [Generate.self]
+        subcommands: [Generate.self],
     )
 
     struct Generate: AsyncParsableCommand {
@@ -24,7 +24,7 @@ struct OpenRPC: AsyncParsableCommand {
                 info: SpecInfo(
                     title: "JAM JSONRPC (draft)",
                     version: "0.0.1",
-                    description: "JSONRPC spec for JAM nodes (draft)"
+                    description: "JSONRPC spec for JAM nodes (draft)",
                 ),
                 methods: handlers.map { h in
                     SpecMethod(
@@ -35,9 +35,9 @@ struct OpenRPC: AsyncParsableCommand {
                             createSpecContent(type: $1, name: h.requestNames[safe: $0])
                         },
                         result: createSpecContent(type: h.responseType, name: nil),
-                        examples: nil
+                        examples: nil,
                     )
-                }
+                },
             )
 
             let encoder = JSONEncoder()
@@ -85,7 +85,7 @@ struct AnyJSONSchemaComponent: JSONSchemaComponent, @unchecked Sendable {
     }
 }
 
-// 👇 Wrap helper for nicer syntax
+/// 👇 Wrap helper for nicer syntax
 func wrap(_ schema: any JSONSchemaComponent & Sendable) -> AnyJSONSchemaComponent {
     .init(wrapped: schema)
 }
@@ -109,7 +109,7 @@ func createSpecContent(type: Any.Type, name: String?) -> SpecContent {
             summary: nil,
             description: nil,
             required: required,
-            schema: getSchema(type: type).definition()
+            schema: getSchema(type: type).definition(),
         )
     }
 }
@@ -166,18 +166,33 @@ extension Optional: TypeDescription {
 }
 
 extension Bool: TypeDescription {
-    static var name: String { "Bool" }
-    static var schema: any JSONSchemaComponent & Sendable { JSONBoolean() }
+    static var name: String {
+        "Bool"
+    }
+
+    static var schema: any JSONSchemaComponent & Sendable {
+        JSONBoolean()
+    }
 }
 
 extension String: TypeDescription {
-    static var name: String { "String" }
-    static var schema: any JSONSchemaComponent & Sendable { JSONString() }
+    static var name: String {
+        "String"
+    }
+
+    static var schema: any JSONSchemaComponent & Sendable {
+        JSONString()
+    }
 }
 
 extension BinaryInteger where Self: TypeDescription {
-    static var name: String { String(describing: Self.self) }
-    static var schema: any JSONSchemaComponent & Sendable { JSONInteger() }
+    static var name: String {
+        String(describing: Self.self)
+    }
+
+    static var schema: any JSONSchemaComponent & Sendable {
+        JSONInteger()
+    }
 }
 
 extension Int8: TypeDescription {}
@@ -192,21 +207,30 @@ extension UInt64: TypeDescription {}
 extension UInt: TypeDescription {}
 
 extension Data: TypeDescription {
-    static var name: String { "Data" }
+    static var name: String {
+        "Data"
+    }
+
     static var schema: any JSONSchemaComponent & Sendable {
         JSONString().title(name).pattern("^0x[0-9a-fA-F]*$")
     }
 }
 
 extension FixedSizeData: TypeDescription {
-    static var name: String { "Data\(T.value)" }
+    static var name: String {
+        "Data\(T.value)"
+    }
+
     static var schema: any JSONSchemaComponent & Sendable {
         JSONString().title(name).pattern("^0x[0-9a-fA-F]{\(T.value * 2)}$")
     }
 }
 
 extension Array: TypeDescription {
-    static var name: String { "Array<\(getName(type: Element.self))>" }
+    static var name: String {
+        "Array<\(getName(type: Element.self))>"
+    }
+
     static var schema: any JSONSchemaComponent & Sendable {
         JSONArray { wrap(getSchema(type: Element.self)) }
     }
@@ -257,7 +281,10 @@ extension ConfigLimitedSizeArray: TypeDescription {
 }
 
 extension Ref: TypeDescription {
-    static var name: String { getName(type: T.self) }
+    static var name: String {
+        getName(type: T.self)
+    }
+
     static var schema: any JSONSchemaComponent & Sendable {
         getSchema(type: T.self)
     }

@@ -72,8 +72,8 @@ extension FixedSizeData: FixedLengthData {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: decoder.codingPath,
-                    debugDescription: "Not enough data to decode \(T.self)"
-                )
+                    debugDescription: "Not enough data to decode \(T.self)",
+                ),
             )
         }
         self.data = data

@@ -15,7 +15,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     // a: authorizer hash
     public var authorizerHash: Data32
 
-    // g
+    /// g
     public var authGasUsed: UInt
 
     // t: authorizer trace
@@ -28,7 +28,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
     public var digests: ConfigLimitedSizeArray<
         WorkDigest,
         ProtocolConfig.Int1,
-        ProtocolConfig.MaxWorkItems
+        ProtocolConfig.MaxWorkItems,
     >
 
     public init(
@@ -39,7 +39,7 @@ public struct WorkReport: Sendable, Equatable, Codable, Hashable {
         packageSpecification: AvailabilitySpecifications,
         lookup: [Data32: Data32],
         digests: ConfigLimitedSizeArray<WorkDigest, ProtocolConfig.Int1, ProtocolConfig.MaxWorkItems>,
-        authGasUsed: UInt
+        authGasUsed: UInt,
     ) {
         self.authorizerHash = authorizerHash
         self.coreIndex = coreIndex
@@ -63,7 +63,7 @@ extension WorkReport: Dummy {
             packageSpecification: AvailabilitySpecifications.dummy(config: config),
             lookup: [:],
             digests: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkDigest.dummy(config: config)),
-            authGasUsed: 0
+            authGasUsed: 0,
         )
     }
 }

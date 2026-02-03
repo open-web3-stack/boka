@@ -17,7 +17,7 @@ public actor BatchOperations {
         dataStore: any DataStoreProtocol,
         d3lStore: D3LSegmentStore,
         shardRetrieval: ShardRetrieval,
-        reconstructionService: ReconstructionService
+        reconstructionService: ReconstructionService,
     ) {
         self.dataStore = dataStore
         self.d3lStore = d3lStore
@@ -35,7 +35,7 @@ public actor BatchOperations {
             do {
                 let segments = try await d3lStore.getSegments(
                     erasureRoot: request.erasureRoot,
-                    indices: request.indices
+                    indices: request.indices,
                 )
                 results[request.erasureRoot] = segments
             } catch {
@@ -61,7 +61,7 @@ public actor BatchOperations {
         fetchStrategy: FetchStrategy,
         validators: [UInt16: NetAddr]? = nil,
         coreIndex: UInt16 = 0,
-        totalValidators: UInt16 = 1023
+        totalValidators: UInt16 = 1023,
     ) async throws -> [Data32: Data] {
         // Capture state for TaskGroup closures
         let dataStore = dataStore
@@ -77,7 +77,7 @@ public actor BatchOperations {
             var activeTasks = 0
             var iterator = erasureRoots.makeIterator()
 
-            // Helper to add next task
+            /// Helper to add next task
             func addNextTask() {
                 guard let erasureRoot = iterator.next() else { return }
 
@@ -91,7 +91,7 @@ public actor BatchOperations {
                         do {
                             let data = try await self.reconstructionService.reconstructFromLocalShards(
                                 erasureRoot: erasureRoot,
-                                originalLength: originalLengths[erasureRoot] ?? 0
+                                originalLength: originalLengths[erasureRoot] ?? 0,
                             )
                             return (erasureRoot, data)
                         } catch {
@@ -119,8 +119,8 @@ public actor BatchOperations {
                                 totalValidators: totalValidators,
                                 requiredShards: max(
                                     0,
-                                    cEcOriginalCount - (self.shardRetrieval.getLocalShardCount(erasureRoot: erasureRoot))
-                                )
+                                    cEcOriginalCount - (self.shardRetrieval.getLocalShardCount(erasureRoot: erasureRoot)),
+                                ),
                             )
 
                             // Store fetched shards locally
@@ -137,14 +137,14 @@ public actor BatchOperations {
                                 try await dataStore.storeShard(
                                     shardData: shardData,
                                     erasureRoot: erasureRoot,
-                                    shardIndex: shardIndex
+                                    shardIndex: shardIndex,
                                 )
                             }
 
                             // Now reconstruct with combined local + fetched shards
                             let data = try await self.reconstructionService.reconstructFromLocalShards(
                                 erasureRoot: erasureRoot,
-                                originalLength: originalLengths[erasureRoot] ?? 0
+                                originalLength: originalLengths[erasureRoot] ?? 0,
                             )
 
                             logger.info("Successfully reconstructed erasureRoot=\(erasureRoot.toHexString()) with network fallback")
@@ -185,7 +185,7 @@ public actor BatchOperations {
     /// Batch reconstruction from local shards only
     private func batchReconstructFromLocal(
         erasureRoots: [Data32],
-        originalLengths: [Data32: Int]
+        originalLengths: [Data32: Int],
     ) async throws -> [Data32: Data] {
         // Parallelize local reconstruction
         try await withThrowingTaskGroup(of: (Data32, Data?).self) { group in
@@ -199,7 +199,7 @@ public actor BatchOperations {
                     do {
                         let data = try await self.reconstructionService.reconstructFromLocalShards(
                             erasureRoot: erasureRoot,
-                            originalLength: originalLength
+                            originalLength: originalLength,
                         )
                         return (erasureRoot, data)
                     } catch {

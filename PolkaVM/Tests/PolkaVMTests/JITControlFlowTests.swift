@@ -8,11 +8,10 @@
 // known limitations in test infrastructure (bitmask encoding complexity).
 
 import Foundation
+@testable import PolkaVM
 import Testing
 import TracingUtils
 import Utils
-
-@testable import PolkaVM
 
 private let logger = Logger(label: "JITControlFlowTests")
 
@@ -22,7 +21,7 @@ struct JITControlFlowTests {
     // MARK: - Halt Instruction (Opcode 1)
 
     @Test("JIT: Fallthrough instruction at end of program traps")
-    func jitHalt() async throws {
+    func jitHalt() async {
         // Create a program with just fallthrough (opcode 1) at the end
         // Per spec, when execution continues past the program end, it should trap
         let program = ProgramBlobBuilder.createSingleInstructionProgram([0x01]) // fallthrough
@@ -34,33 +33,33 @@ struct JITControlFlowTests {
     }
 
     @Test("JIT vs Interpreter: Fallthrough parity")
-    func jitHaltParity() async throws {
+    func jitHaltParity() async {
         let program = ProgramBlobBuilder.createSingleInstructionProgram([0x01]) // fallthrough
 
         let (interpreterResult, jitResult, differences) = await JITParityComparator.compare(
             blob: program,
-            testName: "Fallthrough"
+            testName: "Fallthrough",
         )
 
         // Both should trap (execution continued past end of program)
         #expect(
             interpreterResult.exitReason == .panic(.trap),
-            "Interpreter should trap: got \(interpreterResult.exitReason)"
+            "Interpreter should trap: got \(interpreterResult.exitReason)",
         )
         #expect(
             jitResult.exitReason == .panic(.trap),
-            "JIT should trap: got \(jitResult.exitReason)"
+            "JIT should trap: got \(jitResult.exitReason)",
         )
         #expect(
             differences == nil,
-            "Fallthrough parity mismatch: \(differences ?? "none")"
+            "Fallthrough parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - Trap Instruction (Opcode 0)
 
     @Test("JIT: Trap instruction stops execution")
-    func jitTrap() async throws {
+    func jitTrap() async {
         // Trap program - single trap instruction
         let trapProgram = ProgramBlobBuilder.createSingleInstructionProgram([0x00]) // trap instruction
 
@@ -71,7 +70,7 @@ struct JITControlFlowTests {
     }
 
     @Test("JIT: Trap does not consume excessive gas")
-    func jitTrapGasConsumption() async throws {
+    func jitTrapGasConsumption() async {
         let trapProgram = ProgramBlobBuilder.createSingleInstructionProgram([0x00]) // trap instruction
 
         let initialGas = Gas(1000)
@@ -80,27 +79,27 @@ struct JITControlFlowTests {
         // Should consume minimal gas (typically 1 for the instruction)
         #expect(
             result.finalGas.value > initialGas.value - 100,
-            "Trap should not consume significant gas: initial=\(initialGas), final=\(result.finalGas)"
+            "Trap should not consume significant gas: initial=\(initialGas), final=\(result.finalGas)",
         )
     }
 
     @Test("JIT vs Interpreter: Trap parity")
-    func jitTrapParity() async throws {
+    func jitTrapParity() async {
         let (_, _, differences) = await JITParityComparator.compareSingleInstruction(
             [0x00],
-            testName: "Trap"
+            testName: "Trap",
         )
 
         #expect(
             differences == nil,
-            "Trap parity mismatch: \(differences ?? "none")"
+            "Trap parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - Jump Instruction (Opcode 40)
 
     @Test("JIT: Jump forward over instruction")
-    func jitJumpForward() async throws {
+    func jitJumpForward() async {
         // Build a simple program: Jump(forward), Fallthrough
         // This tests if Jump instruction works at all
 
@@ -124,12 +123,12 @@ struct JITControlFlowTests {
         // Jump to fallthrough, then execution continues past end → trap
         #expect(
             result.exitReason == .panic(.trap),
-            "Expected trap after fallthrough, got \(result.exitReason)"
+            "Expected trap after fallthrough, got \(result.exitReason)",
         )
     }
 
     @Test("JIT vs Interpreter: Jump forward parity")
-    func jitJumpParity() async throws {
+    func jitJumpParity() async {
         // Simple Jump test: Jump to Halt
         let jumpOffset = Int32(5) // Jump to PC=5 (past the 5-byte Jump instruction)
         let jumpInst: [UInt8] = [
@@ -145,20 +144,20 @@ struct JITControlFlowTests {
 
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "Jump forward"
+            testName: "Jump forward",
         )
 
         // Both should have the same behavior (currently both trap due to bitmask encoding issue)
         #expect(
             differences == nil,
-            "Jump parity mismatch: \(differences ?? "none")"
+            "Jump parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - JumpInd Instruction (Opcode 50)
 
     @Test("JIT vs Interpreter: JumpInd parity")
-    func jitJumpIndParity() async throws {
+    func jitJumpIndParity() async {
         // JumpInd through register - jump forward to Halt
         var code = Data()
 
@@ -211,20 +210,20 @@ struct JITControlFlowTests {
 
         let (interpreterResult, jitResult, _) = await JITParityComparator.compare(
             blob: blob,
-            testName: "JumpInd"
+            testName: "JumpInd",
         )
 
         // Both should have the same behavior
         #expect(
             interpreterResult.exitReason == jitResult.exitReason,
-            "JumpInd exit reason mismatch: interpreter=\(interpreterResult.exitReason), jit=\(jitResult.exitReason)"
+            "JumpInd exit reason mismatch: interpreter=\(interpreterResult.exitReason), jit=\(jitResult.exitReason)",
         )
     }
 
     // MARK: - LoadImmJump Instruction (Opcode 80)
 
     @Test("JIT: LoadImmJump loads then jumps")
-    func jitLoadImmJump() async throws {
+    func jitLoadImmJump() async {
         // LoadImmJump: load immediate into register, then jump
         var code = Data()
 
@@ -262,7 +261,7 @@ struct JITControlFlowTests {
     }
 
     @Test("JIT vs Interpreter: LoadImmJump parity")
-    func jitLoadImmJumpParity() async throws {
+    func jitLoadImmJumpParity() async {
         // Per spec pvm.tex section 5.10:
         // Format: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
         // where l_X = min(4, floor(byte[1]/16) mod 8), l_Y = min(4, max(0, ℓ - l_X - 1))
@@ -293,19 +292,19 @@ struct JITControlFlowTests {
 
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "LoadImmJump"
+            testName: "LoadImmJump",
         )
 
         #expect(
             differences == nil,
-            "LoadImmJump parity mismatch: \(differences ?? "none")"
+            "LoadImmJump parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - LoadImmJumpInd Instruction (Opcode 180)
 
     @Test("JIT: LoadImmJumpInd loads then jumps indirect")
-    func jitLoadImmJumpInd() async throws {
+    func jitLoadImmJumpInd() async {
         // LoadImmJumpInd: load jump target into register, then jump through it
         var code = Data()
 
@@ -352,7 +351,7 @@ struct JITControlFlowTests {
     }
 
     @Test("JIT vs Interpreter: LoadImmJumpInd parity")
-    func jitLoadImmJumpIndParity() async throws {
+    func jitLoadImmJumpIndParity() async {
         // Test LoadImmJumpInd with special encoding
         // Format: [opcode][ra_rb_packed][value_bytes][offset_bytes]
         // This is similar to LoadImmJump but uses packed registers instead of r_A|l_X
@@ -392,20 +391,20 @@ struct JITControlFlowTests {
 
         let (interpreterResult, jitResult, _) = await JITParityComparator.compare(
             blob: blob,
-            testName: "LoadImmJumpInd"
+            testName: "LoadImmJumpInd",
         )
 
         // Both should have the same behavior
         #expect(
             interpreterResult.exitReason == jitResult.exitReason,
-            "LoadImmJumpInd exit reason mismatch: interpreter=\(interpreterResult.exitReason), jit=\(jitResult.exitReason)"
+            "LoadImmJumpInd exit reason mismatch: interpreter=\(interpreterResult.exitReason), jit=\(jitResult.exitReason)",
         )
     }
 
     // MARK: - Edge Cases
 
     @Test("JIT: Jump to invalid target causes panic")
-    func jitJumpInvalidTarget() async throws {
+    func jitJumpInvalidTarget() async {
         // Jump to a non-basic-block location
         var code = Data()
 
@@ -441,12 +440,12 @@ struct JITControlFlowTests {
         // Should panic due to invalid branch target
         #expect(
             result.exitReason == .panic(.invalidBranch),
-            "Jump to invalid target should panic: got \(result.exitReason)"
+            "Jump to invalid target should panic: got \(result.exitReason)",
         )
     }
 
     @Test("JIT: Large jump offset")
-    func jitJumpLargeOffset() async throws {
+    func jitJumpLargeOffset() async {
         // Test jumping with a large offset value
         var code = Data()
 
@@ -479,7 +478,7 @@ struct JITControlFlowTests {
 
     @Test(
         "Interpreter: Branch validation using bitmask",
-        .disabled("isInstructionBoundary temporarily disabled due to Data corruption issues")
+        .disabled("isInstructionBoundary temporarily disabled due to Data corruption issues"),
     )
     func interpreterBranchValidation() async throws {
         // Test that interpreter validates branch targets using bitmask
@@ -518,7 +517,7 @@ struct JITControlFlowTests {
             pc: 0,
             registers: Registers([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
             gas: Gas(10000),
-            memory: memory
+            memory: memory,
         )
         let engine = Engine(config: DefaultPvmConfig())
         let exitReason = await engine.execute(state: vmState)
@@ -526,7 +525,7 @@ struct JITControlFlowTests {
         // Should panic due to invalid branch target
         #expect(
             exitReason == .panic(.invalidBranch),
-            "Jump to PC=3 (invalid) should panic: got \(exitReason)"
+            "Jump to PC=3 (invalid) should panic: got \(exitReason)",
         )
     }
 }

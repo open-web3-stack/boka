@@ -14,7 +14,7 @@ public enum MemoryError: Error, Equatable {
 
     private static let pageSize = UInt32(DefaultPvmConfig().pvmMemoryPageSize)
 
-    // align to page start address
+    /// align to page start address
     private func alignToPageStart(address: UInt32) -> UInt32 {
         (address / Self.pageSize) * Self.pageSize
     }

@@ -10,7 +10,7 @@ public final class IsAuthorizedContext: InvocationContext {
     public var context: ContextType = ()
     public let config: ProtocolConfigRef
 
-    // other info needed for dispatches
+    /// other info needed for dispatches
     public let package: WorkPackage
 
     public init(config: ProtocolConfigRef, package: WorkPackage) {

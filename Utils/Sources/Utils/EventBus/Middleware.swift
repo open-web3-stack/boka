@@ -17,7 +17,7 @@ public struct Middleware: MiddlewareProtocol {
 }
 
 private struct NoopMiddleware: MiddlewareProtocol {
-    public func handle<T: Sendable>(_ event: T, next: MiddlewareHandler<T>) async throws {
+    func handle<T: Sendable>(_ event: T, next: MiddlewareHandler<T>) async throws {
         try await next(event)
     }
 }

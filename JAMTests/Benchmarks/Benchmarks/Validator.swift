@@ -168,7 +168,7 @@ func validatorBenchmarks() {
             basicSize: basicSize,
             originalCount: originalCount,
             recoveryCount: recoveryCount,
-            originalLength: originalData.count
+            originalLength: originalData.count,
         )
         benchmark.stopMeasurement()
         blackHole(reconstructed.count)

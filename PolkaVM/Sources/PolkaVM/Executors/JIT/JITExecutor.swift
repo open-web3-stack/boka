@@ -105,7 +105,7 @@ final class JITExecutor {
         initialPC: UInt32,
         invocationContext: UnsafeMutableRawPointer?,
         initialMemory: (any Memory)? = nil,
-        memoryLayout: JITMemoryLayout? = nil
+        memoryLayout: JITMemoryLayout? = nil,
     ) throws -> (ExitReason, MemoryAllocationInfo) {
         // Create a flat memory buffer for the JIT execution
         logger.debug("Setting up JIT execution environment")
@@ -137,7 +137,7 @@ final class JITExecutor {
                 prot,
                 flags,
                 -1, // No file descriptor
-                0 // No offset
+                0, // No offset
             )
 
             if ptr == MAP_FAILED {
@@ -202,7 +202,7 @@ final class JITExecutor {
                             memcpy(zoneBase, baseAddress, zone.data.count)
                             totalCopied += zone.data.count
                             logger.debug(
-                                "  Copied zone: \(zone.data.count) bytes to original address 0x\(String(zone.originalBase, radix: 16))"
+                                "  Copied zone: \(zone.data.count) bytes to original address 0x\(String(zone.originalBase, radix: 16))",
                             )
                         }
                     }
@@ -273,7 +273,7 @@ final class JITExecutor {
                 UInt32, // VM memory size
                 UnsafeMutablePointer<UInt64>, // VM gas counter
                 UInt32, // Initial PC
-                UnsafeMutableRawPointer? // Context pointer
+                UnsafeMutableRawPointer?, // Context pointer
             ) -> Int32
 
             // Cast the raw function pointer to the expected type
@@ -286,7 +286,7 @@ final class JITExecutor {
                 jitMemorySize,
                 &gasValue,
                 initialPC,
-                invocationContext
+                invocationContext,
             )
         }
 
@@ -340,7 +340,7 @@ final class JITExecutor {
         let memoryInfo = MemoryAllocationInfo(
             pointer: memoryBuffer,
             size: Int(jitMemorySize),
-            usesMmap: usesMmap
+            usesMmap: usesMmap,
         )
 
         return (exitReason, memoryInfo)

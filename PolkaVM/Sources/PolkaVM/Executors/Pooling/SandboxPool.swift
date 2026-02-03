@@ -18,7 +18,7 @@ public actor SandboxPool {
     private var nextWorkerID: UInt32 = 0
     private var overflowWorkers: Int = 0
 
-    // Request tracking
+    /// Request tracking
     private var activeRequests = 0
 
     // Statistics
@@ -33,7 +33,7 @@ public actor SandboxPool {
     private var isHealthy = true
     private var unhealthyReason: String?
 
-    // Queue wait time tracking
+    /// Queue wait time tracking
     private var queueWaitTimes: [TimeInterval] = []
 
     public init(config: SandboxPoolConfiguration, executionMode: ExecutionMode) async throws {
@@ -68,7 +68,7 @@ public actor SandboxPool {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx _: (any InvocationContext)?
+        ctx _: (any InvocationContext)?,
     ) async throws -> VMExecutionResult {
         logger.debug("[POOL] execute() called - activeRequests: \(activeRequests), workers: \(workers.count)")
 
@@ -94,7 +94,7 @@ public actor SandboxPool {
                 blob: blob,
                 pc: pc,
                 gas: gas,
-                argumentData: argumentData
+                argumentData: argumentData,
             )
         }
 
@@ -114,7 +114,7 @@ public actor SandboxPool {
                 pc: pc,
                 gas: gas,
                 argumentData: argumentData,
-                executionMode: executionMode
+                executionMode: executionMode,
             )
 
             totalExecutions += 1
@@ -123,7 +123,7 @@ public actor SandboxPool {
 
             logger
                 .debug(
-                    "[POOL] Execution successful - total: \(totalExecutions), succeeded: \(successfulExecutions), failed: \(failedExecutions)"
+                    "[POOL] Execution successful - total: \(totalExecutions), succeeded: \(successfulExecutions), failed: \(failedExecutions)",
                 )
 
             // Check if worker needs recycling
@@ -143,7 +143,7 @@ public actor SandboxPool {
 
             logger
                 .error(
-                    "[POOL] Execution failed - total: \(totalExecutions), succeeded: \(successfulExecutions), failed: \(failedExecutions) - error: \(error)"
+                    "[POOL] Execution failed - total: \(totalExecutions), succeeded: \(successfulExecutions), failed: \(failedExecutions) - error: \(error)",
                 )
 
             // Check if error indicates worker failure
@@ -183,7 +183,7 @@ public actor SandboxPool {
             uptime: uptime,
             isHealthy: isHealthy,
             averageQueueWaitTime: averageQueueWait,
-            workerFailureRate: failureRate
+            workerFailureRate: failureRate,
         )
     }
 
@@ -236,7 +236,7 @@ public actor SandboxPool {
             do {
                 let worker = try await SandboxWorker(
                     workerID: workerID,
-                    config: config
+                    config: config,
                 )
                 workers[workerID] = worker
                 logger.debug("[POOL] Worker \(workerID) spawned successfully")
@@ -304,7 +304,7 @@ public actor SandboxPool {
         do {
             let worker = try await SandboxWorker(
                 workerID: workerID,
-                config: config
+                config: config,
             )
             workers[workerID] = worker
             overflowWorkers += 1
@@ -320,7 +320,7 @@ public actor SandboxPool {
         blob: Data,
         pc: UInt32,
         gas: Gas,
-        argumentData: Data?
+        argumentData: Data?,
     ) async throws -> VMExecutionResult {
         switch config.exhaustionPolicy {
         case .queue:
@@ -337,7 +337,7 @@ public actor SandboxPool {
                     pc: pc,
                     gas: gas,
                     argumentData: argumentData,
-                    executionMode: executionMode
+                    executionMode: executionMode,
                 )
             }
             throw SandboxPoolError.poolExhausted
@@ -374,7 +374,7 @@ public actor SandboxPool {
             do {
                 let newWorker = try await SandboxWorker(
                     workerID: nextWorkerID,
-                    config: config
+                    config: config,
                 )
                 nextWorkerID += 1
                 let newWorkerID = await newWorker.id

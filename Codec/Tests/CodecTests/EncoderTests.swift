@@ -1,7 +1,6 @@
+@testable import Codec
 import Foundation
 import Testing
-
-@testable import Codec
 
 struct EncoderTests {
     struct TestStruct: Codable {
@@ -81,7 +80,7 @@ struct EncoderTests {
             optionalInt64Value2: 1_234_567_890_123,
             uint64Value: 18_446_744_073_709_551_615,
             optionalUint64Value: nil,
-            optionalUint64Value2: 9_223_372_036_854_775_807
+            optionalUint64Value2: 9_223_372_036_854_775_807,
         )
 
         let encoded = try JamEncoder.encode(testObject)
@@ -290,9 +289,9 @@ struct EncoderTests {
                     uint32Value: 8,
                     uint64Value: 9,
                     dataValue: Data([0x01]),
-                    nestedValues: []
+                    nestedValues: [],
                 ),
-            ]
+            ],
         )
 
         let encoded = try JamEncoder.encode(testData)

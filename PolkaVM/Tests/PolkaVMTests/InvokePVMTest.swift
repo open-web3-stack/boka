@@ -1,8 +1,7 @@
 import Foundation
+@testable import PolkaVM
 import Testing
 import Utils
-
-@testable import PolkaVM
 
 // standard programs
 let empty = Data([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0])
@@ -26,7 +25,7 @@ let sumToNWithHostCall = Data([
 ])
 
 struct InvokePVMTests {
-    @Test func testEmptyProgram() async throws {
+    @Test func emptyProgram() async {
         let config = DefaultPvmConfig()
         let (exitReason, _, output) = await invokePVM(
             config: config,
@@ -34,7 +33,7 @@ struct InvokePVMTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data(),
-            ctx: nil
+            ctx: nil,
         )
         #expect(exitReason == .panic(.trap))
         #expect(output == nil)
@@ -45,7 +44,7 @@ struct InvokePVMTests {
         (8, 34, 999_944),
         (9, 55, 999_938),
     ])
-    func testFibonacci(testCase: (input: UInt8, output: UInt8, gas: UInt64)) async throws {
+    func testFibonacci(testCase: (input: UInt8, output: UInt8, gas: UInt64)) async {
         let config = DefaultPvmConfig()
         let (exitReason, _, output) = await invokePVM(
             config: config,
@@ -53,7 +52,7 @@ struct InvokePVMTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([testCase.input]),
-            ctx: nil
+            ctx: nil,
         )
 
         let value = output?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
@@ -71,7 +70,7 @@ struct InvokePVMTests {
         (4, 10, 999_979),
         (5, 15, 999_976),
     ])
-    func testSumToN(testCase: (input: UInt8, output: UInt8, gas: UInt64)) async throws {
+    func testSumToN(testCase: (input: UInt8, output: UInt8, gas: UInt64)) async {
         let config = DefaultPvmConfig()
         let (exitReason, _, output) = await invokePVM(
             config: config,
@@ -79,7 +78,7 @@ struct InvokePVMTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([testCase.input]),
-            ctx: nil
+            ctx: nil,
         )
 
         let value = output?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
@@ -92,7 +91,7 @@ struct InvokePVMTests {
         }
     }
 
-    @Test func testInvocationContext() async throws {
+    @Test func invocationContext() async {
         let config = DefaultPvmConfig()
 
         struct TestInvocationContext: InvocationContext {
@@ -121,7 +120,7 @@ struct InvokePVMTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([5]),
-            ctx: TestInvocationContext()
+            ctx: TestInvocationContext(),
         )
 
         let value = output?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0

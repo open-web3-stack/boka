@@ -5,11 +5,10 @@
 // and their immediate variants
 
 import Foundation
+@testable import PolkaVM
 import Testing
 import TracingUtils
 import Utils
-
-@testable import PolkaVM
 
 private let logger = Logger(label: "JITArithmeticTests")
 
@@ -19,7 +18,7 @@ struct JITArithmeticTests {
     // MARK: - Add64/Sub64 Instructions (Opcodes 200-201)
 
     @Test("JIT: Add64 adds two registers")
-    func jitAdd64() async throws {
+    func jitAdd64() async {
         // LoadImm64 r1, 100
         // LoadImm64 r2, 42
         // Add64 r3, r1, r2
@@ -50,7 +49,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT: Add64 with overflow wraps correctly")
-    func jitAdd64Overflow() async throws {
+    func jitAdd64Overflow() async {
         // LoadImm64 r1, UInt64.max
         // LoadImm64 r2, 1
         // Add64 r3, r1, r2
@@ -81,7 +80,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT: Sub64 subtracts two registers")
-    func jitSub64() async throws {
+    func jitSub64() async {
         // LoadImm64 r1, 100
         // LoadImm64 r2, 42
         // Sub64 r3, r1, r2
@@ -112,7 +111,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT: Sub64 with underflow wraps correctly")
-    func jitSub64Underflow() async throws {
+    func jitSub64Underflow() async {
         // LoadImm64 r1, 42
         // LoadImm64 r2, 100
         // Sub64 r3, r1, r2
@@ -144,7 +143,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT vs Interpreter: Add64 parity")
-    func jitAdd64Parity() async throws {
+    func jitAdd64Parity() async {
         var code = Data()
 
         code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 1000
@@ -165,19 +164,19 @@ struct JITArithmeticTests {
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "Add64"
+            testName: "Add64",
         )
 
         #expect(
             differences == nil,
-            "Add64 parity mismatch: \(differences ?? "none")"
+            "Add64 parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - AddImm/SubImm Instructions (Opcodes 149-154)
 
     @Test("JIT: AddImm64 adds immediate to register")
-    func jitAddImm64() async throws {
+    func jitAddImm64() async {
         // LoadImm64 r1, 100
         // AddImm64 r1, 42
         // Halt
@@ -203,7 +202,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT vs Interpreter: AddImm64 parity")
-    func jitAddImm64Parity() async throws {
+    func jitAddImm64Parity() async {
         var code = Data()
 
         code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 1000
@@ -220,19 +219,19 @@ struct JITArithmeticTests {
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "AddImm64"
+            testName: "AddImm64",
         )
 
         #expect(
             differences == nil,
-            "AddImm64 parity mismatch: \(differences ?? "none")"
+            "AddImm64 parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - Mul64 Instruction (Opcode 202)
 
     @Test("JIT: Mul64 multiplies two registers")
-    func jitMul64() async throws {
+    func jitMul64() async {
         // LoadImm64 r1, 100
         // LoadImm64 r2, 42
         // Mul64 r3, r1, r2
@@ -262,7 +261,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT: Mul64 with overflow wraps correctly")
-    func jitMul64Overflow() async throws {
+    func jitMul64Overflow() async {
         // LoadImm64 r1, 2^40
         // LoadImm64 r2, 2^30
         // Mul64 r3, r1, r2
@@ -293,7 +292,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT vs Interpreter: Mul64 parity")
-    func jitMul64Parity() async throws {
+    func jitMul64Parity() async {
         var code = Data()
 
         code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 12345
@@ -313,19 +312,19 @@ struct JITArithmeticTests {
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "Mul64"
+            testName: "Mul64",
         )
 
         #expect(
             differences == nil,
-            "Mul64 parity mismatch: \(differences ?? "none")"
+            "Mul64 parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - Shift Instructions (Opcodes 206-211)
 
     @Test("JIT: ShloL64 shifts left logical")
-    func jitShloL64() async throws {
+    func jitShloL64() async {
         // LoadImm64 r1, 1
         // LoadImm64 r2, 4
         // ShloL64 r3, r1, r2
@@ -355,7 +354,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT: ShloL64 with large shift wraps")
-    func jitShloL64LargeShift() async throws {
+    func jitShloL64LargeShift() async {
         // LoadImm64 r1, 1
         // LoadImm64 r2, 68 (greater than 64)
         // ShloL64 r3, r1, r2
@@ -385,7 +384,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT: ShroR64 shifts right logical")
-    func jitShroR64() async throws {
+    func jitShroR64() async {
         // LoadImm64 r1, 128
         // LoadImm64 r2, 2
         // ShroR64 r3, r1, r2
@@ -415,7 +414,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT: SharR64 shifts right arithmetic")
-    func jitSharR64() async throws {
+    func jitSharR64() async {
         // LoadImm64 r1, -128 (as signed)
         // LoadImm64 r2, 2
         // SharR64 r3, r1, r2
@@ -447,7 +446,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT vs Interpreter: ShloL64 parity")
-    func jitShloL64Parity() async throws {
+    func jitShloL64Parity() async {
         var code = Data()
 
         code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 256
@@ -467,19 +466,19 @@ struct JITArithmeticTests {
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "ShloL64"
+            testName: "ShloL64",
         )
 
         #expect(
             differences == nil,
-            "ShloL64 parity mismatch: \(differences ?? "none")"
+            "ShloL64 parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - And/Or/Xor Instructions (Opcodes 210-212)
 
     @Test("JIT: And performs bitwise AND")
-    func jitAnd() async throws {
+    func jitAnd() async {
         // LoadImm64 r1, 0xFF00FF00
         // LoadImm64 r2, 0xFFFF0000
         // And r3, r1, r2
@@ -509,7 +508,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT: Or performs bitwise OR")
-    func jitOr() async throws {
+    func jitOr() async {
         // LoadImm64 r1, 0xF0
         // LoadImm64 r2, 0x0F
         // Or r3, r1, r2
@@ -539,7 +538,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT: Xor performs bitwise XOR")
-    func jitXor() async throws {
+    func jitXor() async {
         // LoadImm64 r1, 0xFF
         // LoadImm64 r2, 0xFF
         // Xor r3, r1, r2
@@ -569,7 +568,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT vs Interpreter: And parity")
-    func jitAndParity() async throws {
+    func jitAndParity() async {
         var code = Data()
 
         code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x123456789ABCDEF0
@@ -589,19 +588,19 @@ struct JITArithmeticTests {
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "And"
+            testName: "And",
         )
 
         #expect(
             differences == nil,
-            "And parity mismatch: \(differences ?? "none")"
+            "And parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - Edge Cases
 
     @Test("JIT: Add64 with zero register")
-    func jitAdd64WithZero() async throws {
+    func jitAdd64WithZero() async {
         // LoadImm64 r1, 100
         // LoadImm64 r2, 0
         // Add64 r3, r1, r2
@@ -631,7 +630,7 @@ struct JITArithmeticTests {
     }
 
     @Test("JIT: Mul64 by zero")
-    func jitMul64ByZero() async throws {
+    func jitMul64ByZero() async {
         // LoadImm64 r1, 12345
         // LoadImm64 r2, 0
         // Mul64 r3, r1, r2

@@ -21,7 +21,7 @@ public enum HostCallResultCode: UInt64 {
     case OK = 0
 }
 
-// Inner pvm invocations have their own set of result codes👇
+/// Inner pvm invocations have their own set of result codes👇
 public enum HostCallResultCodeInner: UInt32 {
     /// HALT = 0: The invocation completed and halted normally.
     case HALT = 0

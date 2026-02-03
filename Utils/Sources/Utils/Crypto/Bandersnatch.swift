@@ -48,7 +48,7 @@ public enum Bandersnatch: KeyType {
                     ptrs[1].ptr,
                     ptrs[1].count,
                     out_buf.ptr,
-                    out_buf.count
+                    out_buf.count,
                 )
             } onErr: { err throws(Error) in
                 throw .ietfVRFSignFailed(err)
@@ -66,7 +66,7 @@ public enum Bandersnatch: KeyType {
                     ptrs[0].ptr,
                     ptrs[0].count,
                     out_buf.ptr,
-                    out_buf.count
+                    out_buf.count,
                 )
             } onErr: { err throws(Error) in
                 throw .getOutputFailed(err)
@@ -146,7 +146,7 @@ public enum Bandersnatch: KeyType {
         ///
         /// On success returns the VRF output hash.
         public func ietfVRFVerify(
-            vrfInputData: Data, auxData: Data = Data(), signature: Data96
+            vrfInputData: Data, auxData: Data = Data(), signature: Data96,
         ) throws(Error) -> Data32 {
             var output = Data(repeating: 0, count: 32)
 
@@ -160,7 +160,7 @@ public enum Bandersnatch: KeyType {
                     ptrs[2].ptr,
                     ptrs[2].count,
                     out_buf.ptr,
-                    out_buf.count
+                    out_buf.count,
                 )
             } onErr: { err throws(Error) in
                 throw .ietfVRFVerifyFailed(err)
@@ -222,7 +222,7 @@ public enum Bandersnatch: KeyType {
                         ptrs[1].ptr,
                         ptrs[1].count,
                         out_buf.ptr,
-                        out_buf.count
+                        out_buf.count,
                     )
                 }
             } onErr: { err throws(Error) in
@@ -247,7 +247,7 @@ public enum Bandersnatch: KeyType {
                         ringPtrs.baseAddress,
                         UInt(ringPtrs.count),
                         ctx.ptr.value,
-                        &ptr
+                        &ptr,
                     )
                 }
 
@@ -310,7 +310,7 @@ public enum Bandersnatch: KeyType {
                     ptrs[2].ptr,
                     ptrs[2].count,
                     out_buf.ptr,
-                    out_buf.count
+                    out_buf.count,
                 )
             } onErr: { err throws(Error) in
                 throw .ringVRFVerifyFailed(err)
@@ -328,7 +328,7 @@ public enum Bandersnatch: KeyType {
                 ptrs[0].ptr,
                 ptrs[0].count,
                 out_buf.ptr,
-                out_buf.count
+                out_buf.count,
             )
         } onErr: { err throws(Error) in
             throw .getOutputFailed(err)

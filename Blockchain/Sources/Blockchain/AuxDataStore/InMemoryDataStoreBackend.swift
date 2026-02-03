@@ -2,31 +2,31 @@ import Foundation
 import Utils
 
 public actor InMemoryDataStoreBackend {
-    // segment root => erasure root (for audit bundles)
+    /// segment root => erasure root (for audit bundles)
     private var erasureRootBySegmentRoot: [Data32: Data32] = [:]
 
-    // segment root => D³L erasure root (separate mapping to avoid collision)
+    /// segment root => D³L erasure root (separate mapping to avoid collision)
     private var d3lErasureRootBySegmentsRoot: [Data32: Data32] = [:]
 
-    // work package hash => segment root
+    /// work package hash => segment root
     private var segmentRootByWorkPackageHash: [Data32: Data32] = [:]
 
-    // erasure root + index => segment data (variable-length to support both audit and D³L shards)
+    /// erasure root + index => segment data (variable-length to support both audit and D³L shards)
     private var chunks: [Data32: [UInt16: Data]] = [:]
 
-    // erasure root => timestamp
+    /// erasure root => timestamp
     private var timestamps: [Data32: Date] = [:]
 
-    // erasure root => Paged-Proofs metadata
+    /// erasure root => Paged-Proofs metadata
     private var pagedProofsMetadata: [Data32: Data] = [:]
 
-    // erasure root => audit entry
+    /// erasure root => audit entry
     private var auditEntries: [Data32: AuditEntry] = [:]
 
-    // erasure root => D³L entry
+    /// erasure root => D³L entry
     private var d3lEntries: [Data32: D3LEntry] = [:]
 
-    // Generic metadata storage
+    /// Generic metadata storage
     private var genericMetadata: [Data: Data] = [:]
 
     public init() {}
@@ -96,14 +96,14 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
         erasureRoot: Data32,
         segmentsRoot: Data32,
         bundleSize: Int,
-        timestamp: Date
+        timestamp: Date,
     ) async throws {
         auditEntries[erasureRoot] = AuditEntry(
             workPackageHash: workPackageHash,
             erasureRoot: erasureRoot,
             segmentsRoot: segmentsRoot,
             bundleSize: bundleSize,
-            timestamp: timestamp
+            timestamp: timestamp,
         )
     }
 
@@ -122,7 +122,7 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
     public func cleanupAuditEntriesIteratively(
         before cutoff: Date,
         batchSize: Int,
-        processor: @Sendable ([AuditEntry]) async throws -> Bool
+        processor: @Sendable ([AuditEntry]) async throws -> Bool,
     ) async throws -> Int {
         let entries = auditEntries.values.filter { $0.timestamp < cutoff }
         var totalProcessed = 0
@@ -147,7 +147,7 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
             segmentsRoot: segmentsRoot,
             erasureRoot: erasureRoot,
             segmentCount: segmentCount,
-            timestamp: timestamp
+            timestamp: timestamp,
         )
     }
 
@@ -166,7 +166,7 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
     public func cleanupD3LEntriesIteratively(
         before cutoff: Date,
         batchSize: Int,
-        processor: @Sendable ([D3LEntry]) async throws -> Bool
+        processor: @Sendable ([D3LEntry]) async throws -> Bool,
     ) async throws -> Int {
         let entries = d3lEntries.values.filter { $0.timestamp < cutoff }
         var totalProcessed = 0

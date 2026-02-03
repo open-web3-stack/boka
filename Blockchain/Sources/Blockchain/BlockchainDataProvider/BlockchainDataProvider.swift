@@ -37,7 +37,7 @@ public actor BlockchainDataProvider {
         finalizedHead = try await HeadInfo(
             hash: finalizedHeadHash,
             timeslot: dataProvider.getHeader(hash: finalizedHeadHash).unwrap().value.timeslot,
-            number: dataProvider.getBlockNumber(hash: finalizedHeadHash).unwrap()
+            number: dataProvider.getBlockNumber(hash: finalizedHeadHash).unwrap(),
         )
 
         self.dataProvider = dataProvider
@@ -122,7 +122,7 @@ extension BlockchainDataProvider {
         try await dataProvider.getStorage(key: key, blockHash: blockHash)
     }
 
-    // add forks of finalized head is not allowed
+    /// add forks of finalized head is not allowed
     public func add(block: BlockRef) async throws {
         logger.debug("adding block: \(block.hash)")
 

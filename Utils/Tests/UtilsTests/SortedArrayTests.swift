@@ -1,7 +1,6 @@
 import Codec
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct SortedArrayTests {

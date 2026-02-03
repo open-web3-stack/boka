@@ -8,7 +8,7 @@ extension GenesisPreset: @retroactive ExpressibleByArgument {}
 
 struct Generate: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Generate a JIP 4 chainspec file"
+        abstract: "Generate a JIP 4 chainspec file",
     )
 
     @Argument(help: "output file")

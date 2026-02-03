@@ -14,8 +14,13 @@ public enum RPCHandlers {
         public typealias Response = [String]
         public typealias DataSource = [any RPCHandler.Type]
 
-        public static var method: String { "rpc_methods" }
-        public static var summary: String? { "Returns a list of available RPC methods." }
+        public static var method: String {
+            "rpc_methods"
+        }
+
+        public static var summary: String? {
+            "Returns a list of available RPC methods."
+        }
 
         private let methods: [String]
 

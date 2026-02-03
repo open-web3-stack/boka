@@ -23,7 +23,7 @@ public struct ChainSpec: Codable, Equatable {
         bootnodes: [String]? = nil,
         genesisHeader: Data,
         genesisState: [String: Data],
-        protocolParameters: Data
+        protocolParameters: Data,
     ) {
         self.id = id
         self.bootnodes = bootnodes
@@ -156,5 +156,7 @@ extension String {
         return withCString { cstring in inet_pton(AF_INET6, cstring, &sin6.sin6_addr) } == 1
     }
 
-    func isIpAddress() -> Bool { isIPv6() || isIPv4() }
+    func isIpAddress() -> Bool {
+        isIPv6() || isIPv4()
+    }
 }

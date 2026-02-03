@@ -5,8 +5,13 @@ import Utils
 /// Thread-safety: @unchecked Sendable is inherited from RefWithHash<T>
 /// which provides synchronization for immutable value access
 public final class BlockRef: RefWithHash<Block>, @unchecked Sendable {
-    public var header: Header { value.header }
-    public var extrinsic: Extrinsic { value.extrinsic }
+    public var header: Header {
+        value.header
+    }
+
+    public var extrinsic: Extrinsic {
+        value.extrinsic
+    }
 
     override public var description: String {
         "Block(hash: \(hash), timeslot: \(header.timeslot))"

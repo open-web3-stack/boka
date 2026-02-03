@@ -31,13 +31,13 @@ public enum CESegmentShardHandler {
         erasureRoot: Data32,
         shardIndex: UInt16,
         segmentIndices: [UInt16],
-        from assurerAddress: NetAddr
+        from assurerAddress: NetAddr,
     ) async throws -> [Data] {
         logger.debug(
             """
             Fetching \(segmentIndices.count) segment shards (shard \(shardIndex)) \
             from \(assurerAddress) using CE 139 (fast mode)
-            """
+            """,
         )
 
         let responseData = try await sendSegmentShardRequest1(
@@ -45,7 +45,7 @@ public enum CESegmentShardHandler {
             to: assurerAddress,
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
-            segmentIndices: segmentIndices
+            segmentIndices: segmentIndices,
         )
 
         let response = try ShardResponse.decode(responseData)
@@ -53,7 +53,7 @@ public enum CESegmentShardHandler {
         logger.info(
             """
             Successfully fetched \(response.segmentShards.count) segment shards from \(assurerAddress)
-            """
+            """,
         )
 
         return response.segmentShards
@@ -78,13 +78,13 @@ public enum CESegmentShardHandler {
         erasureRoot: Data32,
         shardIndex: UInt16,
         segmentIndices: [UInt16],
-        from assurerAddress: NetAddr
+        from assurerAddress: NetAddr,
     ) async throws -> ([Data], [AvailabilityJustification]) {
         logger.debug(
             """
             Fetching \(segmentIndices.count) segment shards (shard \(shardIndex)) \
             from \(assurerAddress) using CE 140 (verified mode)
-            """
+            """,
         )
 
         let responseData = try await sendSegmentShardRequest2(
@@ -92,7 +92,7 @@ public enum CESegmentShardHandler {
             to: assurerAddress,
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
-            segmentIndices: segmentIndices
+            segmentIndices: segmentIndices,
         )
 
         let response = try ShardResponse.decode(responseData)
@@ -110,7 +110,7 @@ public enum CESegmentShardHandler {
         logger.info(
             """
             Successfully fetched \(response.segmentShards.count) verified segment shards from \(assurerAddress)
-            """
+            """,
         )
 
         return (response.segmentShards, justifications)
@@ -133,12 +133,12 @@ public enum CESegmentShardHandler {
         to address: NetAddr,
         erasureRoot: Data32,
         shardIndex: UInt16,
-        segmentIndices: [UInt16]
+        segmentIndices: [UInt16],
     ) async throws -> Data {
         let requestData = try ShardRequest(
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
-            segmentIndices: segmentIndices
+            segmentIndices: segmentIndices,
         ).encode()
 
         // Send the request via network
@@ -173,12 +173,12 @@ public enum CESegmentShardHandler {
         to address: NetAddr,
         erasureRoot: Data32,
         shardIndex: UInt16,
-        segmentIndices: [UInt16]
+        segmentIndices: [UInt16],
     ) async throws -> Data {
         let requestData = try ShardRequest(
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
-            segmentIndices: segmentIndices
+            segmentIndices: segmentIndices,
         ).encode()
 
         // Send the request via network
@@ -217,7 +217,7 @@ public enum CESegmentShardHandler {
     public static func verifyAvailabilityJustification(
         justification: AvailabilityJustification,
         segmentShard: Data,
-        erasureRoot: Data32
+        erasureRoot: Data32,
     ) -> Bool {
         // Verify the justification based on its type
         switch justification {
@@ -252,7 +252,7 @@ public enum CESegmentShardHandler {
     private static func verifyCopath(
         steps: [AvailabilityJustification.AvailabilityJustificationStep],
         shard: Data,
-        expectedRoot: Data32
+        expectedRoot: Data32,
     ) -> Bool {
         // Start with the shard hash
         var currentHash = shard.blake2b256hash()

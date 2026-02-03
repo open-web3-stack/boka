@@ -1,8 +1,7 @@
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct TrieElement: Codable {
     let input: [String: String]

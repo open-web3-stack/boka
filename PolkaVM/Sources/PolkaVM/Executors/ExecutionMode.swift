@@ -28,5 +28,7 @@ public enum PVMExecutionMode: String, CaseIterable, Sendable {
     }
 
     /// Human-readable description
-    public var description: String { rawValue }
+    public var description: String {
+        rawValue
+    }
 }

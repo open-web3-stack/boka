@@ -48,8 +48,8 @@ extension BoundaryNode: Codable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: decoder.codingPath,
-                        debugDescription: "Invalid BoundaryNode variant: \(variant)"
-                    )
+                        debugDescription: "Invalid BoundaryNode variant: \(variant)",
+                    ),
                 )
             }
         } else {
@@ -65,8 +65,8 @@ extension BoundaryNode: Codable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: container.codingPath,
-                        debugDescription: "Could not decode BoundaryNode"
-                    )
+                        debugDescription: "Could not decode BoundaryNode",
+                    ),
                 )
             }
         }

@@ -33,7 +33,7 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ]
+            ],
         ),
         .target(
             name: "CTools",
@@ -41,8 +41,8 @@ let package = Package(
             publicHeadersPath: ".",
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ]
+            ],
         ),
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageModes: [.version("6")],
 )

@@ -1,12 +1,11 @@
 import Foundation
+@testable import PolkaVM
 import Testing
 import Utils
 
-@testable import PolkaVM
-
 /// Unit tests for Gas operations
 struct GasTests {
-    @Test func testGasCreation() {
+    @Test func gasCreation() {
         // Test gas creation from various integer types
         let gas1 = Gas(0)
         #expect(gas1.value == 0)
@@ -21,7 +20,7 @@ struct GasTests {
         #expect(gas4.value == UInt64.max)
     }
 
-    @Test func testGasComparison() {
+    @Test func gasComparison() {
         let gas1 = Gas(100)
         let gas2 = Gas(200)
         let gas3 = Gas(100)
@@ -33,7 +32,7 @@ struct GasTests {
         #expect(gas2 >= gas1)
     }
 
-    @Test func testGasArithmetic() {
+    @Test func gasArithmetic() {
         let gas1 = Gas(100)
         let gas2 = Gas(50)
 
@@ -48,13 +47,13 @@ struct GasTests {
         #expect(noOverflow.value >= 0) // Should saturate, not underflow
     }
 
-    @Test func testGasSendable() {
-        // Gas should be Sendable
+    @Test func gasSendable() {
+        /// Gas should be Sendable
         func requiresSendable(_ _: some Sendable) {}
         requiresSendable(Gas(100))
     }
 
-    @Test func testGasSaturating() {
+    @Test func gasSaturating() {
         // Test that Gas is a saturating number
         // This means arithmetic operations won't overflow/underflow
         let maxGas = Gas(UInt64.max)
@@ -65,7 +64,7 @@ struct GasTests {
         #expect(result.value == UInt64.max || result.value > UInt64.max - additional.value)
     }
 
-    @Test func testGasZero() {
+    @Test func gasZero() {
         let zeroGas = Gas(0)
         #expect(zeroGas.value == 0)
 
@@ -75,7 +74,7 @@ struct GasTests {
         #expect(positiveGas > zeroGas)
     }
 
-    @Test func testGasLargeValues() {
+    @Test func gasLargeValues() {
         // Test very large gas values
         let largeGas1 = Gas(1_000_000_000)
         #expect(largeGas1.value == 1_000_000_000)

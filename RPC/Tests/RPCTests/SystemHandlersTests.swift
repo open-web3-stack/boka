@@ -1,11 +1,10 @@
 import Blockchain
+@testable import RPC
 import Testing
 import TracingUtils
+@testable import Utils
 import Vapor
 import XCTVapor
-
-@testable import RPC
-@testable import Utils
 
 struct DummySource: SystemDataSource {
     func getProperties() async throws -> JSON {
@@ -40,7 +39,7 @@ final class SystemHandlersTests {
         app = Application(.testing)
 
         let rpcController = JSONRPCController(
-            handlers: SystemHandlers.getHandlers(source: DummySource())
+            handlers: SystemHandlers.getHandlers(source: DummySource()),
         )
         try app.register(collection: rpcController)
     }

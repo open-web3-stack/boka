@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct JSONTests {
@@ -42,7 +41,7 @@ struct JSONTests {
         JSON.boolean(true),
         JSON.null,
     ])
-    func propertyAccess(json: JSON) throws {
+    func propertyAccess(json: JSON) {
         let isNil: [Bool] = [
             json.dictionary == nil,
             json.array == nil,
@@ -68,7 +67,7 @@ struct JSONTests {
         (-456, "-456"), // Negative integer
         (0, "0"), // Zero
     ])
-    func integerKeyFromInt(value: Int, expectedString: String) throws {
+    func integerKeyFromInt(value: Int, expectedString: String) {
         let key = JSON.IntegerKey(value)
         #expect(key.intValue == value)
         #expect(key.stringValue == expectedString)
@@ -79,11 +78,11 @@ struct JSONTests {
         ("-456", -456), // Negative integer string
         ("invalid", nil), // Non-numeric string
     ])
-    func integerKeyFromString(value: String, expectedInt: Int?) throws {
+    func integerKeyFromString(value: String, expectedInt: Int?) {
         let key = JSON.IntegerKey(stringValue: value)
         if let expected = expectedInt {
-            #expect(key!.intValue == expected)
-            #expect(key!.stringValue == value)
+            #expect(key?.intValue == expected)
+            #expect(key?.stringValue == value)
         } else {
             #expect(key == nil) // Ensure `nil` for invalid strings
         }
@@ -94,7 +93,7 @@ struct JSONTests {
         (-42, JSON.number(-42.0)), // Negative integer to JSON
         (0, JSON.number(0.0)), // Zero to JSON
     ])
-    func binaryIntegerToJSON(value: Int, expectedJSON: JSON) throws {
+    func binaryIntegerToJSON(value: Int, expectedJSON: JSON) {
         let json = value.json
         #expect(json == expectedJSON)
     }
@@ -103,7 +102,7 @@ struct JSONTests {
         ("Hello, world!", JSON.string("Hello, world!")), // Simple string
         ("", JSON.string("")), // Empty string
     ])
-    func stringToJSON(value: String, expectedJSON: JSON) throws {
+    func stringToJSON(value: String, expectedJSON: JSON) {
         let json = value.json
         #expect(json == expectedJSON)
     }
@@ -112,7 +111,7 @@ struct JSONTests {
         (true, JSON.boolean(true)), // Boolean true to JSON
         (false, JSON.boolean(false)), // Boolean false to JSON
     ])
-    func boolToJSON(value: Bool, expectedJSON: JSON) throws {
+    func boolToJSON(value: Bool, expectedJSON: JSON) {
         let json = value.json
         #expect(json == expectedJSON)
     }

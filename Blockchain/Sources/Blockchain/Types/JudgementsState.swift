@@ -18,7 +18,7 @@ public struct JudgementsState: Sendable, Equatable, Codable {
         goodSet: Set<Data32>,
         banSet: Set<Data32>,
         wonkySet: Set<Data32>,
-        punishSet: Set<Ed25519PublicKey>
+        punishSet: Set<Ed25519PublicKey>,
     ) {
         self.goodSet = goodSet
         self.banSet = banSet
@@ -34,7 +34,7 @@ extension JudgementsState: Dummy {
             goodSet: [],
             banSet: [],
             wonkySet: [],
-            punishSet: []
+            punishSet: [],
         )
     }
 }

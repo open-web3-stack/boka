@@ -6,7 +6,7 @@ extension Executor {
     public static func pooled(
         mode: ExecutionMode,
         config: PvmConfig = DefaultPvmConfig(),
-        poolConfig: SandboxPoolConfiguration = .throughputOptimized
+        poolConfig: SandboxPoolConfiguration = .throughputOptimized,
     ) -> Executor {
         let executor = Executor(mode: mode, config: config)
 
@@ -16,7 +16,7 @@ extension Executor {
             executor.frontend = ExecutorFrontendSandboxedWithPool(
                 mode: mode,
                 config: config,
-                poolConfig: poolConfig
+                poolConfig: poolConfig,
             )
         } else {
             print("[DEBUG] Mode does not contain .sandboxed, using default frontend")

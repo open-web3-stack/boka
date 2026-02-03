@@ -20,7 +20,7 @@ public actor AuditBundleStore {
     public init(
         dataStore: any DataStoreProtocol,
         filesystemStore: FilesystemDataStore,
-        erasureCoding: ErasureCodingService
+        erasureCoding: ErasureCodingService,
     ) {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
@@ -37,7 +37,7 @@ public actor AuditBundleStore {
     public func storeBundle(
         bundle: Data,
         workPackageHash: Data32,
-        segmentsRoot: Data32
+        segmentsRoot: Data32,
     ) async throws -> Data32 {
         logger.debug("Storing audit bundle: workPackageHash=\(workPackageHash.toHexString()), size=\(bundle.count)")
 
@@ -66,7 +66,7 @@ public actor AuditBundleStore {
         // Calculate erasure root
         let erasureRoot = try await erasureCoding.calculateErasureRoot(
             segmentsRoot: segmentsRoot,
-            shards: shards
+            shards: shards,
         )
 
         // Store bundle in filesystem (for quick retrieval)
@@ -85,7 +85,7 @@ public actor AuditBundleStore {
             erasureRoot: erasureRoot,
             segmentsRoot: segmentsRoot,
             bundleSize: bundle.count,
-            timestamp: Date()
+            timestamp: Date(),
         )
         try await dataStore.set(erasureRoot: erasureRoot, forSegmentRoot: segmentsRoot)
 
@@ -121,7 +121,7 @@ public actor AuditBundleStore {
         // Reconstruct
         let reconstructed = try await erasureCoding.reconstruct(
             shards: shards,
-            originalLength: auditEntry.bundleSize
+            originalLength: auditEntry.bundleSize,
         )
 
         logger.debug("Reconstructed audit bundle from \(shards.count) shards")

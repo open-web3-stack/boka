@@ -1,10 +1,9 @@
 import Blockchain
 import Database
 import Foundation
+@testable import Node
 import Testing
 import Utils
-
-@testable import Node
 
 enum BackendType: String, CaseIterable {
     case inMemory = "InMemoryBackend"
@@ -38,13 +37,13 @@ final class StateBackendTests {
                 path: testPath,
                 config: config,
                 genesisBlock: genesisBlock,
-                genesisStateData: [:]
+                genesisStateData: [:],
             )
         }
     }
 
     @Test(arguments: BackendType.allCases)
-    func testGetKeysBasic(backendType: BackendType) async throws {
+    func getKeysBasic(backendType: BackendType) async throws {
         let backend = try await createBackend(backendType, testIndex: 1)
         let stateBackend = StateBackend(backend, config: config, rootHash: Data32())
 
@@ -100,7 +99,7 @@ final class StateBackendTests {
         // Should find keys >= 0x05, which are the 0xAA and 0xBB prefixed keys (5 total)
         #expect(
             startKeyResults.count == 5,
-            "[\(backendType.rawValue)] Should get exactly 5 keys starting from 0x05 (AA and BB prefixed keys)"
+            "[\(backendType.rawValue)] Should get exactly 5 keys starting from 0x05 (AA and BB prefixed keys)",
         )
 
         for result in startKeyResults {
@@ -122,7 +121,7 @@ final class StateBackendTests {
     }
 
     @Test(arguments: BackendType.allCases)
-    func testGetKeysLargeBatch(backendType: BackendType) async throws {
+    func getKeysLargeBatch(backendType: BackendType) async throws {
         let backend = try await createBackend(backendType, testIndex: 2)
         let stateBackend = StateBackend(backend, config: config, rootHash: Data32())
 
@@ -138,7 +137,7 @@ final class StateBackendTests {
             keyData[1] = UInt8(i % 256)
             keyData[2] = UInt8(i / 256)
 
-            let key = Data31(keyData)!
+            let key = try #require(Data31(keyData))
             let value = Data("batchValue\(i)".utf8)
 
             try await stateBackend.writeRaw([(key: key, value: value)])

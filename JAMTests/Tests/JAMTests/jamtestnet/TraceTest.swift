@@ -1,12 +1,11 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import PolkaVM
 import Testing
 import TracingUtils
 import Utils
-
-@testable import JAMTests
 
 private let logger = Logger(label: "TraceTest")
 
@@ -14,7 +13,7 @@ enum TraceTest {
     static func test(
         _ input: Testcase,
         config: ProtocolConfigRef = TestVariants.tiny.config,
-        executionMode: ExecutionMode = []
+        executionMode: ExecutionMode = [],
     ) async throws {
         // setupTestLogger()
 
@@ -59,15 +58,21 @@ enum TraceTest {
                 if ourVal != value {
                     mismatchCount += 1
                     if mismatchCount <= 5 {
-                        logger
-                            .error(
-                                "KV mismatch #\(mismatchCount) - key: \(key.toHexString()), expected: \(value.toHexString()), got: \(ourVal?.toHexString() ?? "nil")"
-                            )
+                        let expectedHex = value.toHexString()
+                        let actualHex = ourVal?.toHexString() ?? "nil"
+                        logger.error(
+                            "KV mismatch #\(mismatchCount) - key: \(key.toHexString()), expected: \(expectedHex), " +
+                                "got: \(actualHex)",
+                        )
                     }
                 }
+                let expectedHex = value.toHexString()
+                let actualHex = ourVal?.toHexString() ?? "nil"
+                let mismatchMessage =
+                    "kv mismatch for key: \(key), expected: \(expectedHex), got: \(actualHex)"
                 #expect(
                     ourVal == value,
-                    "kv mismatch for key: \(key), expected: \(value.toHexString()), got: \(ourVal?.toHexString() ?? "nil")"
+                    mismatchMessage,
                 )
             }
 
@@ -85,7 +90,7 @@ enum TraceTest {
                 }
                 #expect(
                     expectedStateDict[data31] != nil,
-                    "extra key in boka post state: \(data31.toHexString()), value: \(value.toDebugHexString())"
+                    "extra key in boka post state: \(data31.toHexString()), value: \(value.toDebugHexString())",
                 )
             }
 

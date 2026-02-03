@@ -76,14 +76,14 @@ enum IPCProtocol {
         pc: UInt32,
         gas: UInt64,
         argumentData: Data?,
-        executionMode: ExecutionMode
+        executionMode: ExecutionMode,
     ) throws -> Data {
         let request = IPCExecuteRequest(
             blob: blob,
             pc: pc,
             gas: gas,
             argumentData: argumentData,
-            executionMode: executionMode.rawValue
+            executionMode: executionMode.rawValue,
         )
 
         let payload = try encodePayload(request)
@@ -110,13 +110,13 @@ enum IPCProtocol {
         exitReason: ExitReason,
         gasUsed: UInt64,
         outputData: Data?,
-        errorMessage: String? = nil
+        errorMessage: String? = nil,
     ) throws -> Data {
         let response = IPCExecuteResponse(
             exitReasonCode: exitReason.toUInt64(),
             gasUsed: gasUsed,
             outputData: outputData,
-            errorMessage: errorMessage
+            errorMessage: errorMessage,
         )
 
         let payload = try encodePayload(response)
@@ -141,7 +141,7 @@ enum IPCProtocol {
     static func createErrorMessage(
         requestId: UInt32,
         errorType: IPCErrorMessage.ErrorType,
-        message: String
+        message: String,
     ) throws -> Data {
         let errorMsg = IPCErrorMessage(errorType: errorType, message: message)
         let payload = try encodePayload(errorMsg)

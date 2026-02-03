@@ -16,7 +16,7 @@ public final class NodeDataSource: Sendable {
         chainDataProvider: BlockchainDataProvider,
         networkManager: NetworkManager,
         keystore: KeyStore,
-        name: String?
+        name: String?,
     ) {
         self.blockchain = blockchain
         self.chainDataProvider = chainDataProvider
@@ -62,7 +62,7 @@ extension NodeDataSource: BuilderDataSource {
             .WorkPackagesSubmitted(
                 coreIndex: coreIndex,
                 workPackage: decoded.asRef(),
-                extrinsics: extrinsics
+                extrinsics: extrinsics,
             ))
     }
 }

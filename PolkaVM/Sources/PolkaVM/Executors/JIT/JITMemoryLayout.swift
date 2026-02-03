@@ -1,21 +1,21 @@
-/// JIT Memory Layout
-///
-/// Rebases PolkaVM's sparse memory model into a contiguous flat buffer
-/// for efficient JIT compilation and execution.
-///
-/// PolkaVM Memory Layout (sparse):
-/// - Read-only zone: 0x00010000 (65536)
-/// - Heap zone: 0x00020000+ (variable)
-/// - Stack zone: 0xFF000000-0xFF800000 (~4GB)
-/// - Argument zone: 0xFF800000+
-///
-/// JIT Memory Layout (contiguous):
-/// - Read-only zone: offset 0x00000000
-/// - Heap zone: offset 0x00010000
-/// - Stack zone: offset 0x00020000
-/// - Argument zone: offset 0x00030000
-///
-/// This reduces memory from 4GB to ~256KB for typical programs.
+// JIT Memory Layout
+//
+// Rebases PolkaVM's sparse memory model into a contiguous flat buffer
+// for efficient JIT compilation and execution.
+//
+// PolkaVM Memory Layout (sparse):
+// - Read-only zone: 0x00010000 (65536)
+// - Heap zone: 0x00020000+ (variable)
+// - Stack zone: 0xFF000000-0xFF800000 (~4GB)
+// - Argument zone: 0xFF800000+
+//
+// JIT Memory Layout (contiguous):
+// - Read-only zone: offset 0x00000000
+// - Heap zone: offset 0x00010000
+// - Stack zone: offset 0x00020000
+// - Argument zone: offset 0x00030000
+//
+// This reduces memory from 4GB to ~256KB for typical programs.
 import Foundation
 
 struct JITMemoryLayout {
@@ -64,7 +64,7 @@ struct JITMemoryLayout {
             baseOffset: currentOffset,
             originalBase: readOnlyInfo.startAddress,
             size: readOnlyInfo.endAddress - readOnlyInfo.startAddress,
-            data: readOnlyInfo.data
+            data: readOnlyInfo.data,
         )
         extractedZones.append(readOnlyZone)
         currentOffset = Self.alignToZoneSize(size: currentOffset + readOnlyZone.size, config: config)
@@ -75,7 +75,7 @@ struct JITMemoryLayout {
             baseOffset: currentOffset,
             originalBase: heapInfo.startAddress,
             size: heapInfo.endAddress - heapInfo.startAddress,
-            data: heapInfo.data
+            data: heapInfo.data,
         )
         extractedZones.append(heapZone)
         currentOffset = Self.alignToZoneSize(size: currentOffset + heapZone.size, config: config)
@@ -86,7 +86,7 @@ struct JITMemoryLayout {
             baseOffset: currentOffset,
             originalBase: stackInfo.startAddress,
             size: stackInfo.endAddress - stackInfo.startAddress,
-            data: stackInfo.data
+            data: stackInfo.data,
         )
         extractedZones.append(stackZone)
         currentOffset = Self.alignToZoneSize(size: currentOffset + stackZone.size, config: config)
@@ -97,7 +97,7 @@ struct JITMemoryLayout {
             baseOffset: currentOffset,
             originalBase: argumentInfo.startAddress,
             size: argumentInfo.endAddress - argumentInfo.startAddress,
-            data: argumentInfo.data
+            data: argumentInfo.data,
         )
         extractedZones.append(argumentZone)
 

@@ -5,11 +5,10 @@
 // StoreU8/U16/U32/U64, StoreImmU8/U16/U32/U64, and indirect variants
 
 import Foundation
+@testable import PolkaVM
 import Testing
 import TracingUtils
 import Utils
-
-@testable import PolkaVM
 
 private let logger = Logger(label: "JITLoadStoreTests")
 
@@ -42,7 +41,7 @@ struct JITLoadStoreTests {
     // MARK: - LoadImm Instructions (Opcodes 51, 20)
 
     @Test("JIT: LoadImm64 loads 64-bit immediate")
-    func jitLoadImm64() async throws {
+    func jitLoadImm64() async {
         // LoadImm64 r1, 0x123456789ABCDEF0
         let instruction: [UInt8] = [
             0x14, // LoadImm64 opcode (20)
@@ -56,7 +55,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT: LoadImm64 with zero")
-    func jitLoadImm64Zero() async throws {
+    func jitLoadImm64Zero() async {
         // LoadImm64 r2, 0
         let instruction: [UInt8] = [
             0x14, // LoadImm64 opcode (20)
@@ -69,7 +68,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT: LoadImm64 with max value")
-    func jitLoadImm64Max() async throws {
+    func jitLoadImm64Max() async {
         // LoadImm64 r3, UInt64.max
         let instruction: [UInt8] = [
             0x14, // LoadImm64 opcode (20)
@@ -82,7 +81,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT: LoadImm loads 32-bit immediate with sign extension")
-    func jitLoadImm32() async throws {
+    func jitLoadImm32() async {
         // LoadImm r1, 0x12345678 (sign-extended to 64-bit)
         // LoadImm format: [opcode][reg_index][value_32bit] (6 bytes total)
         let value = Int32(0x1234_5678)
@@ -99,7 +98,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT: LoadImm sign-extends negative 32-bit values")
-    func jitLoadImmNegative() async throws {
+    func jitLoadImmNegative() async {
         // LoadImm r1, -1 (0xFFFFFFFF as signed 32-bit)
         // LoadImm format: [opcode][reg_index][value_32bit] (6 bytes total)
         // When sign-extended to 64-bit, this becomes 0xFFFFFFFFFFFFFFFF
@@ -117,7 +116,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT: LoadImm64 loads unsigned 32-bit value zero-extended")
-    func jitLoadImmU32() async throws {
+    func jitLoadImmU32() async {
         // LoadImm64 r1, 0xFFFFFFFF (zero-extended 32-bit value)
         let instruction: [UInt8] = [
             0x14, // LoadImm64 opcode
@@ -131,7 +130,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT vs Interpreter: LoadImm64 parity")
-    func jitLoadImm64Parity() async throws {
+    func jitLoadImm64Parity() async {
         let instruction: [UInt8] = [
             0x14, // LoadImm64 opcode
             0x01, // r1
@@ -139,19 +138,19 @@ struct JITLoadStoreTests {
 
         let (_, _, differences) = await JITParityComparator.compareSingleInstruction(
             instruction,
-            testName: "LoadImm64"
+            testName: "LoadImm64",
         )
 
         #expect(
             differences == nil,
-            "LoadImm64 parity mismatch: \(differences ?? "none")"
+            "LoadImm64 parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - LoadU8/I8/U16/I16/U32/I32/U64 Instructions (Opcodes 52-58)
 
     @Test("JIT: LoadU8 loads unsigned byte")
-    func jitLoadU8() async throws {
+    func jitLoadU8() async {
         // LoadU8 r2, [0x10000] - load from read-only data using DIRECT addressing
         // Halt
 
@@ -171,7 +170,7 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: readOnlyData,
             readWriteData: Data(),
-            heapPages: 0
+            heapPages: 0,
         )
 
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -181,7 +180,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT: LoadI8 sign-extends byte")
-    func jitLoadI8() async throws {
+    func jitLoadI8() async {
         // LoadI8 r2, [0x10000] - load 0xFF (should sign-extend to -1)
         // Halt
 
@@ -200,7 +199,7 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: readOnlyData,
             readWriteData: Data(),
-            heapPages: 0
+            heapPages: 0,
         )
 
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -210,7 +209,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT: LoadU16 loads unsigned halfword")
-    func jitLoadU16() async throws {
+    func jitLoadU16() async {
         // LoadU16 r2, [0x10000] - load 0x1234
         // Halt
 
@@ -229,7 +228,7 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: readOnlyData,
             readWriteData: Data(),
-            heapPages: 0
+            heapPages: 0,
         )
 
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -239,7 +238,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT vs Interpreter: LoadU8 parity")
-    func jitLoadU8Parity() async throws {
+    func jitLoadU8Parity() async {
         var code = Data()
 
         // LoadU8 r2, [0x10000]
@@ -254,24 +253,24 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: readOnlyData,
             readWriteData: Data(),
-            heapPages: 0
+            heapPages: 0,
         )
 
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "LoadU8"
+            testName: "LoadU8",
         )
 
         #expect(
             differences == nil,
-            "LoadU8 parity mismatch: \(differences ?? "none")"
+            "LoadU8 parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - StoreU8/U16/U32/U64 Instructions (Opcodes 59-62)
 
     @Test("JIT: StoreU8 stores byte to memory")
-    func jitStoreU8() async throws {
+    func jitStoreU8() async {
         // LoadImm64 r1, value (0xAB)
         // StoreU8 [0x20000], r1
         // LoadU8 r2, [0x20000] - read back
@@ -301,7 +300,7 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
-            heapPages: 0
+            heapPages: 0,
         )
 
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -311,7 +310,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT: StoreU16 stores halfword to memory")
-    func jitStoreU16() async throws {
+    func jitStoreU16() async {
         // LoadImm64 r1, value (0x1234)
         // StoreU16 [0x20000], r1
         // LoadU16 r2, [0x20000] - read back
@@ -340,7 +339,7 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
-            heapPages: 0
+            heapPages: 0,
         )
 
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -349,7 +348,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT vs Interpreter: StoreU8 parity")
-    func jitStoreU8Parity() async throws {
+    func jitStoreU8Parity() async {
         var code = Data()
 
         code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0xFF
@@ -367,24 +366,24 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
-            heapPages: 0
+            heapPages: 0,
         )
 
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "StoreU8"
+            testName: "StoreU8",
         )
 
         #expect(
             differences == nil,
-            "StoreU8 parity mismatch: \(differences ?? "none")"
+            "StoreU8 parity mismatch: \(differences ?? "none")",
         )
     }
 
     // MARK: - StoreImmU8/U16/U32/U64 Instructions (Opcodes 30-33)
 
     @Test("JIT: StoreImmU8 stores immediate byte")
-    func jitStoreImmU8() async throws {
+    func jitStoreImmU8() async {
         // LoadImm64 r1, writeable address
         // StoreImmU8 [r1], 0xAB
         // LoadU8 r2, [r1] - read back
@@ -414,7 +413,7 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
-            heapPages: 0
+            heapPages: 0,
         )
 
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -423,7 +422,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT: StoreImmU32 stores immediate 32-bit value")
-    func jitStoreImmU32() async throws {
+    func jitStoreImmU32() async {
         // LoadImm64 r1, writeable address
         // StoreImmU32 [r1], 0x12345678
         // LoadU32 r2, [r1] - read back
@@ -453,7 +452,7 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
-            heapPages: 0
+            heapPages: 0,
         )
 
         let result = await JITInstructionExecutor.execute(blob: blob)
@@ -462,7 +461,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT vs Interpreter: StoreImmU8 parity")
-    func jitStoreImmU8Parity() async throws {
+    func jitStoreImmU8Parity() async {
         var code = Data()
 
         code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x20000
@@ -481,17 +480,17 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: Data(),
             readWriteData: heapData,
-            heapPages: 0
+            heapPages: 0,
         )
 
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "StoreImmU8"
+            testName: "StoreImmU8",
         )
 
         #expect(
             differences == nil,
-            "StoreImmU8 parity mismatch: \(differences ?? "none")"
+            "StoreImmU8 parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -499,9 +498,9 @@ struct JITLoadStoreTests {
 
     @Test(
         "JIT: Load from invalid address causes page fault",
-        .disabled("Memory protection is implemented but requires test infrastructure update")
+        .disabled("Memory protection is implemented but requires test infrastructure update"),
     )
-    func jitLoadInvalidAddress() async throws {
+    func jitLoadInvalidAddress() {
         // TODO: Implement proper test for memory protection
         // The bounds checking code is in place for all x86_64 and ARM64 load/store
         // We need to create a test that actually triggers a bounds check at runtime
@@ -521,7 +520,7 @@ struct JITLoadStoreTests {
     }
 
     @Test("JIT: Store to read-only memory causes panic")
-    func jitStoreToReadOnly() async throws {
+    func jitStoreToReadOnly() async {
         // LoadImm64 r1, read-only address
         // LoadImm64 r2, value
         // StoreIndU8 [r1+0], r2 - should panic (read-only violation)
@@ -550,7 +549,7 @@ struct JITLoadStoreTests {
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
             readOnlyData: readOnlyData,
             readWriteData: Data(),
-            heapPages: 0
+            heapPages: 0,
         )
 
         let result = await JITInstructionExecutor.execute(blob: blob)

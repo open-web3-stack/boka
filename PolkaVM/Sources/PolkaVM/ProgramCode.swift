@@ -26,7 +26,7 @@ public class ProgramCode {
     public let code: Data
     let bitmask: Data
 
-    // parsed stuff
+    /// parsed stuff
     public private(set) var basicBlockIndices: Set<UInt32> = []
 
     private final class InstRef {
@@ -69,7 +69,7 @@ public class ProgramCode {
         guard jumpTableEndIndex <= slice.endIndex else {
             Self.logger
                 .error(
-                    "Jump table extends beyond blob: jumpTableSize=\(jumpTableSize), startIndex=\(slice.startIndex), endIndex=\(jumpTableEndIndex), slice.endIndex=\(slice.endIndex)"
+                    "Jump table extends beyond blob: jumpTableSize=\(jumpTableSize), startIndex=\(slice.startIndex), endIndex=\(jumpTableEndIndex), slice.endIndex=\(slice.endIndex)",
                 )
             throw Error.invalidDataLength
         }
@@ -81,7 +81,7 @@ public class ProgramCode {
         guard codeEndIndex <= slice.endIndex else {
             Self.logger
                 .error(
-                    "Code extends beyond blob: codeLength=\(codeLength), jumpTableEndIndex=\(jumpTableEndIndex), codeEndIndex=\(codeEndIndex), slice.endIndex=\(slice.endIndex)"
+                    "Code extends beyond blob: codeLength=\(codeLength), jumpTableEndIndex=\(jumpTableEndIndex), codeEndIndex=\(codeEndIndex), slice.endIndex=\(slice.endIndex)",
                 )
             throw Error.invalidDataLength
         }
@@ -95,7 +95,7 @@ public class ProgramCode {
         guard expectedBitmaskSize == actualBitmaskSize else {
             Self.logger
                 .error(
-                    "Bitmask size mismatch: codeLength=\(codeLength), expected=\(expectedBitmaskSize), actual=\(actualBitmaskSize), blob.count=\(self.blob.count), jumpTableEndIndex=\(jumpTableEndIndex), codeEndIndex=\(codeEndIndex), slice.startIndex=\(slice.startIndex), slice.endIndex=\(slice.endIndex)"
+                    "Bitmask size mismatch: codeLength=\(codeLength), expected=\(expectedBitmaskSize), actual=\(actualBitmaskSize), blob.count=\(self.blob.count), jumpTableEndIndex=\(jumpTableEndIndex), codeEndIndex=\(codeEndIndex), slice.startIndex=\(slice.startIndex), slice.endIndex=\(slice.endIndex)",
                 )
             throw Error.invalidDataLength
         }
@@ -234,9 +234,7 @@ public class ProgramCode {
 
         let offsetBits = start % 8
 
-        let idx = min(UInt32((value >> offsetBits).trailingZeroBitCount), Constants.maxInstructionLength)
-
-        return idx
+        return min(UInt32((value >> offsetBits).trailingZeroBitCount), Constants.maxInstructionLength)
     }
 }
 

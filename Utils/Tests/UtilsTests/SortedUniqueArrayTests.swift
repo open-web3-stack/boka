@@ -1,11 +1,10 @@
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct SortedUniqueArrayTests {
     @Test
-    func initialization() throws {
+    func initialization() {
         let array = SortedUniqueArray([3, 1, 2, 3, 5, 4, 2])
         #expect(array.array == [1, 2, 3, 4, 5])
 
@@ -20,7 +19,7 @@ struct SortedUniqueArrayTests {
     }
 
     @Test
-    func insertion() throws {
+    func insertion() {
         var array = SortedUniqueArray([1, 3, 5])
 
         array.insert(2)
@@ -31,7 +30,7 @@ struct SortedUniqueArrayTests {
     }
 
     @Test
-    func removal() throws {
+    func removal() {
         var array = SortedUniqueArray([1, 2, 3, 4, 5])
 
         array.remove(at: 2)
@@ -51,7 +50,7 @@ struct SortedUniqueArrayTests {
     }
 
     @Test
-    func appending() throws {
+    func appending() {
         var array = SortedUniqueArray([1, 3, 5])
         let otherArray = SortedUniqueArray([2, 4])
 

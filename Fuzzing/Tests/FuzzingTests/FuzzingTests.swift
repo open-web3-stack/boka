@@ -1,10 +1,9 @@
 import Foundation
+@testable import Fuzzing
 import Testing
 
-@testable import Fuzzing
-
 struct FuzzingTests {
-    @Test func testSeededRandomNumberGenerator() throws {
+    @Test func seededRandomNumberGenerator() {
         let seed: UInt64 = 42
         let generator1 = SeededRandomNumberGenerator(seed: seed)
         let generator2 = SeededRandomNumberGenerator(seed: seed)

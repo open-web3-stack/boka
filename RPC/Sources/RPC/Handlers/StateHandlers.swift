@@ -19,9 +19,17 @@ public enum StateHandlers {
         public typealias Request = Request4<Data, UInt32, Data31?, Data32?>
         public typealias Response = [String]
 
-        public static var method: String { "state_getKeys" }
-        public static var requestNames: [String] { ["prefix", "count", "startKey", "blockHash"] }
-        public static var summary: String? { "Returns the keys of the state." }
+        public static var method: String {
+            "state_getKeys"
+        }
+
+        public static var requestNames: [String] {
+            ["prefix", "count", "startKey", "blockHash"]
+        }
+
+        public static var summary: String? {
+            "Returns the keys of the state."
+        }
 
         private let source: ChainDataSource
 
@@ -38,9 +46,17 @@ public enum StateHandlers {
         public typealias Request = Request2<Data31, Data32?>
         public typealias Response = [String]
 
-        public static var method: String { "state_getStorage" }
-        public static var requestNames: [String] { ["key", "blockHash"] }
-        public static var summary: String? { "Returns the storage entry for a key for blockHash or best head." }
+        public static var method: String {
+            "state_getStorage"
+        }
+
+        public static var requestNames: [String] {
+            ["key", "blockHash"]
+        }
+
+        public static var summary: String? {
+            "Returns the storage entry for a key for blockHash or best head."
+        }
 
         private let source: ChainDataSource
 

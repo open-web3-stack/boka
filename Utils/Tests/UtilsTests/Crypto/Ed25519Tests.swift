@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-
 @testable import Utils
 
 @Suite struct Ed25519Tests {
@@ -35,7 +34,7 @@ import Testing
         var tamperedSignature = signature.data
         tamperedSignature.replaceSubrange(0 ... 1, with: [10, 12])
 
-        #expect(!publicKey.verify(signature: Data64(tamperedSignature)!, message: message))
+        #expect(try !publicKey.verify(signature: #require(Data64(tamperedSignature)), message: message))
     }
 
     @Test func initializeFromData() throws {
@@ -100,6 +99,6 @@ import Testing
 
         var tamperedSignature = signature.data
         tamperedSignature[0] ^= 0xFF
-        #expect(!publicKey.verify(signature: Data64(tamperedSignature)!, message: message))
+        #expect(try !publicKey.verify(signature: #require(Data64(tamperedSignature)), message: message))
     }
 }

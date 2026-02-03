@@ -1,10 +1,9 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct ReportsTestcaseState: Codable, Equatable {
     var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
@@ -17,7 +16,7 @@ struct ReportsTestcaseState: Codable, Equatable {
     var recentHistory: RecentHistory
     var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
     @CodingAs<SortedKeyValues<ServiceIndex, ServiceAccountDetails>> var services: [ServiceIndex: ServiceAccountDetails]
     var coresStatistics: ConfigFixedSizeArray<Statistics.Core, ProtocolConfig.TotalNumberOfCores>
@@ -51,7 +50,7 @@ struct ReportsState: Guaranteeing {
     var recentHistory: RecentHistory
     var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
     var services: [ServiceIndex: ServiceAccountDetails]
 
@@ -95,7 +94,7 @@ struct ReportsTests {
             coreAuthorizationPool: testcase.preState.coreAuthorizationPool,
             services: testcase.preState.services,
             accumulationQueue: try! ConfigFixedSizeArray(config: config, defaultValue: []),
-            accumulationHistory: try! ConfigFixedSizeArray(config: config, defaultValue: .init())
+            accumulationHistory: try! ConfigFixedSizeArray(config: config, defaultValue: .init()),
         )
         let result = await Result {
             try testcase.input.reports.validate(config: config)
@@ -104,7 +103,7 @@ struct ReportsTests {
                 config: config,
                 timeslot: testcase.input.timeslot,
                 extrinsic: testcase.input.reports,
-                ancestry: nil
+                ancestry: nil,
             )
         }
         switch result {
@@ -122,16 +121,16 @@ struct ReportsTests {
                     services: state.services,
                     // NOTE: just use testcase postState since we don't update stats in guaranteeing STF
                     coresStatistics: testcase.postState.coresStatistics,
-                    servicesStatistics: testcase.postState.servicesStatistics
+                    servicesStatistics: testcase.postState.servicesStatistics,
                 )
                 let expectedOutput = ReportsOutput(
                     reported: reported.map { report in
                         ReportedPackage(
                             workPackageHash: report.packageSpecification.workPackageHash,
-                            segmentRoot: report.packageSpecification.segmentRoot
+                            segmentRoot: report.packageSpecification.segmentRoot,
                         )
                     },
-                    reporters: reporters
+                    reporters: reporters,
                 )
                 #expect(expectedPostState == testcase.postState)
                 #expect(expectedOutput == output)

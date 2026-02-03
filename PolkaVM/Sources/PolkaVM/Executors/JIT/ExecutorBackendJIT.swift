@@ -92,7 +92,7 @@ private final class JITCodeCache {
                     hitCount += 1
                     logger
                         .debug(
-                            "JIT cache HIT (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)"
+                            "JIT cache HIT (hits: \(hitCount), misses: \(missCount), ratio: \(hitCount * 100 / (hitCount + missCount))%)",
                         )
                     return entry
                 } else {
@@ -114,7 +114,7 @@ private final class JITCodeCache {
         initialPC: UInt32,
         functionPtr: UnsafeRawPointer,
         dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?,
-        dispatcherTableSize: UInt32
+        dispatcherTableSize: UInt32,
     ) {
         let bytecodeHash = hashBytecode(bytecode)
         let configHash = hashConfig(config)
@@ -138,7 +138,7 @@ private final class JITCodeCache {
                 bytecode: bytecode,
                 configHash: configHash,
                 initialPC: initialPC,
-                runtimeContext: runtimeContext
+                runtimeContext: runtimeContext,
             )
 
             cache[key] = entry
@@ -167,8 +167,8 @@ private final class JITCodeCache {
     }
 }
 
-// Static C-callable trampoline that calls the instance method.
-// Must be defined before JITExecutionContext so it can be referenced in init.
+/// Static C-callable trampoline that calls the instance method.
+/// Must be defined before JITExecutionContext so it can be referenced in init.
 private func dispatchHostCall_C_Trampoline(
     opaqueOwnerContext: UnsafeMutableRawPointer?,
     hostCallIndex: UInt32,
@@ -176,7 +176,7 @@ private func dispatchHostCall_C_Trampoline(
     guestMemoryBasePtr: UnsafeMutablePointer<UInt8>,
     guestMemorySize: UInt32,
     guestGasPtr: UnsafeMutablePointer<UInt64>,
-    invocationContextPtr: UnsafeMutableRawPointer?
+    invocationContextPtr: UnsafeMutableRawPointer?,
 ) -> UInt32 {
     guard let ownerCtxPtr = opaqueOwnerContext else {
         return JITHostCallError.internalErrorInvalidContext.rawValue
@@ -190,76 +190,76 @@ private func dispatchHostCall_C_Trampoline(
         guestMemoryBasePtr: guestMemoryBasePtr,
         guestMemorySize: guestMemorySize,
         guestGasPtr: guestGasPtr,
-        invocationContextPtr: invocationContextPtr
+        invocationContextPtr: invocationContextPtr,
     )
 }
 
-/// ⚠️ CRITICAL: ExecutorBackendJIT Concurrency Model
-///
-/// This class is designed for **single-threaded execution only** and is NOT
-/// thread-safe for concurrent `execute()` calls on the same instance.
-///
-/// ## Thread Safety Model
-///
-/// ✅ **SAFE**:
-/// - Single-threaded execution of one instance
-/// - Multiple instances (each accessed from different thread)
-/// - Concurrent `execute()` calls on different instances
-///
-/// ❌ **UNSAFE**:
-/// - Concurrent calls to `execute()` on the same instance
-/// - Shared access to `context.syncHostCallHandler` or `context.currentProgramCode`
-///
-/// ## Concurrency Architecture
-///
-/// The JIT executor uses a hybrid approach to support async host functions:
-///
-/// 1. **Async entry point**: `execute()` is `async` and offloads JIT execution
-///    to `DispatchQueue.global()` to avoid blocking Swift concurrency pool threads
-///
-/// 2. **Sync JIT execution**: The actual JIT code runs synchronously on the
-///    DispatchQueue thread, which is **outside** the Swift concurrency pool
-///
-/// 3. **Host call bridge**: When JIT code needs to call an async Swift function,
-///    it uses `semaphore.wait()` to block the DispatchQueue thread while the
-///    async operation runs on the Swift concurrency pool
-///
-/// 4. **Multi-program execution**: The blockchain node can run multiple PVM programs
-///    concurrently by spawning multiple ExecutorBackendJIT instances (one per program)
-///
-/// ## Why DispatchQueue Offloading?
-///
-/// Without DispatchQueue offloading, the `semaphore.wait()` in the host call bridge
-/// would block Swift concurrency pool threads, potentially deadlocking when:
-/// - Multiple executions run concurrently
-/// - The thread pool has insufficient threads
-///
-/// By offloading to DispatchQueue.global(), we ensure:
-/// - Swift concurrency pool threads remain free for async operations
-/// - Only dedicated non-pool threads are blocked by semaphore.wait()
-/// - Multiple PVM programs can run concurrently at the node level
-///
-/// ## Usage Pattern for Node
-///
-/// ```swift
-/// // Node spawns one executor instance per PVM program
-/// let executor1 = ExecutorBackendJIT()  // Program 1
-/// let executor2 = ExecutorBackendJIT()  // Program 2
-///
-/// // These run concurrently without blocking each other
-/// async let result1 = executor1.execute(...)
-/// async let result2 = executor2.execute(...)
-/// ```
-///
-/// ## Internal State Safety
-///
-/// ✅ FIXED: Thread-safe via JITExecutionContext - each execution has isolated state
+// ⚠️ CRITICAL: ExecutorBackendJIT Concurrency Model
+//
+// This class is designed for **single-threaded execution only** and is NOT
+// thread-safe for concurrent `execute()` calls on the same instance.
+//
+// ## Thread Safety Model
+//
+// ✅ **SAFE**:
+// - Single-threaded execution of one instance
+// - Multiple instances (each accessed from different thread)
+// - Concurrent `execute()` calls on different instances
+//
+// ❌ **UNSAFE**:
+// - Concurrent calls to `execute()` on the same instance
+// - Shared access to `context.syncHostCallHandler` or `context.currentProgramCode`
+//
+// ## Concurrency Architecture
+//
+// The JIT executor uses a hybrid approach to support async host functions:
+//
+// 1. **Async entry point**: `execute()` is `async` and offloads JIT execution
+//    to `DispatchQueue.global()` to avoid blocking Swift concurrency pool threads
+//
+// 2. **Sync JIT execution**: The actual JIT code runs synchronously on the
+//    DispatchQueue thread, which is **outside** the Swift concurrency pool
+//
+// 3. **Host call bridge**: When JIT code needs to call an async Swift function,
+//    it uses `semaphore.wait()` to block the DispatchQueue thread while the
+//    async operation runs on the Swift concurrency pool
+//
+// 4. **Multi-program execution**: The blockchain node can run multiple PVM programs
+//    concurrently by spawning multiple ExecutorBackendJIT instances (one per program)
+//
+// ## Why DispatchQueue Offloading?
+//
+// Without DispatchQueue offloading, the `semaphore.wait()` in the host call bridge
+// would block Swift concurrency pool threads, potentially deadlocking when:
+// - Multiple executions run concurrently
+// - The thread pool has insufficient threads
+//
+// By offloading to DispatchQueue.global(), we ensure:
+// - Swift concurrency pool threads remain free for async operations
+// - Only dedicated non-pool threads are blocked by semaphore.wait()
+// - Multiple PVM programs can run concurrently at the node level
+//
+// ## Usage Pattern for Node
+//
+// ```swift
+// // Node spawns one executor instance per PVM program
+// let executor1 = ExecutorBackendJIT()  // Program 1
+// let executor2 = ExecutorBackendJIT()  // Program 2
+//
+// // These run concurrently without blocking each other
+// async let result1 = executor1.execute(...)
+// async let result2 = executor2.execute(...)
+// ```
+//
+// ## Internal State Safety
+//
+// ✅ FIXED: Thread-safe via JITExecutionContext - each execution has isolated state
 
 /// Execution context that holds all mutable state for a single JIT execution.
 /// Each call to executeSynchronous creates its own context instance, isolating state
 /// between concurrent executions and eliminating race conditions.
 private final class JITExecutionContext {
-    // Host function table (heap-allocated for C++ interop)
+    /// Host function table (heap-allocated for C++ interop)
     let jitHostFunctionTablePtr: UnsafeMutablePointer<JITHostFunctionTable>
 
     // Memory protection bitmaps (128KB each for 2^20 bits)
@@ -267,16 +267,16 @@ private final class JITExecutionContext {
     var writeMapBitmap: UnsafeMutablePointer<UInt8>?
     let bitmapSize = (1 << 20) / 8
 
-    // Program code being executed
+    /// Program code being executed
     var currentProgramCode: ProgramCode?
 
-    // Host function handler (bridge from sync JIT to async Swift)
+    /// Host function handler (bridge from sync JIT to async Swift)
     var syncHostCallHandler: ((
         UInt32,
         UnsafeMutablePointer<UInt64>,
         UnsafeMutablePointer<UInt8>,
         UInt32,
-        UnsafeMutablePointer<UInt64>
+        UnsafeMutablePointer<UInt64>,
     ) -> UInt32)?
 
     init(trampolineFn: @convention(c) (
@@ -286,7 +286,7 @@ private final class JITExecutionContext {
         UnsafeMutablePointer<UInt8>,
         UInt32,
         UnsafeMutablePointer<UInt64>,
-        UnsafeMutableRawPointer?
+        UnsafeMutableRawPointer?,
     ) -> UInt32) {
         // Allocate host function table on heap as C-compatible struct
         // This avoids passing Swift object headers to C++ code
@@ -308,7 +308,7 @@ private final class JITExecutionContext {
             dispatcherJumpTableSize: 0,
             heapEnd: 0, // Will be set from StandardMemory before execution
             readMap: nil, // Will be set from StandardMemory before execution
-            writeMap: nil // Will be set from StandardMemory before execution
+            writeMap: nil, // Will be set from StandardMemory before execution
         ))
     }
 
@@ -356,15 +356,15 @@ final class ExecutorBackendJIT: ExecutorBackend {
         codeCache.clear()
     }
 
-    // Simple synchronous handler for host functions
-    // This is the bridge between the sync world of JIT and the async world of Swift
+    /// Simple synchronous handler for host functions
+    /// This is the bridge between the sync world of JIT and the async world of Swift
     fileprivate func dispatchHostCall(
         hostCallIndex: UInt32,
         guestRegistersPtr: UnsafeMutablePointer<UInt64>,
         guestMemoryBasePtr: UnsafeMutablePointer<UInt8>,
         guestMemorySize: UInt32,
         guestGasPtr: UnsafeMutablePointer<UInt64>,
-        invocationContextPtr: UnsafeMutableRawPointer?
+        invocationContextPtr: UnsafeMutableRawPointer?,
     ) -> UInt32 { // Return value for guest (e.g., to be put in R0) or error code
         logger.debug("Swift: dispatchHostCall received call for index \(hostCallIndex)")
 
@@ -418,7 +418,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx: (any InvocationContext)?
+        ctx: (any InvocationContext)?,
     ) async -> VMExecutionResult {
         logger.debug("JIT execution request. PC: \(pc), Gas: \(gas.value), Blob size: \(blob.count) bytes.")
 
@@ -452,7 +452,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         pc: pc,
                         gas: gas,
                         argumentData: boxedArgumentData.value,
-                        ctx: boxedCtx.value
+                        ctx: boxedCtx.value,
                     )
                 } catch let e {
                     error = e
@@ -466,13 +466,13 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         .init(
                             exitReason: jitError.toExitReason(),
                             gasUsed: gas,
-                            outputData: nil
+                            outputData: nil,
                         )
                     } else {
                         .init(
                             exitReason: .panic(.trap),
                             gasUsed: gas,
-                            outputData: nil
+                            outputData: nil,
                         )
                     }
                     continuation.resume(returning: mappedError)
@@ -488,7 +488,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx: (any InvocationContext)?
+        ctx: (any InvocationContext)?,
     ) throws -> VMExecutionResult {
         // Create execution context for this invocation
         // Each execution gets its own isolated state, making this thread-safe
@@ -513,7 +513,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     gasUsed: gas,
                     outputData: nil,
                     finalRegisters: Registers(),
-                    finalPC: 0
+                    finalPC: 0,
                 )
             }
 
@@ -548,7 +548,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 let totalMB = Double(totalMemorySize) / (1024.0 * 1024.0)
 
                 logger.debug(
-                    "✅ Using interpreter-compatible layout: total=\(String(format: "%.2f", totalMB)) MB (data: \(String(format: "%.2f", usageMB)) MB)"
+                    "✅ Using interpreter-compatible layout: total=\(String(format: "%.2f", totalMB)) MB (data: \(String(format: "%.2f", usageMB)) MB)",
                 )
             } catch {
                 // Fallback if layout creation fails
@@ -565,7 +565,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     gasUsed: gas,
                     outputData: nil,
                     finalRegisters: Registers(),
-                    finalPC: 0
+                    finalPC: 0,
                 )
             }
 
@@ -578,7 +578,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
             let bytecode = programCode.code
             logger
                 .debug(
-                    "🔍 JIT bytecode: \(bytecode.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " "))... (total: \(bytecode.count) bytes)"
+                    "🔍 JIT bytecode: \(bytecode.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " "))... (total: \(bytecode.count) bytes)",
                 )
             logger.debug("🔍 JIT initial PC: \(pc)")
 
@@ -587,7 +587,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
             let (compiledFuncPtr, dispatcherTable, dispatcherTableSize): (
                 UnsafeMutableRawPointer,
                 UnsafeMutablePointer<UnsafeMutableRawPointer?>?,
-                UInt32
+                UInt32,
             )
             if false, let cachedEntry = codeCache.lookup(bytecode: bytecode, config: config, initialPC: pc) {
                 // Cache hit - use cached function pointer
@@ -612,7 +612,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     targetArchitecture: targetArchitecture,
                     jitMemorySize: totalMemorySize,
                     skipTable: skipTable,
-                    bitmask: bitmask
+                    bitmask: bitmask,
                 )
 
                 // Retrieve dispatcher jump table for this compiled function
@@ -628,7 +628,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         initialPC: pc,
                         functionPtr: funcPtr,
                         dispatcherTable: table,
-                        dispatcherTableSize: UInt32(size)
+                        dispatcherTableSize: UInt32(size),
                     )
 
                     compiledFuncPtr = funcPtr
@@ -662,7 +662,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
             // Log initial register values for debugging
             logger
                 .debug(
-                    "Initial registers: R0=\(registers[Registers.Index(raw: 0)]), R1=\(registers[Registers.Index(raw: 1)]), R7=\(registers[Registers.Index(raw: 7)]), R8=\(registers[Registers.Index(raw: 8)])"
+                    "Initial registers: R0=\(registers[Registers.Index(raw: 0)]), R1=\(registers[Registers.Index(raw: 1)]), R7=\(registers[Registers.Index(raw: 7)]), R8=\(registers[Registers.Index(raw: 8)])",
                 )
 
             // Set up the synchronous handler that will bridge to async context if invoked
@@ -670,105 +670,104 @@ final class ExecutorBackendJIT: ExecutorBackend {
             if let invocationContext = ctx {
                 // Initialize the synchronous handler
                 // Use [weak self] to avoid retain cycle (cleanup happens in defer block)
-                context.syncHostCallHandler =
-                    { [weak self] hostCallIndex, guestRegistersPtr, guestMemoryBasePtr, guestMemorySize, guestGasPtr -> UInt32 in
-                        guard let self else {
-                            return JITHostCallError.internalErrorInvalidContext.rawValue
+                context.syncHostCallHandler = { [weak self] hostCallIndex, guestRegistersPtr, guestMemoryBasePtr, guestMemorySize, guestGasPtr -> UInt32 in
+                    guard let self else {
+                        return JITHostCallError.internalErrorInvalidContext.rawValue
+                    }
+
+                    guard let programCode = context.currentProgramCode else {
+                        logger.error("No program code available for host call")
+                        return JITHostCallError.internalErrorInvalidContext.rawValue
+                    }
+
+                    // Create a VMStateJIT adapter
+                    // NOTE: PC is tracked internally by JIT-compiled code, not exposed to host calls.
+                    // Using 0 as initialPC. The PC value is typically not needed by host functions,
+                    // but if it is, the C++ JIT code needs to be modified to pass it.
+                    let vmState = VMStateJIT(
+                        jitMemoryBasePtr: guestMemoryBasePtr,
+                        jitMemorySize: guestMemorySize,
+                        jitRegistersPtr: guestRegistersPtr,
+                        jitGasPtr: guestGasPtr,
+                        programCode: programCode,
+                        initialPC: 0,
+                    )
+
+                    // Convert async operation to sync using semaphore + lock
+                    let semaphore = DispatchSemaphore(value: 0)
+
+                    // Thread-safe result box using class wrapper (required for escaping closure)
+                    final class ResultBox: @unchecked Sendable {
+                        private let lock = Utils.ReadWriteLock()
+                        private var _value: ExecOutcome?
+
+                        func set(_ value: ExecOutcome) {
+                            lock.withWriteLock { _value = value }
                         }
 
-                        guard let programCode = context.currentProgramCode else {
-                            logger.error("No program code available for host call")
-                            return JITHostCallError.internalErrorInvalidContext.rawValue
-                        }
-
-                        // Create a VMStateJIT adapter
-                        // NOTE: PC is tracked internally by JIT-compiled code, not exposed to host calls.
-                        // Using 0 as initialPC. The PC value is typically not needed by host functions,
-                        // but if it is, the C++ JIT code needs to be modified to pass it.
-                        let vmState = VMStateJIT(
-                            jitMemoryBasePtr: guestMemoryBasePtr,
-                            jitMemorySize: guestMemorySize,
-                            jitRegistersPtr: guestRegistersPtr,
-                            jitGasPtr: guestGasPtr,
-                            programCode: programCode,
-                            initialPC: 0
-                        )
-
-                        // Convert async operation to sync using semaphore + lock
-                        let semaphore = DispatchSemaphore(value: 0)
-
-                        // Thread-safe result box using class wrapper (required for escaping closure)
-                        final class ResultBox: @unchecked Sendable {
-                            private let lock = Utils.ReadWriteLock()
-                            private var _value: ExecOutcome?
-
-                            func set(_ value: ExecOutcome) {
-                                lock.withWriteLock { _value = value }
-                            }
-
-                            func get() -> ExecOutcome? {
-                                lock.withReadLock { _value }
-                            }
-                        }
-
-                        let resultBox = ResultBox()
-
-                        // ⚠️ Thread-safety requirement: InvocationContext must be thread-safe
-                        // The context is passed to a detached task that may run on a different thread.
-                        // Implementations MUST ensure:
-                        // 1. Context is NOT shared across concurrent executions (use separate instances)
-                        // 2. Context internally synchronizes access to mutable state (locks/actors)
-                        // 3. Context does NOT rely on thread-local storage
-                        //
-                        // The UncheckedSendableBox wrapper allows passing non-Sendable contexts
-                        // across concurrency boundaries, but safety depends on proper implementation.
-                        let boxedCtx = UncheckedSendableBox(invocationContext)
-
-                        // Kick off the async operation on a detached task
-                        Task.detached(priority: Task.currentPriority) {
-                            let r = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
-                            resultBox.set(r)
-                            semaphore.signal()
-                        }
-
-                        // Block until async operation completes
-                        // ✅ SAFE: This blocks the DispatchQueue thread (NOT Swift concurrency pool)
-                        //
-                        // The execute() method offloads JIT execution to DispatchQueue.global(),
-                        // so this semaphore.wait() blocks a dedicated non-pool thread.
-                        // The Swift concurrency pool remains free for the detached task to run.
-                        //
-                        // This architecture allows:
-                        // - Multiple PVM programs to run concurrently (different executor instances)
-                        // - Host functions to use async/await without deadlocking the pool
-                        semaphore.wait()
-
-                        // Process the result
-                        guard let result = resultBox.get() else {
-                            logger.error("No result from async host function call")
-                            return JITHostCallError.hostFunctionThrewError.rawValue
-                        }
-
-                        switch result {
-                        case .continued:
-                            return 0
-                        case let .exit(reason):
-                            switch reason {
-                            case .halt:
-                                return JITHostCallError.hostRequestedHalt.rawValue
-                            case .outOfGas:
-                                return JITHostCallError.gasExhausted.rawValue
-                            case let .hostCall(nestedIndex):
-                                logger.error("Nested host calls not supported: \(nestedIndex)")
-                                return JITHostCallError.hostFunctionThrewError.rawValue
-                            case let .pageFault(address):
-                                logger.error("Page fault at address \(address)")
-                                return JITHostCallError.pageFault.rawValue
-                            case .panic:
-                                return JITHostCallError.hostFunctionThrewError.rawValue
-                            }
+                        func get() -> ExecOutcome? {
+                            lock.withReadLock { _value }
                         }
                     }
+
+                    let resultBox = ResultBox()
+
+                    // ⚠️ Thread-safety requirement: InvocationContext must be thread-safe
+                    // The context is passed to a detached task that may run on a different thread.
+                    // Implementations MUST ensure:
+                    // 1. Context is NOT shared across concurrent executions (use separate instances)
+                    // 2. Context internally synchronizes access to mutable state (locks/actors)
+                    // 3. Context does NOT rely on thread-local storage
+                    //
+                    // The UncheckedSendableBox wrapper allows passing non-Sendable contexts
+                    // across concurrency boundaries, but safety depends on proper implementation.
+                    let boxedCtx = UncheckedSendableBox(invocationContext)
+
+                    // Kick off the async operation on a detached task
+                    Task.detached(priority: Task.currentPriority) {
+                        let r = await boxedCtx.value.dispatch(index: hostCallIndex, state: vmState)
+                        resultBox.set(r)
+                        semaphore.signal()
+                    }
+
+                    // Block until async operation completes
+                    // ✅ SAFE: This blocks the DispatchQueue thread (NOT Swift concurrency pool)
+                    //
+                    // The execute() method offloads JIT execution to DispatchQueue.global(),
+                    // so this semaphore.wait() blocks a dedicated non-pool thread.
+                    // The Swift concurrency pool remains free for the detached task to run.
+                    //
+                    // This architecture allows:
+                    // - Multiple PVM programs to run concurrently (different executor instances)
+                    // - Host functions to use async/await without deadlocking the pool
+                    semaphore.wait()
+
+                    // Process the result
+                    guard let result = resultBox.get() else {
+                        logger.error("No result from async host function call")
+                        return JITHostCallError.hostFunctionThrewError.rawValue
+                    }
+
+                    switch result {
+                    case .continued:
+                        return 0
+                    case let .exit(reason):
+                        switch reason {
+                        case .halt:
+                            return JITHostCallError.hostRequestedHalt.rawValue
+                        case .outOfGas:
+                            return JITHostCallError.gasExhausted.rawValue
+                        case let .hostCall(nestedIndex):
+                            logger.error("Nested host calls not supported: \(nestedIndex)")
+                            return JITHostCallError.hostFunctionThrewError.rawValue
+                        case let .pageFault(address):
+                            logger.error("Page fault at address \(address)")
+                            return JITHostCallError.pageFault.rawValue
+                        case .panic:
+                            return JITHostCallError.hostFunctionThrewError.rawValue
+                        }
+                    }
+                }
             } else {
                 // Clear the handler if no context provided
                 context.syncHostCallHandler = nil
@@ -891,7 +890,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         initialPC: pc,
                         invocationContext: invocationContextPointer,
                         initialMemory: initialMemory,
-                        memoryLayout: memoryLayout
+                        memoryLayout: memoryLayout,
                     )
                 }
                 // Assign values from first execution path
@@ -986,7 +985,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                     initialPC: pc,
                     invocationContext: invocationContextPointer,
                     initialMemory: initialMemory,
-                    memoryLayout: memoryLayout
+                    memoryLayout: memoryLayout,
                 )
                 // Assign values from second execution path
                 exitReason = er
@@ -1039,7 +1038,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                         gasUsed: gasUsed,
                         outputData: nil,
                         finalRegisters: Registers(),
-                        finalPC: 0
+                        finalPC: 0,
                     )
                 }
             default:
@@ -1053,7 +1052,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 gasUsed: gasUsed,
                 outputData: outputData,
                 finalRegisters: registers,
-                finalPC: 0 // JIT doesn't track final PC - only exit reason
+                finalPC: 0, // JIT doesn't track final PC - only exit reason
             )
 
         } catch let error as JITCompiler.CompilationError {
@@ -1076,7 +1075,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 gasUsed: gas,
                 outputData: nil,
                 finalRegisters: Registers(),
-                finalPC: 0
+                finalPC: 0,
             )
         } catch let error as JITError {
             logger.error("JIT execution failed with JITError: \(error)")
@@ -1085,7 +1084,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 gasUsed: gas,
                 outputData: nil,
                 finalRegisters: Registers(),
-                finalPC: 0
+                finalPC: 0,
             )
         } catch {
             logger.error("JIT execution failed with an unexpected error: \(error)")
@@ -1094,7 +1093,7 @@ final class ExecutorBackendJIT: ExecutorBackend {
                 gasUsed: gas,
                 outputData: nil,
                 finalRegisters: Registers(),
-                finalPC: 0
+                finalPC: 0,
             )
         }
     }
@@ -1109,22 +1108,22 @@ final class ExecutorBackendJIT: ExecutorBackend {
 // collision with legitimate success values returned by host functions.
 
 enum JITHostCallError: UInt32 {
-    // Indicates an internal error within the JIT host call mechanism,
-    // such as the owner context being nil.
+    /// Indicates an internal error within the JIT host call mechanism,
+    /// such as the owner context being nil.
     case internalErrorInvalidContext = 0xFFFF_FFFF
 
-    // Indicates that no host function was found registered for the given index.
+    /// Indicates that no host function was found registered for the given index.
     case hostFunctionNotFound = 0xFFFF_FFFE
 
-    // Indicates that the registered host function was called but threw a Swift error during its execution.
+    /// Indicates that the registered host function was called but threw a Swift error during its execution.
     case hostFunctionThrewError = 0xFFFF_FFFD
 
-    // Indicates that the VM ran out of gas during host function execution
+    /// Indicates that the VM ran out of gas during host function execution
     case gasExhausted = 0xFFFF_FFFC
 
-    // Indicates that a page fault occurred during host function execution
+    /// Indicates that a page fault occurred during host function execution
     case pageFault = 0xFFFF_FFFB
 
-    // Indicates that the host function requested the VM to halt
+    /// Indicates that the host function requested the VM to halt
     case hostRequestedHalt = 0xFFFF_FFFA
 }

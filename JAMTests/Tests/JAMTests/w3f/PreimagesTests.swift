@@ -1,10 +1,9 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 private struct PreimageInfo: Codable, Equatable, Hashable, Comparable {
     var hash: Data32
@@ -95,7 +94,7 @@ struct PreimagesTests {
                 config: config,
                 timeslot: testcase.input.slot,
                 preimages: testcase.input.preimages,
-                priorState: priorState
+                priorState: priorState,
             )
         }
 

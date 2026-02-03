@@ -9,7 +9,7 @@ public enum QuicError: Error, Equatable, Sendable {
     case unableToGetRemoteAddress
 }
 
-// App specific error codes
+/// App specific error codes
 public struct QuicErrorCode: Sendable, Equatable {
     public let code: UInt64
 

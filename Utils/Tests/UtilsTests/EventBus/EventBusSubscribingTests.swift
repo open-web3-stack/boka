@@ -2,12 +2,11 @@
 import Foundation
 import Synchronization
 import Testing
-
 @testable import Utils
 
 // TestEvent and AnotherTestEvent are defined in EventBusTests
 
-// A helper actor to safely check if a handler was called and capture values
+/// A helper actor to safely check if a handler was called and capture values
 private actor TestHandlerChecker<T> {
     private(set) var callCount = 0
     private(set) var capturedValues: [T] = []
@@ -19,7 +18,7 @@ private actor TestHandlerChecker<T> {
 }
 
 struct EventBusSubscribingTests {
-    @Test func testBasicSubscription() async throws {
+    @Test func basicSubscription() async throws {
         let eventBus = EventBus()
         let handlerChecker = TestHandlerChecker<TestEvent>()
 
@@ -62,7 +61,7 @@ struct EventBusSubscribingTests {
         #expect(callCount == 0)
     }
 
-    @Test func testMultipleSubscribers() async throws {
+    @Test func multipleSubscribers() async throws {
         let eventBus = EventBus()
         let handler1Checker = TestHandlerChecker<TestEvent>()
         let handler2Checker = TestHandlerChecker<TestEvent>()
@@ -87,7 +86,7 @@ struct EventBusSubscribingTests {
         await eventBus.unsubscribe(token: token2)
     }
 
-    @Test func testSubscribingToDifferentEvents() async throws {
+    @Test func subscribingToDifferentEvents() async throws {
         let eventBus = EventBus()
         let testEventHandler = TestHandlerChecker<TestEvent>()
         let anotherTestEventHandler = TestHandlerChecker<AnotherTestEvent>()
@@ -113,7 +112,7 @@ struct EventBusSubscribingTests {
         await eventBus.unsubscribe(token: token2)
     }
 
-    @Test func testUnsubscribeOneOfMany() async throws {
+    @Test func unsubscribeOneOfMany() async throws {
         let eventBus = EventBus()
         let handler1Checker = TestHandlerChecker<TestEvent>()
         let handler2Checker = TestHandlerChecker<TestEvent>()
@@ -208,12 +207,12 @@ struct EventBusSubscribingTests {
 
     // MARK: - EventSubscriptions Helper Tests
 
-    @Test func testEventSubscriptionsDeinit() async throws {
+    @Test func eventSubscriptionsDeinit() async throws {
         let eventBus = EventBus()
         let handlerChecker = TestHandlerChecker<TestEvent>()
 
         var subscriptions: EventSubscriptions? = EventSubscriptions(eventBus: eventBus)
-        await subscriptions!.subscribe(TestEvent.self, id: "test") { event in
+        await subscriptions?.subscribe(TestEvent.self, id: "test") { event in
             await handlerChecker.handlerCalled(with: event)
         }
 
@@ -231,7 +230,7 @@ struct EventBusSubscribingTests {
         #expect(callCount == 0)
     }
 
-    @Test func testEventSubscriptionsExplicitUnsubscribe() async throws {
+    @Test func eventSubscriptionsExplicitUnsubscribe() async throws {
         let eventBus = EventBus()
         let subscriptions = EventSubscriptions(eventBus: eventBus)
         let handlerChecker = TestHandlerChecker<TestEvent>()

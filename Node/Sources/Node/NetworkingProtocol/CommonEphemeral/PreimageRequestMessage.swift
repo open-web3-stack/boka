@@ -20,7 +20,7 @@ extension PreimageRequestMessage: CEMessage {
         guard let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "Unexpected data"
+                debugDescription: "Unexpected data",
             ))
         }
         return try JamDecoder.decode(PreimageRequestMessage.self, from: data, withConfig: config)

@@ -1,10 +1,9 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import Node
 import Testing
 import Utils
-
-@testable import Node
 
 struct NodeDataSourceTests {
     let dataSource: NodeDataSource
@@ -24,7 +23,7 @@ struct NodeDataSourceTests {
             },
             blockchain: services.blockchain,
             eventBus: services.eventBus,
-            devPeers: []
+            devPeers: [],
         )
 
         self.networkManager = networkManager
@@ -37,7 +36,7 @@ struct NodeDataSourceTests {
             chainDataProvider: services.dataProvider,
             networkManager: networkManager,
             keystore: InMemoryKeyStore(),
-            name: "NodeDataSourceTests"
+            name: "NodeDataSourceTests",
         )
     }
 
@@ -92,9 +91,9 @@ struct NodeDataSourceTests {
         let ed25519Key = try await dataSource.create(keyType: .Ed25519)
         let bandersnatchKey = try await dataSource.create(keyType: .Bandersnatch)
 
-        let blsKeyData = Data(fromHexString: blsKey.key)!
-        let ed25519KeyData = Data(fromHexString: ed25519Key.key)!
-        let bandersnatchKeyData = Data(fromHexString: bandersnatchKey.key)!
+        let blsKeyData = try #require(Data(fromHexString: blsKey.key))
+        let ed25519KeyData = try #require(Data(fromHexString: ed25519Key.key))
+        let bandersnatchKeyData = try #require(Data(fromHexString: bandersnatchKey.key))
 
         let hasBLSKey = try await dataSource.has(keyType: .BLS, with: blsKeyData)
 

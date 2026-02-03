@@ -1,8 +1,7 @@
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct Ed25519TestVector: Codable, CustomStringConvertible {
     let number: Int
@@ -27,15 +26,15 @@ struct ED25519Tests {
     }
 
     @Test(arguments: try loadTestVectors())
-    func testEd25519Signature(vector: Ed25519TestVector) throws {
-        let rBytes = Data(fromHexString: vector.r)!
-        let sBytes = Data(fromHexString: vector.s)!
+    func ed25519Signature(vector: Ed25519TestVector) throws {
+        let rBytes = try #require(Data(fromHexString: vector.r))
+        let sBytes = try #require(Data(fromHexString: vector.s))
         let signature = Data64(rBytes + sBytes)!
 
-        let pkBytes = Data(fromHexString: vector.pk)!
-        let publicKey = try Ed25519.PublicKey(from: Data32(pkBytes)!)
+        let pkBytes = try #require(Data(fromHexString: vector.pk))
+        let publicKey = try Ed25519.PublicKey(from: #require(Data32(pkBytes)))
 
-        let message = Data(fromHexString: vector.msg)!
+        let message = try #require(Data(fromHexString: vector.msg))
         let isValid = publicKey.verify(signature: signature, message: message)
 
         #expect(isValid, "\(vector.description) should verify correctly")

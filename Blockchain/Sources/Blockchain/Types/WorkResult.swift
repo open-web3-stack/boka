@@ -56,8 +56,8 @@ extension WorkResult: Codable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: decoder.codingPath,
-                        debugDescription: "Invalid WorkResultError: unknown variant \(variant)"
-                    )
+                        debugDescription: "Invalid WorkResultError: unknown variant \(variant)",
+                    ),
                 )
             }
         } else {
@@ -80,8 +80,8 @@ extension WorkResult: Codable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: container.codingPath,
-                        debugDescription: "Not valid key founded"
-                    )
+                        debugDescription: "Not valid key founded",
+                    ),
                 )
             }
         }

@@ -1,7 +1,6 @@
 import Codec
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct EitherTests {
@@ -65,7 +64,7 @@ struct EitherTests {
         Either<String, Int>.left("Hello"),
         Either<String, Int>.right(42),
     ])
-    func testAccessors(either: Either<String, Int>) {
+    func accessors(either: Either<String, Int>) {
         if let left = either.left {
             #expect(left == "Hello")
             #expect(either.right == nil)
@@ -149,7 +148,7 @@ struct EitherTests {
         Either<Int, Int>.left(42),
         Either<Int, Int>.right(99),
     ])
-    func testMaybeEitherUnwrapped(either: Either<Int, Int>) {
+    func maybeEitherUnwrapped(either: Either<Int, Int>) {
         let maybe = MaybeEither(either)
         #expect(maybe.unwrapped == (either == .left(42) ? 42 : 99))
     }

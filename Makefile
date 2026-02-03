@@ -69,7 +69,7 @@ lint: githooks
 
 .PHONY: format
 format: githooks
-	@echo swiftformat is disabled
+	swiftformat .
 
 .PHONY: format-cargo
 format-cargo:

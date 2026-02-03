@@ -1,11 +1,10 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import TracingUtils
 import Utils
-
-@testable import JAMTests
 
 private let logger = Logger(label: "AccumulateTests")
 
@@ -56,11 +55,11 @@ private struct AccumulateState: Equatable, Codable {
     var entropy: Data32
     var accumulationQueue: ConfigFixedSizeArray<
         [AccumulationQueueItem],
-        ProtocolConfig.EpochLength
+        ProtocolConfig.EpochLength,
     >
     var accumulationHistory: ConfigFixedSizeArray<
         SortedUniqueArray<Data32>,
-        ProtocolConfig.EpochLength
+        ProtocolConfig.EpochLength,
     >
     var privilegedServices: PrivilegedServices
     var serviceStatistics: [ServiceStatisticsMapEntry]
@@ -88,8 +87,8 @@ private enum Output: Codable {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: decoder.codingPath,
-                    debugDescription: "invalid output variant \(variant)"
-                )
+                    debugDescription: "invalid output variant \(variant)",
+                ),
             )
         }
     }
@@ -120,7 +119,7 @@ private struct FullAccumulateState: Accumulation {
     var validatorQueue: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
     var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<Data32, ProtocolConfig.MaxAuthorizationsQueueItems>,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
     var accumulationQueue: StateKeys.AccumulationQueueKey.Value
     var accumulationHistory: StateKeys.AccumulationHistoryKey.Value
@@ -149,7 +148,7 @@ private struct FullAccumulateState: Accumulation {
     func get(
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
-        length: UInt32
+        length: UInt32,
     ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
         preimageInfo[index]?[HashAndLength(hash: hash, length: length)]
     }
@@ -181,7 +180,7 @@ private struct FullAccumulateState: Accumulation {
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value?
+        value: StateKeys.ServiceAccountPreimageInfoKey.Value?,
     ) {
         let key = HashAndLength(hash: hash, length: length)
         // update footprint
@@ -221,7 +220,7 @@ struct AccumulateTests {
             validatorQueue: .init(config: config, defaultValue: .dummy(config: config)),
             authorizationQueue: .init(config: config, defaultValue: .init(config: config, defaultValue: Data32())),
             accumulationQueue: preState.accumulationQueue,
-            accumulationHistory: preState.accumulationHistory
+            accumulationHistory: preState.accumulationHistory,
         )
 
         for entry in testcase.preState.accounts {
@@ -244,7 +243,7 @@ struct AccumulateTests {
                 availableReports: testcase.input.reports,
                 timeslot: testcase.input.timeslot,
                 prevTimeslot: preState.timeslot,
-                entropy: preState.entropy
+                entropy: preState.entropy,
             )
         }
 
@@ -271,7 +270,7 @@ struct AccumulateTests {
                         let key = HashAndLength(hash: preimageRequest.key.hash, length: preimageRequest.key.length)
                         #expect(
                             fullState.preimageInfo[entry.index]?[key] == preimageRequest.value,
-                            "Preimage request mismatch"
+                            "Preimage request mismatch",
                         )
                     }
                 }

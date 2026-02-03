@@ -8,10 +8,10 @@ final class ExecutorFrontendSandboxedWithPool: ExecutorFrontend {
     private let config: PvmConfig
     private let poolConfig: SandboxPoolConfiguration
 
-    // Pool instance (lazy initialized)
+    /// Pool instance (lazy initialized)
     private var pool: SandboxPool?
 
-    // Protocol requirement
+    /// Protocol requirement
     required convenience init(mode: ExecutionMode) {
         self.init(mode: mode, config: DefaultPvmConfig(), poolConfig: .throughputOptimized)
     }
@@ -28,7 +28,7 @@ final class ExecutorFrontendSandboxedWithPool: ExecutorFrontend {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx: (any InvocationContext)?
+        ctx: (any InvocationContext)?,
     ) async -> VMExecutionResult {
         logger.debug("[Frontend] execute() called - ctx: \(ctx != nil ? "non-nil" : "nil")")
 
@@ -44,7 +44,7 @@ final class ExecutorFrontendSandboxedWithPool: ExecutorFrontend {
                 pc: pc,
                 gas: gas,
                 argumentData: argumentData,
-                ctx: ctx
+                ctx: ctx,
             )
         }
 
@@ -62,7 +62,7 @@ final class ExecutorFrontendSandboxedWithPool: ExecutorFrontend {
                 pc: pc,
                 gas: gas,
                 argumentData: argumentData,
-                ctx: nil
+                ctx: nil,
             )
 
         } catch {
@@ -72,7 +72,7 @@ final class ExecutorFrontendSandboxedWithPool: ExecutorFrontend {
             return VMExecutionResult(
                 exitReason: .panic(.trap),
                 gasUsed: Gas(0),
-                outputData: nil
+                outputData: nil,
             )
         }
     }
@@ -85,7 +85,7 @@ final class ExecutorFrontendSandboxedWithPool: ExecutorFrontend {
 
         let newPool = try await SandboxPool(
             config: poolConfig,
-            executionMode: mode
+            executionMode: mode,
         )
         pool = newPool
         return newPool

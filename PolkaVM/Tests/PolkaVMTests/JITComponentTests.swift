@@ -4,13 +4,12 @@
 // NOTE: Tests that depend on incomplete C++ code have been removed.
 
 import Foundation
+@testable import PolkaVM
 import Testing
 import Utils
 
-@testable import PolkaVM
-
 struct JITComponentTests {
-    // Helper function to create a valid blob with given code
+    /// Helper function to create a valid blob with given code
     private func createBlob(code: Data) -> Data {
         var blob = Data()
 
@@ -145,7 +144,7 @@ struct JITComponentTests {
         // Each block should have one instruction with data
         for (_, block) in blocks {
             #expect(block.instructions.count == 1)
-            let instruction = block.instructions.first!
+            let instruction = try #require(block.instructions.first)
             #expect(instruction.opcode == 0)
             #expect(!instruction.data.isEmpty)
             // First byte should be the opcode
@@ -238,5 +237,4 @@ struct JITComponentTests {
         let totalInstructions = blocks.values.reduce(0) { $0 + $1.instructions.count }
         #expect(totalInstructions == instructionCount)
     }
-
 }

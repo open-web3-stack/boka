@@ -235,7 +235,7 @@ public class CacheStatsTracker: @unchecked Sendable {
             misses: misses,
             evictions: evictions,
             hitRate: Double(hits) / Double(max(1, hits + misses)),
-            totalAccesses: hits + misses
+            totalAccesses: hits + misses,
         )
         lock.unlock()
         return stats

@@ -27,7 +27,7 @@ public actor AssuranceCoordinator {
     public func distributeAssurances(
         assurances: ExtrinsicAvailability.AssurancesList,
         parentHash: Data32,
-        validators _: [ValidatorIndex]
+        validators _: [ValidatorIndex],
     ) async throws -> Bool {
         // CE 141: Distribute assurances to validators
         // 1. Verify the assurances are valid
@@ -77,7 +77,7 @@ public actor AssuranceCoordinator {
     /// - Returns: The valid assurances
     public func verifyAssurances(
         assurances: ExtrinsicAvailability.AssurancesList,
-        parentHash: Data32
+        parentHash: Data32,
     ) async throws -> ExtrinsicAvailability.AssurancesList {
         // Verify assurances from validators
         let state = try await dataProvider.getState(hash: dataProvider.bestHead.hash)

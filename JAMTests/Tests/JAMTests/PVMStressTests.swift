@@ -1,10 +1,9 @@
 import Foundation
+@testable import JAMTests
 import PolkaVM
 import Testing
 import TracingUtils
 import Utils
-
-@testable import JAMTests
 
 private let logger = Logger(label: "PVMStressTests")
 
@@ -14,7 +13,7 @@ private let logger = Logger(label: "PVMStressTests")
 struct PVMStressTests {
     // MARK: - Extreme Gas Values
 
-    @Test func stress_extremeGasValues() async throws {
+    @Test func stress_extremeGasValues() async {
         let config = DefaultPvmConfig()
 
         let fibonacci = Data([
@@ -44,7 +43,7 @@ struct PVMStressTests {
                 pc: 0,
                 gas: gas,
                 argumentData: Data([5]),
-                ctx: nil
+                ctx: nil,
             )
 
             let (exitReasonSandbox, _, _) = await invokePVM(
@@ -54,13 +53,13 @@ struct PVMStressTests {
                 pc: 0,
                 gas: gas,
                 argumentData: Data([5]),
-                ctx: nil
+                ctx: nil,
             )
 
             // Both should handle extreme gas values consistently
             #expect(
                 exitReasonInterpreter == exitReasonSandbox,
-                "Extreme gas (\(gasValue)): Exit reasons differ"
+                "Extreme gas (\(gasValue)): Exit reasons differ",
             )
 
             logger.info("Extreme gas test (\(gasValue)): both modes produced \(exitReasonInterpreter)")
@@ -69,7 +68,7 @@ struct PVMStressTests {
 
     // MARK: - Maximum Argument Size
 
-    @Test func stress_maximumArgumentSize() async throws {
+    @Test func stress_maximumArgumentSize() async {
         let config = DefaultPvmConfig()
 
         let sumToN = Data([
@@ -89,7 +88,7 @@ struct PVMStressTests {
             pc: 0,
             gas: Gas(10_000_000),
             argumentData: maxArgument,
-            ctx: nil
+            ctx: nil,
         )
 
         let (exitReasonSandbox, _, _) = await invokePVM(
@@ -99,13 +98,13 @@ struct PVMStressTests {
             pc: 0,
             gas: Gas(10_000_000),
             argumentData: maxArgument,
-            ctx: nil
+            ctx: nil,
         )
 
         // Both should handle max argument consistently
         #expect(
             exitReasonInterpreter == exitReasonSandbox,
-            "Max argument: Exit reasons differ"
+            "Max argument: Exit reasons differ",
         )
 
         logger.info("Max argument stress test: both modes handled 1MB argument (exit: \(exitReasonInterpreter))")
@@ -113,7 +112,7 @@ struct PVMStressTests {
 
     // MARK: - Rapid Sequential Execution
 
-    @Test func stress_rapidSequentialExecution() async throws {
+    @Test func stress_rapidSequentialExecution() async {
         let config = DefaultPvmConfig()
 
         let sumToN = Data([
@@ -134,7 +133,7 @@ struct PVMStressTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([7]),
-                ctx: nil
+                ctx: nil,
             )
 
             let (_, _, outputSandbox) = await invokePVM(
@@ -144,7 +143,7 @@ struct PVMStressTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([7]),
-                ctx: nil
+                ctx: nil,
             )
 
             #expect(outputInterpreter == outputSandbox, "Rapid execution: Outputs differ")
@@ -155,7 +154,7 @@ struct PVMStressTests {
 
     // MARK: - Memory Stress Tests
 
-    @Test func stress_memoryPatterns() async throws {
+    @Test func stress_memoryPatterns() async {
         let config = DefaultPvmConfig()
 
         let sumToN = Data([
@@ -182,7 +181,7 @@ struct PVMStressTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: argument,
-                ctx: nil
+                ctx: nil,
             )
 
             let (exitReasonSandbox, _, outputSandbox) = await invokePVM(
@@ -192,17 +191,17 @@ struct PVMStressTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: argument,
-                ctx: nil
+                ctx: nil,
             )
 
             #expect(
                 exitReasonInterpreter == exitReasonSandbox,
-                "Memory pattern '\(patternName)': Exit reasons differ"
+                "Memory pattern '\(patternName)': Exit reasons differ",
             )
 
             #expect(
                 outputInterpreter == outputSandbox,
-                "Memory pattern '\(patternName)': Outputs differ"
+                "Memory pattern '\(patternName)': Outputs differ",
             )
 
             logger.info("Memory pattern '\(patternName)'': both modes handled identically")
@@ -211,7 +210,7 @@ struct PVMStressTests {
 
     // MARK: - Concurrency Stress Test
 
-    @Test func stress_concurrentExecution() async throws {
+    @Test func stress_concurrentExecution() async {
         let config = DefaultPvmConfig()
 
         let sumToN = Data([
@@ -230,7 +229,7 @@ struct PVMStressTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([12]),
-                ctx: nil
+                ctx: nil,
             )
         }.value
 
@@ -242,7 +241,7 @@ struct PVMStressTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([12]),
-                ctx: nil
+                ctx: nil,
             )
         }.value
 
@@ -259,7 +258,7 @@ struct PVMStressTests {
 
     // MARK: - Zero Edge Cases
 
-    @Test func stress_zeroInputs() async throws {
+    @Test func stress_zeroInputs() async {
         let config = DefaultPvmConfig()
 
         // Test with program that handles zero inputs
@@ -277,7 +276,7 @@ struct PVMStressTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([0]),
-            ctx: nil
+            ctx: nil,
         )
 
         let (exitReasonSandbox, _, outputSandbox) = await invokePVM(
@@ -287,7 +286,7 @@ struct PVMStressTests {
             pc: 0,
             gas: Gas(1_000_000),
             argumentData: Data([0]),
-            ctx: nil
+            ctx: nil,
         )
 
         #expect(exitReasonInterpreter == exitReasonSandbox)
@@ -314,7 +313,7 @@ struct PVMStressTests {
 
     // MARK: - Boundary Condition Tests
 
-    @Test func stress_boundaryConditions() async throws {
+    @Test func stress_boundaryConditions() async {
         let config = DefaultPvmConfig()
 
         // Test various boundary conditions
@@ -339,7 +338,7 @@ struct PVMStressTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([input]),
-                ctx: nil
+                ctx: nil,
             )
 
             let (_, _, outputSandbox) = await invokePVM(
@@ -349,7 +348,7 @@ struct PVMStressTests {
                 pc: 0,
                 gas: Gas(1_000_000),
                 argumentData: Data([input]),
-                ctx: nil
+                ctx: nil,
             )
 
             #expect(outputInterpreter == outputSandbox, "Boundary test '\(description)': Outputs differ")

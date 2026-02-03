@@ -1,10 +1,9 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct AssurancesInput: Codable {
     var assurances: ExtrinsicAvailability
@@ -40,7 +39,7 @@ struct AssurancesTests {
             try testcase.input.assurances.validate(config: config)
             try state.validateAssurances(
                 extrinsics: testcase.input.assurances,
-                parentHash: testcase.input.parentHash
+                parentHash: testcase.input.parentHash,
             )
             return try state.update(
                 config: config, timeslot: testcase.input.timeslot,

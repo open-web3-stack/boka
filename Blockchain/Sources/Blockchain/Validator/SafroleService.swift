@@ -33,7 +33,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable, OnGenesis, 
     public init(
         config: ProtocolConfigRef,
         eventBus: EventBus,
-        keystore: KeyStore
+        keystore: KeyStore,
     ) async {
         self.keystore = keystore
         ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
@@ -86,13 +86,13 @@ public final class SafroleService: ServiceBase, @unchecked Sendable, OnGenesis, 
                     entropy: state.value.entropyPool.t2,
                     ringContext: ringContext,
                     secret: secret,
-                    idx: UInt32(idx)
+                    idx: UInt32(idx),
                 )
 
                 events.append(.init(
                     epochIndex: state.value.timeslot.timeslotToEpochIndex(config: config),
                     items: tickets,
-                    publicKey: secret.publicKey
+                    publicKey: secret.publicKey,
                 ))
             }
         }
@@ -110,7 +110,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable, OnGenesis, 
         entropy: Data32,
         ringContext: Bandersnatch.RingContext,
         secret: Bandersnatch.SecretKey,
-        idx: UInt32
+        idx: UInt32,
     ) throws -> [TicketItemAndOutput] {
         let pubkeys = try validators.map {
             try Bandersnatch.PublicKey(data: $0.bandersnatch)

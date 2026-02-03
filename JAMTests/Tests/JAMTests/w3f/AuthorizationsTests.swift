@@ -1,10 +1,9 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct CoreAuthorizer: Codable {
     var core: CoreIndex
@@ -21,17 +20,17 @@ struct AuthorizationsState: Equatable, Codable, Authorization {
         ConfigLimitedSizeArray<
             Data32,
             ProtocolConfig.Int0,
-            ProtocolConfig.MaxAuthorizationsPoolItems
+            ProtocolConfig.MaxAuthorizationsPoolItems,
         >,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
 
     var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<
             Data32,
-            ProtocolConfig.MaxAuthorizationsQueueItems
+            ProtocolConfig.MaxAuthorizationsQueueItems,
         >,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
 
     mutating func mergeWith(postState: AuthorizationPostState) {
@@ -59,7 +58,7 @@ struct AuthorizationsTests {
         let result = try state.update(
             config: config,
             timeslot: testcase.input.slot,
-            auths: testcase.input.auths.map { ($0.core, $0.auth) }
+            auths: testcase.input.auths.map { ($0.core, $0.auth) },
         )
 
         state.mergeWith(postState: result)

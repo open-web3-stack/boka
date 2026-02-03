@@ -1,23 +1,22 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct DisputesState: Equatable, Codable, Disputes {
     var judgements: JudgementsState
     var reports: ConfigFixedSizeArray<
         ReportItem?,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
     var timeslot: TimeslotIndex
     var currentValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     >
     var previousValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     >
 
     mutating func mergeWith(postState: DisputesPostState) {
@@ -48,7 +47,7 @@ struct DisputesTests {
             try testcase.input.validate(config: config)
             return try state.update(
                 config: config,
-                disputes: testcase.input
+                disputes: testcase.input,
             )
         }
         switch result {

@@ -192,7 +192,7 @@ public struct State: Sendable {
         }
     }
 
-    // s
+    /// s
     public subscript(serviceAccount index: ServiceIndex, storageKey key: Data) -> StateKeys.ServiceAccountStorageKey.Value? {
         get {
             layer[serviceAccount: index, storageKey: key]
@@ -202,9 +202,9 @@ public struct State: Sendable {
         }
     }
 
-    // p
+    /// p
     public subscript(
-        serviceAccount index: ServiceIndex, preimageHash hash: Data32
+        serviceAccount index: ServiceIndex, preimageHash hash: Data32,
     ) -> StateKeys.ServiceAccountPreimagesKey.Value? {
         get {
             layer[serviceAccount: index, preimageHash: hash]
@@ -214,9 +214,9 @@ public struct State: Sendable {
         }
     }
 
-    // l
+    /// l
     public subscript(
-        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32
+        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32,
     ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
         get {
             layer[serviceAccount: index, preimageHash: hash, length: length]
@@ -286,7 +286,7 @@ extension State: Dummy {
                 headerHash: block.hash,
                 superPeak: Data32(),
                 stateRoot: Data32(),
-                lookup: [Data32: Data32]()
+                lookup: [Data32: Data32](),
             ))
         }
         let safroleState: StateKeys.SafroleStateKey.Value = SafroleState.dummy(config: config)
@@ -306,17 +306,17 @@ extension State: Dummy {
             assigners: try! ConfigFixedSizeArray(config: config, defaultValue: ServiceIndex()),
             delegator: ServiceIndex(),
             registrar: ServiceIndex(),
-            alwaysAcc: [:]
+            alwaysAcc: [:],
         )
         let judgements: StateKeys.JudgementsKey.Value = JudgementsState.dummy(config: config)
         let activityStatistics: StateKeys.ActivityStatisticsKey.Value = Statistics.dummy(config: config)
         let accumulationQueue: StateKeys.AccumulationQueueKey.Value = try! ConfigFixedSizeArray(
             config: config,
-            defaultValue: [AccumulationQueueItem]()
+            defaultValue: [AccumulationQueueItem](),
         )
         let accumulationHistory: StateKeys.AccumulationHistoryKey.Value = try! ConfigFixedSizeArray(
             config: config,
-            defaultValue: .init()
+            defaultValue: .init(),
         )
         let lastAccumulationOutputs: StateKeys.LastAccumulationOutputsKey.Value = []
 
@@ -389,7 +389,7 @@ extension State: ServiceAccounts {
     }
 
     public func get(
-        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32
+        serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32,
     ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
         if layer.isDeleted(serviceAccount: index, preimageHash: hash, length: length) {
             return nil
@@ -403,7 +403,7 @@ extension State: ServiceAccounts {
     public func historicalLookup(
         serviceAccount index: ServiceIndex,
         timeslot: TimeslotIndex,
-        preimageHash hash: Data32
+        preimageHash hash: Data32,
     ) async throws -> Data? {
         if let preimage = try await get(serviceAccount: index, preimageHash: hash),
            let preimageInfo = try await get(serviceAccount: index, preimageHash: hash, length: UInt32(preimage.count))
@@ -449,7 +449,7 @@ extension State: ServiceAccounts {
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value?
+        value: StateKeys.ServiceAccountPreimageInfoKey.Value?,
     ) async throws {
         // update footprint
         let oldValue = try await get(serviceAccount: index, preimageHash: hash, length: length)
@@ -481,27 +481,35 @@ extension State: ServiceAccounts {
 
 extension State: Safrole {
     public var nextValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-    > { safroleState.nextValidators }
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
+    > {
+        safroleState.nextValidators
+    }
 
     public var ticketsAccumulator: ConfigLimitedSizeArray<
         Ticket,
         ProtocolConfig.Int0,
-        ProtocolConfig.EpochLength
-    > { safroleState.ticketsAccumulator }
+        ProtocolConfig.EpochLength,
+    > {
+        safroleState.ticketsAccumulator
+    }
 
     public var ticketsOrKeys: Either<
         ConfigFixedSizeArray<
             Ticket,
-            ProtocolConfig.EpochLength
+            ProtocolConfig.EpochLength,
         >,
         ConfigFixedSizeArray<
             BandersnatchPublicKey,
-            ProtocolConfig.EpochLength
-        >
-    > { safroleState.ticketsOrKeys }
+            ProtocolConfig.EpochLength,
+        >,
+    > {
+        safroleState.ticketsOrKeys
+    }
 
-    public var ticketsVerifier: BandersnatchRingVRFRoot { safroleState.ticketsVerifier }
+    public var ticketsVerifier: BandersnatchRingVRFRoot {
+        safroleState.ticketsVerifier
+    }
 
     public mutating func mergeWith(postState: SafrolePostState) {
         safroleState.nextValidators = postState.nextValidators

@@ -1,18 +1,17 @@
 import Foundation
+@testable import PolkaVM
 import Testing
 import Utils
 
-@testable import PolkaVM
-
 /// Unit tests for PageMap and memory management
 struct PageMapTests {
-    @Test func testPageMapCreation() {
+    @Test func pageMapCreation() {
         let config = DefaultPvmConfig()
         let pageMap = PageMap(pageMap: [], config: config)
         // PageMap should be created successfully
     }
 
-    @Test func testPageAccess() {
+    @Test func pageAccess() {
         // Test PageAccess enum
         let readOnly = PageAccess.readOnly
         let readWrite = PageAccess.readWrite
@@ -24,7 +23,7 @@ struct PageMapTests {
         #expect(readWrite.isWritable())
     }
 
-    @Test func testGeneralMemoryCreation() {
+    @Test func generalMemoryCreation() {
         let pageMap: [(address: UInt32, length: UInt32, writable: Bool)] = []
         let chunks: [(address: UInt32, data: Data)] = []
 
@@ -32,7 +31,7 @@ struct PageMapTests {
         #expect(memory != nil)
     }
 
-    @Test func testMemoryAlignment() {
+    @Test func memoryAlignment() {
         // Test that page sizes are properly aligned
         let pageSizes = [4096, 8192, 16384, 32768, 65536]
 
@@ -41,7 +40,7 @@ struct PageMapTests {
         }
     }
 
-    @Test func testStandardPageSizes() {
+    @Test func standardPageSizes() {
         // Test common page sizes
         let standard4KB = 4096
         let standard8KB = 8192
@@ -54,7 +53,7 @@ struct PageMapTests {
         #expect(standard64KB == 64 * 1024)
     }
 
-    @Test func testPageMapWithPages() {
+    @Test func pageMapWithPages() {
         let config = DefaultPvmConfig()
         let pages: [(address: UInt32, length: UInt32, writable: Bool)] = [
             (address: 0x1000, length: 0x1000, writable: true),
@@ -63,7 +62,7 @@ struct PageMapTests {
 
         let pageMap = PageMap(
             pageMap: pages.map { (address: $0.address, length: $0.length, access: $0.writable ? .readWrite : .readOnly) },
-            config: config
+            config: config,
         )
         // PageMap should handle multiple pages
     }

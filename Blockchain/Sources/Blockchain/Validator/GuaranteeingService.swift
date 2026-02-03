@@ -32,13 +32,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     private let keystore: KeyStore
     private let dataAvailability: DataAvailabilityService
 
-    // Stores the current signing key and validator index
+    /// Stores the current signing key and validator index
     let signingKey: ThreadSafeContainer<(ValidatorIndex, Ed25519.SecretKey)?> = .init(nil)
 
-    // Stores the core assignments for a specific timeslot
+    /// Stores the core assignments for a specific timeslot
     let coreAssignments: ThreadSafeContainer<([CoreIndex], TimeslotIndex)> = .init(([], 0))
 
-    // Cache for processed work package results to avoid duplicate work
+    /// Cache for processed work package results to avoid duplicate work
     let workReportCache = ThreadSafeContainer<[Data32: WorkReport]>([:])
 
     public init(
@@ -47,7 +47,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         scheduler: Scheduler,
         dataProvider: BlockchainDataProvider,
         keystore: KeyStore,
-        dataStore: DataStore
+        dataStore: DataStore,
     ) async {
         self.dataProvider = dataProvider
         self.keystore = keystore
@@ -56,7 +56,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             eventBus: eventBus,
             scheduler: scheduler,
             dataProvider: dataProvider,
-            dataStore: dataStore
+            dataStore: dataStore,
         )
 
         super.init(id: "GuaranteeingService", config: config, eventBus: eventBus, scheduler: scheduler)
@@ -75,7 +75,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         await subscribe(
             RuntimeEvents.WorkPackageBundleReceived.self,
-            id: "GuaranteeingService.WorkPackageBundleReceived"
+            id: "GuaranteeingService.WorkPackageBundleReceived",
         ) { [weak self] event in
             try await self?.on(workPackageBundleReceived: event)
         }
@@ -111,7 +111,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         guard let (_, signingKey) = signingKey.value else {
             publish(RuntimeEvents.WorkPackageBundleReceivedResponse(
                 workBundleHash: workBundleHash,
-                error: GuaranteeingServiceError.notValidator
+                error: GuaranteeingServiceError.notValidator,
             ))
             return
         }
@@ -121,7 +121,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             let report = try await processWorkPackageBundle(
                 coreIndex: event.coreIndex,
                 segmentsRootMappings: event.segmentsRootMappings,
-                bundle: event.bundle
+                bundle: event.bundle,
             )
 
             let payload = SigningContext.guarantee + report.hash().data
@@ -129,12 +129,12 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             publish(RuntimeEvents.WorkPackageBundleReceivedResponse(
                 workBundleHash: workBundleHash,
                 workReportHash: report.hash(),
-                signature: signature
+                signature: signature,
             ))
         } catch {
             publish(RuntimeEvents.WorkPackageBundleReceivedResponse(
                 workBundleHash: workBundleHash,
-                error: error
+                error: error,
             ))
         }
     }
@@ -150,7 +150,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      */
     func validateWorkPackageBundle(
         _ bundle: WorkPackageBundle,
-        segmentsRootMappings: SegmentsRootMappings
+        segmentsRootMappings: SegmentsRootMappings,
     ) async throws {
         try validate(workPackage: bundle.workPackage)
 
@@ -219,7 +219,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     func processWorkPackageBundle(
         coreIndex: CoreIndex,
         segmentsRootMappings: SegmentsRootMappings,
-        bundle: WorkPackageBundle
+        bundle: WorkPackageBundle,
     ) async throws -> WorkReport {
         guard let (validatorIndex, _) = signingKey.value else {
             throw GuaranteeingServiceError.notValidator
@@ -241,7 +241,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         guard currentCoreIndex == coreIndex else {
             logger.error(
                 "Invalid core assignment",
-                metadata: ["expectedCore": "\(currentCoreIndex)", "actualCore": "\(coreIndex)"]
+                metadata: ["expectedCore": "\(currentCoreIndex)", "actualCore": "\(coreIndex)"],
             )
             throw GuaranteeingServiceError.invalidCore
         }
@@ -255,7 +255,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             coreIndex: coreIndex,
             workPackage: workPackage,
             extrinsics: bundle.extrinsics,
-            segmentsRootMappings: segmentsRootMappings
+            segmentsRootMappings: segmentsRootMappings,
         )
 
         var cacheValue = workReportCache.value
@@ -282,7 +282,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
     func refineWorkPackage(
         coreIndex: CoreIndex,
         workPackage: WorkPackageRef,
-        extrinsics: [Data]
+        extrinsics: [Data],
     ) async throws {
         guard let (validatorIndex, signingKey) = signingKey.value else {
             throw GuaranteeingServiceError.notValidator
@@ -306,7 +306,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             coreIndex: coreIndex,
             workPackage: workPackage,
             extrinsics: extrinsics,
-            segmentsRootMappings: nil
+            segmentsRootMappings: nil,
         )
 
         let workReportHash = workReport.hash()
@@ -322,7 +322,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         logger.debug(
             "Requesting signatures from validators",
-            metadata: ["validatorCount": "\(otherValidators.count)", "coreIndex": "\(coreIndex)"]
+            metadata: ["validatorCount": "\(otherValidators.count)", "coreIndex": "\(coreIndex)"],
         )
 
         // Announce work package bundle ready to other validators in the same core group and wait for signatures
@@ -332,7 +332,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                     target: validatorKey,
                     coreIndex: coreIndex,
                     bundle: bundle,
-                    segmentsRootMappings: mappings
+                    segmentsRootMappings: mappings,
                 ))
                 group.addTask {
                     do {
@@ -344,7 +344,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                             // Timeout in seconds for validator response.
                             // Value of 2s is reasonable for local network; may need adjustment for WAN.
                             // Consider making this a ProtocolConfig parameter for tuning.
-                            timeout: 2
+                            timeout: 2,
                         )
                         return ValidatorSignature(validatorIndex: idx, signature: resp.signature)
                     } catch ContinuationError.timeout {
@@ -389,13 +389,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 GuaranteedWorkReportRef(GuaranteedWorkReport(
                     workReport: workReport,
                     slot: timeslot,
-                    signatures: sigs
+                    signatures: sigs,
                 )))
         // Distribute the guaranteed work-report to all current validators
         publish(RuntimeEvents.WorkReportGenerated(
             workReport: workReport,
             slot: timeslot,
-            signatures: sigs
+            signatures: sigs,
         ))
     }
 
@@ -418,7 +418,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         let newCoreAssignment = state.value.getCoreAssignment(
             config: config,
             randomness: state.value.entropyPool.t2,
-            timeslot: timeslot
+            timeslot: timeslot,
         )
 
         coreAssignments.value = (newCoreAssignment, timeslot)
@@ -437,7 +437,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
      */
     func validateSegmentsRootMapping(
         _ mapping: SegmentsRootMapping,
-        for workPackage: WorkPackage
+        for workPackage: WorkPackage,
     ) throws {
         // Verify the mapping belongs to this work package
         guard mapping.workPackageHash == workPackage.hash() else {
@@ -489,7 +489,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             config: config,
             serviceAccounts: state.value,
             package: workPackage,
-            coreIndex: 0 // The authorization doesn't depend on the core index
+            coreIndex: 0, // The authorization doesn't depend on the core index
         )
 
         // Check if the result is a success or failure
@@ -644,7 +644,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         coreIndex: CoreIndex,
         workPackage: WorkPackageRef,
         extrinsics: [Data],
-        segmentsRootMappings: SegmentsRootMappings?
+        segmentsRootMappings: SegmentsRootMappings?,
     ) async throws -> (WorkPackageBundle, SegmentsRootMappings, WorkReport) {
         // Check cache first
         let packageHash = workPackage.hash
@@ -656,13 +656,13 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 workPackage: workPackage.value,
                 extrinsics: extrinsics,
                 importSegments: imports,
-                justifications: justifications
+                justifications: justifications,
             )
 
             let mappings: SegmentsRootMappings = [
                 SegmentsRootMapping(
                     workPackageHash: packageHash,
-                    segmentsRoot: cachedReport.packageSpecification.segmentRoot
+                    segmentsRoot: cachedReport.packageSpecification.segmentRoot,
                 ),
             ]
 
@@ -683,7 +683,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             config: config,
             serviceAccounts: state.value,
             package: workPackage.value,
-            coreIndex: coreIndex
+            coreIndex: coreIndex,
         )
         let authorizerTrace = try authRes.mapError(GuaranteeingServiceError.authorizationError).get()
         logger.debug("Work package authorized successfully", metadata: ["traceSize": "\(authorizerTrace.count)"])
@@ -711,7 +711,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 coreIndex: coreIndex,
                 authorizerTrace: authorizerTrace,
                 importSegments: importSegments,
-                exportSegmentOffset: UInt64(exportSegmentOffset)
+                exportSegmentOffset: UInt64(exportSegmentOffset),
             )
 
             exportSegmentOffset += item.exportsCount
@@ -725,7 +725,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 importsCount: UInt(item.inputs.count),
                 exportsCount: UInt(item.exportsCount),
                 extrinsicsCount: UInt(item.outputs.count),
-                extrinsicsSize: UInt(item.outputs.reduce(into: 0) { $0 += $1.length })
+                extrinsicsSize: UInt(item.outputs.reduce(into: 0) { $0 += $1.length }),
             )
             workDigests.append(workDigest)
 
@@ -747,7 +747,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             workPackage: workPackage.value,
             extrinsics: extrinsics,
             importSegments: imports,
-            justifications: justifications
+            justifications: justifications,
         )
 
         logger.debug("Exporting work package bundle to data availability")
@@ -773,7 +773,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             length: length,
             erasureRoot: erasureRoot,
             segmentRoot: segmentRoot,
-            segmentCount: exportSegmentOffset
+            segmentCount: exportSegmentOffset,
         )
 
         logger.debug("Building lookup dictionary from recent history")
@@ -793,7 +793,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             packageSpecification: packageSpecification,
             lookup: oldLookups,
             digests: ConfigLimitedSizeArray(config: config, array: workDigests),
-            authGasUsed: UInt(authGasUsed.value)
+            authGasUsed: UInt(authGasUsed.value),
         )
 
         workReportCache.write {

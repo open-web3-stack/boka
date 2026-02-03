@@ -1,9 +1,8 @@
 import Foundation
 import MsQuicSwift
+@testable import Networking
 import Testing
 import Utils
-
-@testable import Networking
 
 final class MockPeerEventTests {
     final class MockPeerEventHandler: QuicEventHandler {
@@ -29,7 +28,7 @@ final class MockPeerEventTests {
         }
 
         func newConnection(
-            _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo
+            _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo,
         ) -> QuicStatus {
             events.write { events in
                 events.append(.newConnection(listener: listener, connection: connection, info: info))
@@ -108,7 +107,7 @@ final class MockPeerEventTests {
             630b30a664e1e740c28ddbce3e317243cfc8c3ae283b834ce77ce9a1c963b3125302306092a864886f70d01091531160414c4561932b37ec791f3a8d1\
             0dfbe71211aef56d6f30413031300d0609608648016503040201050004209fba7a4e53ab05c5d40a43f70afd6bb6d3765d7b9e033f3de563c902626f6\
             a46040805f3adf78a4477ff02020800
-            """
+            """,
         )!
     }
 
@@ -123,15 +122,15 @@ final class MockPeerEventTests {
             pkcs12: badCertData,
             alpns: [Data("testalpn".utf8)],
             client: false,
-            settings: QuicSettings.defaultSettings
+            settings: QuicSettings.defaultSettings,
         )
 
         let listener = try QuicListener(
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
-            alpns: [Data("testalpn".utf8)]
+            listenAddress: #require(NetAddr(ipAddress: "127.0.0.1", port: 0)),
+            alpns: [Data("testalpn".utf8)],
         )
 
         let listenAddress = try listener.listenAddress()
@@ -142,28 +141,28 @@ final class MockPeerEventTests {
             pkcs12: certData,
             alpns: [Data("testalpn".utf8)],
             client: true,
-            settings: QuicSettings.defaultSettings
+            settings: QuicSettings.defaultSettings,
         )
 
         let clientConnection = try QuicConnection(
             handler: clientHandler,
             registration: registration,
-            configuration: clientConfiguration
+            configuration: clientConfiguration,
         )
 
         try clientConnection.connect(to: listenAddress)
         try await Task.sleep(for: .milliseconds(100))
-        let (_, reason) = clientHandler.events.value.compactMap {
+        let (_, reason) = try #require(clientHandler.events.value.compactMap {
             if case let .shutdownInitiated(connection, reason) = $0 {
                 return (connection, reason)
             }
             return nil
-        }.first!
+        }.first)
         #expect(
             reason
                 == ConnectionCloseReason.transport(
-                    status: QuicStatus.code(QuicStatusCode.badCert), code: QuicErrorCode(298)
-                )
+                    status: QuicStatus.code(QuicStatusCode.badCert), code: QuicErrorCode(298),
+                ),
         )
     }
 
@@ -180,15 +179,15 @@ final class MockPeerEventTests {
             pkcs12: certData,
             alpns: [Data("testalpn".utf8)],
             client: false,
-            settings: QuicSettings.defaultSettings
+            settings: QuicSettings.defaultSettings,
         )
 
         let listener = try QuicListener(
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
-            alpns: [Data("testalpn".utf8)]
+            listenAddress: #require(NetAddr(ipAddress: "127.0.0.1", port: 0)),
+            alpns: [Data("testalpn".utf8)],
         )
 
         let listenAddress = try listener.listenAddress()
@@ -198,13 +197,13 @@ final class MockPeerEventTests {
             pkcs12: cert,
             alpns: [Data("testalpn".utf8)],
             client: true,
-            settings: QuicSettings.defaultSettings
+            settings: QuicSettings.defaultSettings,
         )
 
         let clientConnection = try QuicConnection(
             handler: clientHandler,
             registration: registration,
-            configuration: clientConfiguration
+            configuration: clientConfiguration,
         )
 
         // Attempt to connect
@@ -215,14 +214,14 @@ final class MockPeerEventTests {
         try stream1.send(data: Data("test data 1".utf8))
 
         try await Task.sleep(for: .milliseconds(100))
-        let (_, info) = serverHandler.events.value.compactMap {
+        let (_, info) = try #require(serverHandler.events.value.compactMap {
             switch $0 {
             case let .newConnection(_, connection, info):
                 (connection, info) as (QuicConnection, ConnectionInfo)?
             default:
                 nil
             }
-        }.first!
+        }.first)
         let (ipAddress2, _) = info.remoteAddress.getAddressAndPort()
 
         #expect(info.negotiatedAlpn == Data("testalpn".utf8))
@@ -241,15 +240,15 @@ final class MockPeerEventTests {
             pkcs12: badCertData,
             alpns: [Data("testalpn".utf8)],
             client: false,
-            settings: QuicSettings.defaultSettings
+            settings: QuicSettings.defaultSettings,
         )
 
         let listener = try QuicListener(
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
-            alpns: [Data("testalpn".utf8)]
+            listenAddress: #require(NetAddr(ipAddress: "127.0.0.1", port: 0)),
+            alpns: [Data("testalpn".utf8)],
         )
 
         let listenAddress = try listener.listenAddress()
@@ -260,13 +259,13 @@ final class MockPeerEventTests {
             pkcs12: certData,
             alpns: [Data("testalpn".utf8)],
             client: true,
-            settings: QuicSettings.defaultSettings
+            settings: QuicSettings.defaultSettings,
         )
 
         let clientConnection = try QuicConnection(
             handler: clientHandler,
             registration: registration,
-            configuration: clientConfiguration
+            configuration: clientConfiguration,
         )
         try clientConnection.connect(to: listenAddress)
         try await Task.sleep(for: .milliseconds(100))
@@ -275,14 +274,14 @@ final class MockPeerEventTests {
         try stream1.send(data: Data("test data 1".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
-        let (serverConnection, info) = serverHandler.events.value.compactMap {
+        let (serverConnection, info) = try #require(serverHandler.events.value.compactMap {
             switch $0 {
             case let .newConnection(_, connection, info):
                 (connection, info) as (QuicConnection, ConnectionInfo)?
             default:
                 nil
             }
-        }.first!
+        }.first)
         let (ipAddress2, _) = info.remoteAddress.getAddressAndPort()
 
         #expect(info.negotiatedAlpn == Data("testalpn".utf8))
@@ -317,15 +316,15 @@ final class MockPeerEventTests {
             pkcs12: certData,
             alpns: [Data("testalpn".utf8)],
             client: false,
-            settings: QuicSettings.defaultSettings
+            settings: QuicSettings.defaultSettings,
         )
 
         let listener = try QuicListener(
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
-            alpns: [Data("testalpn".utf8)]
+            listenAddress: #require(NetAddr(ipAddress: "127.0.0.1", port: 0)),
+            alpns: [Data("testalpn".utf8)],
         )
 
         let listenAddress = try listener.listenAddress()
@@ -336,47 +335,47 @@ final class MockPeerEventTests {
             pkcs12: badCertData,
             alpns: [Data("testalpn".utf8)],
             client: true,
-            settings: QuicSettings.defaultSettings
+            settings: QuicSettings.defaultSettings,
         )
 
         let clientConnection = try QuicConnection(
             handler: clientHandler,
             registration: registration,
-            configuration: clientConfiguration
+            configuration: clientConfiguration,
         )
         try clientConnection.connect(to: listenAddress)
         try await Task.sleep(for: .milliseconds(100))
-        let (_, reason) = clientHandler.events.value.compactMap {
+        let (_, reason) = try #require(clientHandler.events.value.compactMap {
             switch $0 {
             case let .shutdownInitiated(connection, reason):
                 (connection, reason) as (QuicConnection, ConnectionCloseReason)?
             default:
                 nil
             }
-        }.first!
+        }.first)
         #expect(
             reason
                 == ConnectionCloseReason.transport(
-                    status: QuicStatus.code(QuicStatusCode.badCert), code: QuicErrorCode(298)
-                )
+                    status: QuicStatus.code(QuicStatusCode.badCert), code: QuicErrorCode(298),
+                ),
         )
     }
 
     @Test
-    func rejectsConDueToWrongCert() async throws {
+    func rejectsConDueToWrongCert() throws {
         // Client setup with wrong certificate
         #expect(
             throws: QuicError.invalidStatus(
                 message: "ConfigurationLoadCredential",
-                status: QuicStatus(rawValue: QuicStatusCode.tlsError.rawValue)
-            )
+                status: QuicStatus(rawValue: QuicStatusCode.tlsError.rawValue),
+            ),
         ) {
             try QuicConfiguration(
                 registration: registration,
                 pkcs12: Data("wrong cert data".utf8),
                 alpns: [Data("testalpn".utf8)],
                 client: false,
-                settings: QuicSettings.defaultSettings
+                settings: QuicSettings.defaultSettings,
             )
         }
     }

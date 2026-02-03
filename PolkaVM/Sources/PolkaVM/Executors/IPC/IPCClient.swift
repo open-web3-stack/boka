@@ -57,7 +57,7 @@ final class IPCClient: @unchecked Sendable {
         pc: UInt32,
         gas: UInt64,
         argumentData: Data?,
-        executionMode: ExecutionMode
+        executionMode: ExecutionMode,
     ) async throws -> (exitReason: ExitReason, gasUsed: UInt64, outputData: Data?) {
         print("[IPC-ASYNC] sendExecuteRequest called, about to offload to DispatchQueue")
         // ⚠️ Offload blocking I/O to DispatchQueue to avoid blocking Swift concurrency pool
@@ -76,7 +76,7 @@ final class IPCClient: @unchecked Sendable {
                         pc: pc,
                         gas: gas,
                         argumentData: argumentData,
-                        executionMode: executionMode
+                        executionMode: executionMode,
                     )
                     print("[IPC-DISPATCH] sendExecuteRequestBlocking succeeded, resuming")
                     continuation.resume(returning: result)
@@ -94,7 +94,7 @@ final class IPCClient: @unchecked Sendable {
         pc: UInt32,
         gas: UInt64,
         argumentData: Data?,
-        executionMode: ExecutionMode
+        executionMode: ExecutionMode,
     ) throws -> (exitReason: ExitReason, gasUsed: UInt64, outputData: Data?) {
         guard let fd = fileDescriptor else {
             logger.error("[IPC] No file descriptor set")
@@ -126,7 +126,7 @@ final class IPCClient: @unchecked Sendable {
             pc: pc,
             gas: gas,
             argumentData: argumentData,
-            executionMode: executionMode
+            executionMode: executionMode,
         )
 
         logger.trace("[IPC][\(timestamp)] Writing \(requestData.count) bytes to FD \(fd)")
@@ -148,7 +148,7 @@ final class IPCClient: @unchecked Sendable {
         return (
             exitReason: response.toExitReason(),
             gasUsed: response.gasUsed,
-            outputData: response.outputData
+            outputData: response.outputData,
         )
     }
 

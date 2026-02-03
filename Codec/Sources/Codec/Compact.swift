@@ -30,15 +30,15 @@ public struct Compact<T: CompactEncodable & Codable & Sendable>: Codable, Codabl
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: container.codingPath,
-                    debugDescription: "Compact decoding failed: \(error.localizedDescription)"
-                )
+                    debugDescription: "Compact decoding failed: \(error.localizedDescription)",
+                ),
             )
         } catch {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: container.codingPath,
-                    debugDescription: "Value \(uintValue) cannot be converted to \(T.self): \(error)"
-                )
+                    debugDescription: "Value \(uintValue) cannot be converted to \(T.self): \(error)",
+                ),
             )
         }
     }
@@ -54,16 +54,16 @@ public struct Compact<T: CompactEncodable & Codable & Sendable>: Codable, Codabl
                 alias,
                 EncodingError.Context(
                     codingPath: encoder.codingPath,
-                    debugDescription: "Compact encoding failed: \(error.localizedDescription)"
-                )
+                    debugDescription: "Compact encoding failed: \(error.localizedDescription)",
+                ),
             )
         } catch {
             throw EncodingError.invalidValue(
                 alias,
                 EncodingError.Context(
                     codingPath: encoder.codingPath,
-                    debugDescription: "Cannot convert \(alias) to UInt: \(error)"
-                )
+                    debugDescription: "Cannot convert \(alias) to UInt: \(error)",
+                ),
             )
         }
     }

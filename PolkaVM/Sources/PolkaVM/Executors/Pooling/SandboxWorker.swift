@@ -26,7 +26,7 @@ actor SandboxWorker {
     private var consecutiveFailures = 0
     private var failureTimestamps: [TimeInterval] = []
 
-    // Lifecycle
+    /// Lifecycle
     private var startTime = Date()
 
     /// Get the worker ID (for pool management)
@@ -53,7 +53,7 @@ actor SandboxWorker {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        executionMode: ExecutionMode
+        executionMode: ExecutionMode,
     ) async throws -> VMExecutionResult {
         logger.debug("[EXEC] Worker \(workerID): execute() called - isAlive=\(isAlive), isBusy=\(isBusy)")
 
@@ -85,13 +85,13 @@ actor SandboxWorker {
                 pc: pc,
                 gas: gas.value,
                 argumentData: argumentData,
-                executionMode: executionMode
+                executionMode: executionMode,
             )
 
             let executionTime = Date().timeIntervalSince(startTime)
             logger
                 .debug(
-                    "[EXEC] Worker \(workerID): Got result in \(String(format: "%.2f", executionTime * 1000))ms - exitReason=\(result.exitReason)"
+                    "[EXEC] Worker \(workerID): Got result in \(String(format: "%.2f", executionTime * 1000))ms - exitReason=\(result.exitReason)",
                 )
 
             // Update statistics
@@ -103,7 +103,7 @@ actor SandboxWorker {
                 totalExecutionTime: stats.totalExecutionTime + executionTime,
                 currentExecutionCount: executionCountSinceRecycle,
                 isBusy: false,
-                health: .healthy
+                health: .healthy,
             )
 
             consecutiveFailures = 0
@@ -114,20 +114,20 @@ actor SandboxWorker {
             {
                 logger
                     .debug(
-                        "[EXEC] Worker \(workerID): Execution count \(executionCountSinceRecycle) >= threshold \(config.workerRecycleThreshold), recycling"
+                        "[EXEC] Worker \(workerID): Execution count \(executionCountSinceRecycle) >= threshold \(config.workerRecycleThreshold), recycling",
                     )
                 await recycle()
             }
 
             logger
                 .debug(
-                    "[EXEC] Worker \(workerID): Execution successful (total: \(stats.totalExecutions), failures: \(stats.failedExecutions))"
+                    "[EXEC] Worker \(workerID): Execution successful (total: \(stats.totalExecutions), failures: \(stats.failedExecutions))",
                 )
 
             return VMExecutionResult(
                 exitReason: result.exitReason,
                 gasUsed: Gas(result.gasUsed),
-                outputData: result.outputData
+                outputData: result.outputData,
             )
 
         } catch {
@@ -148,7 +148,7 @@ actor SandboxWorker {
                 totalExecutionTime: stats.totalExecutionTime + executionTime,
                 currentExecutionCount: executionCountSinceRecycle,
                 isBusy: false,
-                health: .degraded(reason: "\(error)")
+                health: .degraded(reason: "\(error)"),
             )
 
             // Check if worker should be marked unhealthy
@@ -161,7 +161,7 @@ actor SandboxWorker {
                     totalExecutionTime: stats.totalExecutionTime,
                     currentExecutionCount: executionCountSinceRecycle,
                     isBusy: false,
-                    health: .unhealthy(error: error)
+                    health: .unhealthy(error: error),
                 )
             }
 
@@ -232,7 +232,7 @@ actor SandboxWorker {
 
         logger.debug("[SPAWN] Worker \(workerID): Calling spawnChildProcess")
         let (handle, clientFD) = try await processManager.spawnChildProcess(
-            executablePath: config.sandboxPath
+            executablePath: config.sandboxPath,
         )
 
         logger.debug("[SPAWN] Worker \(workerID): Got handle PID=\(handle.pid), clientFD=\(clientFD)")

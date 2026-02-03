@@ -1,10 +1,9 @@
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct OptionalTests {
-    @Test func testUnwrapSuccess() throws {
+    @Test func unwrapSuccess() throws {
         let optionalValue: Int? = 42
 
         let result = try optionalValue.unwrap()
@@ -12,7 +11,7 @@ struct OptionalTests {
         #expect(result == 42)
     }
 
-    @Test func testUnwrapFailure() throws {
+    @Test func unwrapFailure() throws {
         let optionalValue: Int? = nil
 
         #expect(throws: OptionalError.nilValue) {
@@ -20,7 +19,7 @@ struct OptionalTests {
         }
     }
 
-    @Test func testUnwrapOrErrorSuccess() throws {
+    @Test func unwrapOrErrorSuccess() throws {
         let optionalValue: Int? = 42
 
         let result = try optionalValue.unwrap(orError: NSError(domain: "", code: 1))
@@ -28,7 +27,7 @@ struct OptionalTests {
         #expect(result == 42)
     }
 
-    @Test func testExpectSuccess() throws {
+    @Test func expectSuccess() {
         let optionalValue: Int? = 42
 
         let result = optionalValue.expect("Value should be present")

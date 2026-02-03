@@ -1,5 +1,5 @@
 --extensionacl on-declarations
---maxwidth 140
+--maxwidth 180
 --asynccapturing debugCheck
 --closurevoid preserve
 --disable typeSugar

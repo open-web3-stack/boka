@@ -53,7 +53,7 @@ func rocksdbProfilingBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         // Warm up cache by reading once
@@ -78,7 +78,7 @@ func rocksdbProfilingBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         // Create multiple blocks to test cache behavior
@@ -114,7 +114,7 @@ func rocksdbProfilingBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         benchmark.startMeasurement()
@@ -136,7 +136,7 @@ func rocksdbProfilingBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         // Get all trie keys
@@ -161,7 +161,7 @@ func rocksdbProfilingBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         // Get all trie keys
@@ -187,7 +187,7 @@ func rocksdbProfilingBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         benchmark.startMeasurement()
@@ -220,7 +220,7 @@ func rocksdbProfilingBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         // Get a shallow key (few hops)
@@ -243,7 +243,7 @@ func rocksdbProfilingBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         // Get a deep key (many hops) - use last key which likely has longer path
@@ -268,7 +268,7 @@ func rocksdbProfilingBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         benchmark.startMeasurement()
@@ -298,7 +298,7 @@ func rocksdbProfilingBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         benchmark.startMeasurement()

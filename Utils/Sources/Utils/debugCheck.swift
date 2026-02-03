@@ -6,7 +6,7 @@ public enum DebugCheckError: Error {
 }
 
 public func debugCheck(
-    _ condition: @autoclosure () throws -> Bool, file: StaticString = #file, line: UInt = #line
+    _ condition: @autoclosure () throws -> Bool, file: StaticString = #file, line: UInt = #line,
 ) throws {
     #if DEBUG_ASSERT
         let result = Result { try condition() }
@@ -22,7 +22,7 @@ public func debugCheck(
 }
 
 public func debugCheck(
-    _ condition: @autoclosure () async throws -> Bool, file: StaticString = #file, line: UInt = #line
+    _ condition: @autoclosure () async throws -> Bool, file: StaticString = #file, line: UInt = #line,
 ) async throws {
     #if DEBUG_ASSERT
         let result = await Result { try await condition() }

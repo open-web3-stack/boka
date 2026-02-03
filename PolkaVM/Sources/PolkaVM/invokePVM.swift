@@ -12,7 +12,7 @@ public func invokePVM(
     pc: UInt32,
     gas: Gas,
     argumentData: Data?,
-    ctx: (any InvocationContext)?
+    ctx: (any InvocationContext)?,
 ) async -> (ExitReason, Gas, Data?) {
     do {
         // Use JIT/Executor if requested, otherwise use Engine (interpreter)
@@ -23,7 +23,7 @@ public func invokePVM(
                 pc: pc,
                 gas: gas,
                 argumentData: argumentData,
-                ctx: ctx
+                ctx: ctx,
             )
 
             return (result.exitReason, result.gasUsed, result.outputData)

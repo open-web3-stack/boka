@@ -1,14 +1,13 @@
 import Foundation
+@testable import MsQuicSwift
 import Testing
 import TracingUtils
 import Utils
 
-@testable import MsQuicSwift
-
-// to generate one:
-// openssl genpkey -algorithm ED25519 -out private_key.pem
-// openssl req -new -x509 -key private_key.pem -out certificate.pem -days 365 -subj "/CN=YourCommonName"
-// openssl pkcs12 -export -out certificate.p12 -inkey private_key.pem -in certificate.pem
+/// to generate one:
+/// openssl genpkey -algorithm ED25519 -out private_key.pem
+/// openssl req -new -x509 -key private_key.pem -out certificate.pem -days 365 -subj "/CN=YourCommonName"
+/// openssl pkcs12 -export -out certificate.p12 -inkey private_key.pem -in certificate.pem
 let pkcs12Data =
     Data(
         fromHexString: """
@@ -28,7 +27,7 @@ let pkcs12Data =
         630b30a664e1e740c28ddbce3e317243cfc8c3ae283b834ce77ce9a1c963b3125302306092a864886f70d01091531160414c4561932b37ec791f3a8d1\
         0dfbe71211aef56d6f30413031300d0609608648016503040201050004209fba7a4e53ab05c5d40a43f70afd6bb6d3765d7b9e033f3de563c902626f6\
         a46040805f3adf78a4477ff02020800
-        """
+        """,
     )!
 
 struct QuicListenerTests {
@@ -57,7 +56,7 @@ struct QuicListenerTests {
         init() {}
 
         func newConnection(
-            _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo
+            _ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo,
         ) -> QuicStatus {
             events.write { events in
                 events.append(.newConnection(listener: listener, connection: connection, info: info))
@@ -106,15 +105,15 @@ struct QuicListenerTests {
             pkcs12: pkcs12Data,
             alpns: [Data("testalpn".utf8)],
             client: false,
-            settings: quicSettings
+            settings: quicSettings,
         )
 
         let listener = try QuicListener(
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
-            alpns: [Data("testalpn".utf8)]
+            listenAddress: #require(NetAddr(ipAddress: "127.0.0.1", port: 0)),
+            alpns: [Data("testalpn".utf8)],
         )
 
         let listenAddress = try listener.listenAddress()
@@ -129,13 +128,13 @@ struct QuicListenerTests {
             pkcs12: pkcs12Data,
             alpns: [Data("testalpn".utf8)],
             client: true,
-            settings: quicSettings
+            settings: quicSettings,
         )
 
         let clientConnection = try QuicConnection(
             handler: clientHandler,
             registration: registration,
-            configuration: clientConfiguration
+            configuration: clientConfiguration,
         )
 
         try clientConnection.connect(to: listenAddress)
@@ -145,14 +144,14 @@ struct QuicListenerTests {
         try stream1.send(data: Data("test data 1".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
-        let (serverConnection, info) = serverHandler.events.value.compactMap {
+        let (serverConnection, info) = try #require(serverHandler.events.value.compactMap {
             switch $0 {
             case let .newConnection(_, connection, info):
                 (connection, info) as (QuicConnection, ConnectionInfo)?
             default:
                 nil
             }
-        }.first!
+        }.first)
 
         let (ipAddress2, _) = info.remoteAddress.getAddressAndPort()
 
@@ -199,15 +198,15 @@ struct QuicListenerTests {
             pkcs12: pkcs12Data,
             alpns: [Data("testalpn".utf8)],
             client: false,
-            settings: quicSettings
+            settings: quicSettings,
         )
 
         let listener = try QuicListener(
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
-            alpns: [Data("testalpn".utf8)]
+            listenAddress: #require(NetAddr(ipAddress: "127.0.0.1", port: 0)),
+            alpns: [Data("testalpn".utf8)],
         )
 
         let listenAddress = try listener.listenAddress()
@@ -222,13 +221,13 @@ struct QuicListenerTests {
             pkcs12: pkcs12Data,
             alpns: [Data("testalpn".utf8)],
             client: true,
-            settings: quicSettings
+            settings: quicSettings,
         )
 
         let clientConnection = try QuicConnection(
             handler: clientHandler,
             registration: registration,
-            configuration: clientConfiguration
+            configuration: clientConfiguration,
         )
 
         try clientConnection.connect(to: listenAddress)
@@ -238,14 +237,14 @@ struct QuicListenerTests {
         try stream1.send(data: Data("test data 1".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
-        let (serverConnection, info) = serverHandler.events.value.compactMap {
+        let (serverConnection, info) = try #require(serverHandler.events.value.compactMap {
             switch $0 {
             case let .newConnection(_, connection, info):
                 (connection, info) as (QuicConnection, ConnectionInfo)?
             default:
                 nil
             }
-        }.first!
+        }.first)
 
         let (ipAddress2, _) = info.remoteAddress.getAddressAndPort()
 
@@ -258,25 +257,25 @@ struct QuicListenerTests {
         try stream2.send(data: Data("other test data 2".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
-        let remoteStream1 = clientHandler.events.value.compactMap {
+        let remoteStream1 = try #require(clientHandler.events.value.compactMap {
             switch $0 {
             case let .streamStarted(_, stream):
                 stream as QuicStream?
             default:
                 nil
             }
-        }.first!
+        }.first)
         try remoteStream1.send(data: Data("replay to 1".utf8))
 
         try? await Task.sleep(for: .milliseconds(100))
-        let remoteStream2 = serverHandler.events.value.compactMap {
+        let remoteStream2 = try #require(serverHandler.events.value.compactMap {
             switch $0 {
             case let .streamStarted(_, stream):
                 stream as QuicStream?
             default:
                 nil
             }
-        }.first!
+        }.first)
         try remoteStream2.send(data: Data("another replay to 2".utf8))
 
         try? await Task.sleep(for: .milliseconds(200))
@@ -318,15 +317,15 @@ struct QuicListenerTests {
             pkcs12: pkcs12Data,
             alpns: [Data("testalpn".utf8)],
             client: false,
-            settings: quicSettings
+            settings: quicSettings,
         )
 
         let listener = try QuicListener(
             handler: serverHandler,
             registration: registration,
             configuration: serverConfiguration,
-            listenAddress: NetAddr(ipAddress: "127.0.0.1", port: 0)!,
-            alpns: [Data("testalpn".utf8)]
+            listenAddress: #require(NetAddr(ipAddress: "127.0.0.1", port: 0)),
+            alpns: [Data("testalpn".utf8)],
         )
 
         let listenAddress = try listener.listenAddress()
@@ -341,13 +340,13 @@ struct QuicListenerTests {
             pkcs12: pkcs12Data,
             alpns: [Data("testalpn".utf8)],
             client: true,
-            settings: quicSettings
+            settings: quicSettings,
         )
 
         let clientConnection = try QuicConnection(
             handler: clientHandler,
             registration: registration,
-            configuration: clientConfiguration
+            configuration: clientConfiguration,
         )
 
         try clientConnection.connect(to: listenAddress)
@@ -355,14 +354,14 @@ struct QuicListenerTests {
         let stream1 = try clientConnection.createStream()
 
         try? await Task.sleep(for: .milliseconds(100))
-        let (serverConnection, info) = serverHandler.events.value.compactMap {
+        let (serverConnection, info) = try #require(serverHandler.events.value.compactMap {
             switch $0 {
             case let .newConnection(_, connection, info):
                 (connection, info) as (QuicConnection, ConnectionInfo)?
             default:
                 nil
             }
-        }.first!
+        }.first)
 
         let (ipAddress2, _) = info.remoteAddress.getAddressAndPort()
 

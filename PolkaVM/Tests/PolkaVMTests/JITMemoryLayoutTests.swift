@@ -21,7 +21,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: Data([0x01, 0x02, 0x03]),
             readWriteData: Data([0x04, 0x05]),
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)
@@ -46,7 +46,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: Data([0x01]),
             readWriteData: Data(),
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)
@@ -65,7 +65,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: Data([0xAA, 0xBB, 0xCC]),
             readWriteData: Data(),
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)
@@ -93,7 +93,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: readOnlyData,
             readWriteData: heapData,
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)
@@ -120,7 +120,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: Data([0x01]),
             readWriteData: Data(),
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)
@@ -146,7 +146,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: Data([0x01]),
             readWriteData: Data(),
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)
@@ -169,7 +169,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: Data([0x01, 0x02, 0x03]),
             readWriteData: Data([0x04, 0x05]),
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)
@@ -191,7 +191,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: Data([0x01]),
             readWriteData: Data(),
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)
@@ -213,7 +213,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: Data([0x01, 0x02, 0x03]),
             readWriteData: Data(),
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)
@@ -237,7 +237,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: Data([0x01]),
             readWriteData: Data(),
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)
@@ -262,7 +262,7 @@ struct JITMemoryLayoutTests {
             readOnlyData: readOnlyData,
             readWriteData: heapData,
             heapPages: 0,
-            stackSize: 4096
+            stackSize: 4096,
         )
 
         let standardProgram = try StandardProgram(blob: program, argumentData: nil)

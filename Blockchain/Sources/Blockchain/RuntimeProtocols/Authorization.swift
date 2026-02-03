@@ -13,9 +13,9 @@ public struct AuthorizationPostState: Sendable, Equatable {
         ConfigLimitedSizeArray<
             Data32,
             ProtocolConfig.Int0,
-            ProtocolConfig.MaxAuthorizationsPoolItems
+            ProtocolConfig.MaxAuthorizationsPoolItems,
         >,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
 
     public init(
@@ -23,10 +23,10 @@ public struct AuthorizationPostState: Sendable, Equatable {
             ConfigLimitedSizeArray<
                 Data32,
                 ProtocolConfig.Int0,
-                ProtocolConfig.MaxAuthorizationsPoolItems
+                ProtocolConfig.MaxAuthorizationsPoolItems,
             >,
-            ProtocolConfig.TotalNumberOfCores
-        >
+            ProtocolConfig.TotalNumberOfCores,
+        >,
     ) {
         self.coreAuthorizationPool = coreAuthorizationPool
     }
@@ -37,17 +37,17 @@ public protocol Authorization {
         ConfigLimitedSizeArray<
             Data32,
             ProtocolConfig.Int0,
-            ProtocolConfig.MaxAuthorizationsPoolItems
+            ProtocolConfig.MaxAuthorizationsPoolItems,
         >,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     > { get }
 
     var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<
             Data32,
-            ProtocolConfig.MaxAuthorizationsQueueItems
+            ProtocolConfig.MaxAuthorizationsQueueItems,
         >,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     > { get }
 
     mutating func mergeWith(postState: AuthorizationPostState)
@@ -57,7 +57,7 @@ extension Authorization {
     public func update(
         config _: ProtocolConfigRef,
         timeslot: TimeslotIndex,
-        auths: [(core: CoreIndex, auth: Data32)]
+        auths: [(core: CoreIndex, auth: Data32)],
     ) throws -> AuthorizationPostState {
         var pool = coreAuthorizationPool
 
@@ -95,7 +95,7 @@ extension Authorization {
     /// - Throws: AuthorizationError.invalidReportAuthorizer if an auth is not found
     private func removeAuthorizers(
         from corePool: inout ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
-        coreAuths: [(core: CoreIndex, auth: Data32)]?
+        coreAuths: [(core: CoreIndex, auth: Data32)]?,
     ) throws {
         guard let coreAuths else {
             return
