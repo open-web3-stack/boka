@@ -47,7 +47,7 @@ struct SafroleTicketPoolServiceTests {
         var allTickets = SortedUniqueArray<TicketItemAndOutput>()
 
         for (i, validatorKey) in state.value.nextValidators.enumerated() {
-            let secretKey = try try await #require(keystore.get(
+            let secretKey: Bandersnatch.SecretKey = try await #require(keystore.get(
                 Bandersnatch.self,
                 publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch),
             ))
@@ -86,7 +86,7 @@ struct SafroleTicketPoolServiceTests {
         var allTickets = SortedUniqueArray<TicketItemAndOutput>()
 
         let validatorKey = state.value.currentValidators[0]
-        let secretKey = try try await #require(keystore.get(
+        let secretKey = try await #require(keystore.get(
             Bandersnatch.self,
             publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch),
         ))
@@ -129,7 +129,7 @@ struct SafroleTicketPoolServiceTests {
         // Add some tickets to the pool
         let state: StateRef = try await dataProvider.getBestState()
         let validatorKey = state.value.currentValidators[0]
-        let secretKey = try try await #require(keystore.get(
+        let secretKey = try await #require(keystore.get(
             Bandersnatch.self,
             publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch),
         ))
@@ -186,7 +186,7 @@ struct SafroleTicketPoolServiceTests {
         // Insert some valid tickets
         let state = try await dataProvider.getBestState()
         let validatorKey = state.value.currentValidators[0]
-        let secretKey = try try await #require(keystore.get(
+        let secretKey = try await #require(keystore.get(
             Bandersnatch.self,
             publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch),
         ))
