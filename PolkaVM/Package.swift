@@ -115,6 +115,7 @@ let package = Package(
                 "asmjit/configure_vs2022_x86.bat",
                 "asmjit/configure_vs2022_x64.bat",
                 "asmjit/CMakePresets.json",
+                "asmjit/include",
             ],
             sources: [
                 ".",

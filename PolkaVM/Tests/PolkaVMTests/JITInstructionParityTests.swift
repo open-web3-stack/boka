@@ -5,7 +5,6 @@
 // to identify exactly where JIT behavior diverges from interpreter.
 
 import Foundation
-import PolkaVM
 import Testing
 import TracingUtils
 import Utils

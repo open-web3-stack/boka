@@ -4,7 +4,6 @@
 // Test utilities for executing and verifying individual JIT-compiled instructions
 
 import Foundation
-import PolkaVM
 import Testing
 import TracingUtils
 import Utils
@@ -310,10 +309,8 @@ enum ProgramBlobBuilder {
         var bitmask = Data(repeating: 0, count: (instructionBytes.count + 7) / 8)
 
         // Set bits at each instruction boundary
-        for boundary in instructionBoundaries {
-            if boundary < UInt32(bitmask.count * 8) {
-                setBit(bitmask: &bitmask, at: Int(boundary), value: 1)
-            }
+        for boundary in instructionBoundaries where boundary < UInt32(bitmask.count * 8) {
+            setBit(bitmask: &bitmask, at: Int(boundary), value: 1)
         }
 
         return bitmask

@@ -69,7 +69,7 @@ enum MultiModePVMTest {
                     argumentData: argumentData
                 )
                 let engine = Engine(config: config, invocationContext: context)
-                let _ = await engine.execute(state: state)
+                _ = await engine.execute(state: state)
                 finalRegisters = state.getRegisters()
                 finalPC = state.pc
             } catch {

@@ -5,7 +5,6 @@
 // StoreU8/U16/U32/U64, StoreImmU8/U16/U32/U64, and indirect variants
 
 import Foundation
-import PolkaVM
 import Testing
 import TracingUtils
 import Utils

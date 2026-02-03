@@ -24,7 +24,7 @@ public final class ExecutorFrontendInProcess: ExecutorFrontend {
         gas: Gas,
         argumentData: Data?,
         ctx: (any InvocationContext)?
-    ) async -> ExitReason {
+    ) async -> VMExecutionResult {
         await backend.execute(
             config: config,
             blob: blob,

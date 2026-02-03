@@ -78,7 +78,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
 
             // Wait for child to exit
             if let handle = handle {
-                let _ = try? await childProcessManager.waitForExit(
+                _ = try? await childProcessManager.waitForExit(
                     handle: handle,
                     timeout: 30.0
                 )

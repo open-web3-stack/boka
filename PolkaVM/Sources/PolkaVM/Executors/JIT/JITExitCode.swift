@@ -12,7 +12,6 @@ enum JITExitCode: Int32 {
     case fallback = 2 // Deprecated
     case pageFault = 3
     case trap = -1
-    
     // Host call errors (high bits set)
     // These match JITHostCallError values when cast to Int32
     case hostRequestedHalt = -6      // 0xFFFFFFFA

@@ -114,10 +114,8 @@ struct JITMemoryLayout {
     /// - Parameter address: Original PolkaVM address
     /// - Returns: Contiguous buffer offset, or nil if address not in any zone
     func translate(_ address: UInt32) -> UInt32? {
-        for zone in zones {
-            if zone.contains(address) {
-                return zone.translate(address)
-            }
+        for zone in zones where zone.contains(address) {
+            return zone.translate(address)
         }
         return nil
     }

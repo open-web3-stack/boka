@@ -5,7 +5,6 @@
 // and their immediate variants
 
 import Foundation
-import PolkaVM
 import Testing
 import TracingUtils
 import Utils

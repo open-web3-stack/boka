@@ -252,10 +252,8 @@ public actor SandboxPool {
     /// Get an available worker from the pool
     private func getAvailableWorker() async throws -> SandboxWorker? {
         // Try to find an idle worker
-        for (_, worker) in workers {
-            if await !worker.getStatistics().isBusy {
-                return worker
-            }
+        for (_, worker) in workers where await !worker.getStatistics().isBusy {
+            return worker
         }
 
         // No idle workers - check exhaustion policy
@@ -284,10 +282,8 @@ public actor SandboxPool {
 
         while Date() < deadline {
             // Check for idle worker
-            for (_, worker) in workers {
-                if await !worker.getStatistics().isBusy {
-                    return worker
-                }
+            for (_, worker) in workers where await !worker.getStatistics().isBusy {
+                return worker
             }
 
             // Wait a bit before checking again
@@ -355,11 +351,9 @@ public actor SandboxPool {
 
         // Find the worker ID by looking through the dictionary
         var workerID: UInt32?
-        for (id, w) in workers {
-            if w === worker {
-                workerID = id
-                break
-            }
+        for (id, w) in workers where w === worker {
+            workerID = id
+            break
         }
 
         guard let id = workerID else {

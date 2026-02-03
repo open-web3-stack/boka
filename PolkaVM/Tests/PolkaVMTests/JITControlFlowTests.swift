@@ -8,7 +8,6 @@
 // known limitations in test infrastructure (bitmask encoding complexity).
 
 import Foundation
-import PolkaVM
 import Testing
 import TracingUtils
 import Utils
