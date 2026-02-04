@@ -59,10 +59,9 @@ struct PVMStressTests {
             // Both should handle extreme gas values consistently
             #expect(
                 exitReasonInterpreter == exitReasonSandbox,
-                "Extreme gas (\(gasValue)): Exit reasons differ",
             )
 
-            logger.info("Extreme gas test (\(gasValue)): both modes produced \(exitReasonInterpreter)")
+            logger.debug("Extreme gas test (\(gasValue)): both modes produced \(exitReasonInterpreter)")
         }
     }
 
@@ -104,10 +103,9 @@ struct PVMStressTests {
         // Both should handle max argument consistently
         #expect(
             exitReasonInterpreter == exitReasonSandbox,
-            "Max argument: Exit reasons differ",
         )
 
-        logger.info("Max argument stress test: both modes handled 1MB argument (exit: \(exitReasonInterpreter))")
+        logger.debug("Max argument stress test: both modes handled 1MB argument (exit: \(exitReasonInterpreter))")
     }
 
     // MARK: - Rapid Sequential Execution
@@ -146,10 +144,10 @@ struct PVMStressTests {
                 ctx: nil,
             )
 
-            #expect(outputInterpreter == outputSandbox, "Rapid execution: Outputs differ")
+            #expect(outputInterpreter == outputSandbox)
         }
 
-        logger.info("Rapid sequential execution stress test: \(iterations) iterations completed")
+        logger.debug("Rapid sequential execution stress test: \(iterations) iterations completed")
     }
 
     // MARK: - Memory Stress Tests
@@ -196,22 +194,20 @@ struct PVMStressTests {
 
             #expect(
                 exitReasonInterpreter == exitReasonSandbox,
-                "Memory pattern '\(patternName)': Exit reasons differ",
             )
 
             #expect(
                 outputInterpreter == outputSandbox,
-                "Memory pattern '\(patternName)': Outputs differ",
             )
 
-            logger.info("Memory pattern '\(patternName)'': both modes handled identically")
+            logger.debug("Memory pattern '\(patternName)'': both modes handled identically")
         }
     }
 
     // MARK: - Concurrency Stress Test
 
     @Test func stress_concurrentExecution() async {
-        let config = DefaultPvmConfig()
+        _ = DefaultPvmConfig()
 
         let sumToN = Data([
             0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 46, 0, 0, 0, 0, 0, 38, 128, 119, 0,
@@ -253,7 +249,7 @@ struct PVMStressTests {
         #expect(exitReasonInterpreter == exitReasonSandbox)
         #expect(outputInterpreter == outputSandbox)
 
-        logger.info("Concurrent execution stress test: both modes produced identical results")
+        logger.debug("Concurrent execution stress test: both modes produced identical results")
     }
 
     // MARK: - Zero Edge Cases
@@ -305,10 +301,10 @@ struct PVMStressTests {
             0
         }
 
-        #expect(valueInterpreter == 0, "Zero input: Interpreter should output 0, got \(valueInterpreter)")
-        #expect(valueSandbox == 0, "Zero input: Sandbox should output 0, got \(valueSandbox)")
+        #expect(valueInterpreter == 0)
+        #expect(valueSandbox == 0)
 
-        logger.info("Zero input stress test: both modes correctly produced 0")
+        logger.debug("Zero input stress test: both modes correctly produced 0")
     }
 
     // MARK: - Boundary Condition Tests
@@ -351,9 +347,9 @@ struct PVMStressTests {
                 ctx: nil,
             )
 
-            #expect(outputInterpreter == outputSandbox, "Boundary test '\(description)': Outputs differ")
+            #expect(outputInterpreter == outputSandbox)
 
-            logger.info("Boundary test '\(description)': both modes produced consistent results")
+            logger.debug("Boundary test '\(description)': both modes produced consistent results")
         }
     }
 }

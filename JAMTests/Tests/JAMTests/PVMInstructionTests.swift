@@ -12,38 +12,6 @@ private let logger = Logger(label: "PVMInstructionTests")
 /// These tests focus on verifying that individual instructions work correctly
 /// in both execution modes.
 struct PVMInstructionTests {
-    // MARK: - Arithmetic Instructions
-
-    @Test func add64_interpreter() async throws {
-        try await testAdd64(mode: .interpreter)
-    }
-
-    @Test func add64_sandbox() async throws {
-        try await testAdd64(mode: .sandbox)
-    }
-
-    private func testAdd64(mode _: PVMExecutionMode) async throws {
-        // Simple program that adds two registers: w1 = w2 + w3
-        // Initial: w2 = 10, w3 = 20
-        // Expected: w1 = 30
-        let program = Data([
-            // Standard program header
-            0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-            // Code section length
-            5, 0, 0, 0,
-            // Read-only data (empty)
-            // Read-write data (empty)
-            // Code: add.w w1, w2, w3 (encoded instruction)
-            0x04, 0x12, 0x23, 0,
-            // halt
-            0, 0, 3,
-            // Rest of standard program footer...
-        ])
-
-        // For now, use a simpler approach with known working programs
-        // We'll expand this with more comprehensive instruction tests
-    }
-
     // MARK: - Branch Instructions
 
     @Test func conditionalBranch_interpreter() async throws {
@@ -61,7 +29,7 @@ struct PVMInstructionTests {
 
         // Create a simple branch test program
         // This is a simplified version - in real tests we'd use actual bytecode
-        let (exitReason, _, output) = await invokePVM(
+        _ = await invokePVM(
             config: config,
             executionMode: mode.executionMode,
             blob: Data([0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0]),
@@ -116,8 +84,8 @@ struct PVMInstructionTests {
         )
 
         // Both should fail with out of gas
-        #expect(exitReasonInterpreter == .outOfGas, "Interpreter should run out of gas")
-        #expect(exitReasonSandbox == .outOfGas, "Sandbox should run out of gas")
+        #expect(exitReasonInterpreter == .outOfGas)
+        #expect(exitReasonSandbox == .outOfGas)
     }
 
     @Test func edgeCase_largeArgument() async {
@@ -147,7 +115,7 @@ struct PVMInstructionTests {
         )
 
         // Both should handle large arguments the same way
-        #expect(exitReasonInterpreter == exitReasonSandbox, "Both modes should handle large arguments identically")
+        #expect(exitReasonInterpreter == exitReasonSandbox)
     }
 
     @Test func edgeCase_maxGas() async {
@@ -180,7 +148,7 @@ struct PVMInstructionTests {
         #expect(exitReasonInterpreter == exitReasonSandbox)
 
         let gasDiff = abs(Int64(gasUsedInterpreter.value) - Int64(gasUsedSandbox.value))
-        #expect(gasDiff <= 10, "Gas usage should be similar: interpreter=\(gasUsedInterpreter), sandbox=\(gasUsedSandbox)")
+        #expect(gasDiff <= 10)
     }
 
     // MARK: - Comprehensive Parity Tests
@@ -229,17 +197,11 @@ struct PVMInstructionTests {
             // Verify exit reasons match
             #expect(
                 exitReasonInterpreter == exitReasonSandbox,
-                "Exit reasons differ for input=\(input): interpreter=\(exitReasonInterpreter), sandbox=\(exitReasonSandbox)",
             )
 
             // Verify outputs match
-            let outputMessage =
-                "Outputs differ for input=\(input): " +
-                "interpreter=\(outputInterpreter?.toHexString() ?? "nil"), " +
-                "sandbox=\(outputSandbox?.toHexString() ?? "nil")"
             #expect(
                 outputInterpreter == outputSandbox,
-                outputMessage,
             )
 
             // Verify expected output
@@ -248,12 +210,10 @@ struct PVMInstructionTests {
 
             #expect(
                 valueInterpreter == expectedOutput,
-                "Interpreter output mismatch for input=\(input): expected=\(expectedOutput), got=\(valueInterpreter)",
             )
 
             #expect(
                 valueSandbox == expectedOutput,
-                "Sandbox output mismatch for input=\(input): expected=\(expectedOutput), got=\(valueSandbox)",
             )
         }
     }

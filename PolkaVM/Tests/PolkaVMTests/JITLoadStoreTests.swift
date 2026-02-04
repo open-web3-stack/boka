@@ -143,7 +143,6 @@ struct JITLoadStoreTests {
 
         #expect(
             differences == nil,
-            "LoadImm64 parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -263,7 +262,6 @@ struct JITLoadStoreTests {
 
         #expect(
             differences == nil,
-            "LoadU8 parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -376,7 +374,6 @@ struct JITLoadStoreTests {
 
         #expect(
             differences == nil,
-            "StoreU8 parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -490,7 +487,6 @@ struct JITLoadStoreTests {
 
         #expect(
             differences == nil,
-            "StoreImmU8 parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -516,7 +512,7 @@ struct JITLoadStoreTests {
         // Page fault code: 7 + (address << 32)
         // Returns via ret() to dispatcher which interprets the code correctly
 
-        #expect(Bool(true), "Memory protection implemented - test infrastructure needed")
+        #expect(Bool(true))
     }
 
     @Test("JIT: Store to read-only memory causes panic")
@@ -562,6 +558,6 @@ struct JITLoadStoreTests {
         default:
             false
         }
-        #expect(hasError, "Store to read-only should error: got \(result.exitReason)")
+        #expect(hasError)
     }
 }

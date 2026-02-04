@@ -44,15 +44,12 @@ struct JITControlFlowTests {
         // Both should trap (execution continued past end of program)
         #expect(
             interpreterResult.exitReason == .panic(.trap),
-            "Interpreter should trap: got \(interpreterResult.exitReason)",
         )
         #expect(
             jitResult.exitReason == .panic(.trap),
-            "JIT should trap: got \(jitResult.exitReason)",
         )
         #expect(
             differences == nil,
-            "Fallthrough parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -79,7 +76,6 @@ struct JITControlFlowTests {
         // Should consume minimal gas (typically 1 for the instruction)
         #expect(
             result.finalGas.value > initialGas.value - 100,
-            "Trap should not consume significant gas: initial=\(initialGas), final=\(result.finalGas)",
         )
     }
 
@@ -92,7 +88,6 @@ struct JITControlFlowTests {
 
         #expect(
             differences == nil,
-            "Trap parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -123,7 +118,6 @@ struct JITControlFlowTests {
         // Jump to fallthrough, then execution continues past end → trap
         #expect(
             result.exitReason == .panic(.trap),
-            "Expected trap after fallthrough, got \(result.exitReason)",
         )
     }
 
@@ -150,7 +144,6 @@ struct JITControlFlowTests {
         // Both should have the same behavior (currently both trap due to bitmask encoding issue)
         #expect(
             differences == nil,
-            "Jump parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -216,7 +209,6 @@ struct JITControlFlowTests {
         // Both should have the same behavior
         #expect(
             interpreterResult.exitReason == jitResult.exitReason,
-            "JumpInd exit reason mismatch: interpreter=\(interpreterResult.exitReason), jit=\(jitResult.exitReason)",
         )
     }
 
@@ -297,7 +289,6 @@ struct JITControlFlowTests {
 
         #expect(
             differences == nil,
-            "LoadImmJump parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -397,7 +388,6 @@ struct JITControlFlowTests {
         // Both should have the same behavior
         #expect(
             interpreterResult.exitReason == jitResult.exitReason,
-            "LoadImmJumpInd exit reason mismatch: interpreter=\(interpreterResult.exitReason), jit=\(jitResult.exitReason)",
         )
     }
 
@@ -440,7 +430,6 @@ struct JITControlFlowTests {
         // Should panic due to invalid branch target
         #expect(
             result.exitReason == .panic(.invalidBranch),
-            "Jump to invalid target should panic: got \(result.exitReason)",
         )
     }
 
@@ -525,7 +514,6 @@ struct JITControlFlowTests {
         // Should panic due to invalid branch target
         #expect(
             exitReason == .panic(.invalidBranch),
-            "Jump to PC=3 (invalid) should panic: got \(exitReason)",
         )
     }
 }

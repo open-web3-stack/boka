@@ -23,8 +23,8 @@ enum TraceTest {
         // test state merklize
         let preKv = testcase.preState.toDict()
         let postKv = testcase.postState.toDict()
-        #expect(try stateMerklize(kv: preKv) == testcase.preState.root, "pre_state root mismatch")
-        #expect(try stateMerklize(kv: postKv) == testcase.postState.root, "post_state root mismatch")
+        #expect(try stateMerklize(kv: preKv) == testcase.preState.root)
+        #expect(try stateMerklize(kv: postKv) == testcase.postState.root)
 
         // test STF
         let result = try await JamTestnet.runSTF(testcase, config: config, executionMode: executionMode)
@@ -60,19 +60,14 @@ enum TraceTest {
                     if mismatchCount <= 5 {
                         let expectedHex = value.toHexString()
                         let actualHex = ourVal?.toHexString() ?? "nil"
-                        logger.error(
+                        let mismatchLog =
                             "KV mismatch #\(mismatchCount) - key: \(key.toHexString()), expected: \(expectedHex), " +
-                                "got: \(actualHex)",
-                        )
+                            "got: \(actualHex)"
+                        logger.error(Logger.Message(stringLiteral: mismatchLog))
                     }
                 }
-                let expectedHex = value.toHexString()
-                let actualHex = ourVal?.toHexString() ?? "nil"
-                let mismatchMessage =
-                    "kv mismatch for key: \(key), expected: \(expectedHex), got: \(actualHex)"
                 #expect(
                     ourVal == value,
-                    mismatchMessage,
                 )
             }
 
@@ -85,12 +80,14 @@ enum TraceTest {
                 if expectedStateDict[data31] == nil {
                     extraKeyCount += 1
                     if extraKeyCount <= 5 {
-                        logger.error("Extra key #\(extraKeyCount) - key: \(data31.toHexString()), value: \(value.toDebugHexString())")
+                        let extraKeyLog =
+                            "Extra key #\(extraKeyCount) - key: \(data31.toHexString()), " +
+                            "value: \(value.toDebugHexString())"
+                        logger.error(Logger.Message(stringLiteral: extraKeyLog))
                     }
                 }
                 #expect(
                     expectedStateDict[data31] != nil,
-                    "extra key in boka post state: \(data31.toHexString()), value: \(value.toDebugHexString())",
                 )
             }
 

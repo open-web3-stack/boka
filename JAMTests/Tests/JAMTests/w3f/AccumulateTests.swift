@@ -252,25 +252,24 @@ struct AccumulateTests {
             switch testcase.output {
             case let .ok(expectedRoot):
                 // NOTE: timeslot and entropy are not changed by accumulate
-                #expect(content.root == expectedRoot, "accumulate root mismatch")
-                #expect(fullState.accumulationQueue == testcase.postState.accumulationQueue, "AccumulationQueue mismatch")
-                #expect(fullState.accumulationHistory == testcase.postState.accumulationHistory, "AccumulationHistory mismatch")
-                #expect(fullState.privilegedServices == testcase.postState.privilegedServices, "PrivilegedServices mismatch")
-                #expect(fullState.accounts.count == testcase.postState.accounts.count, "Accounts count mismatch")
+                #expect(content.root == expectedRoot)
+                #expect(fullState.accumulationQueue == testcase.postState.accumulationQueue)
+                #expect(fullState.accumulationHistory == testcase.postState.accumulationHistory)
+                #expect(fullState.privilegedServices == testcase.postState.privilegedServices)
+                #expect(fullState.accounts.count == testcase.postState.accounts.count)
                 for entry in testcase.postState.accounts {
                     let account = fullState.accounts[entry.index]!
-                    #expect(account == entry.data.service, "ServiceAccountDetail mismatch")
+                    #expect(account == entry.data.service)
                     for storage in entry.data.storage {
-                        #expect(fullState.storages[entry.index]?[storage.key] == storage.value, "Storage mismatch")
+                        #expect(fullState.storages[entry.index]?[storage.key] == storage.value)
                     }
                     for preimage in entry.data.preimagesBlobs {
-                        #expect(fullState.preimages[entry.index]?[preimage.hash] == preimage.blob, "Preimage mismatch")
+                        #expect(fullState.preimages[entry.index]?[preimage.hash] == preimage.blob)
                     }
                     for preimageRequest in entry.data.preimageRequests {
                         let key = HashAndLength(hash: preimageRequest.key.hash, length: preimageRequest.key.length)
                         #expect(
                             fullState.preimageInfo[entry.index]?[key] == preimageRequest.value,
-                            "Preimage request mismatch",
                         )
                     }
                 }

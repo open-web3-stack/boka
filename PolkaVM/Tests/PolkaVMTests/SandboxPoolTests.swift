@@ -11,7 +11,7 @@ import Utils
 struct SandboxPoolTests {
     /// Test single worker execution with detailed logging
     @Test("Single worker execution - detailed")
-    func singleWorkerExecution() async throws {
+    func singleWorkerExecution() async {
         let config = SandboxPoolConfiguration(
             poolSize: 1,
             maxQueueDepth: 10,
@@ -43,7 +43,7 @@ struct SandboxPoolTests {
         let haltProgram = createMinimalBlob()
 
         print("\n--- Execution 1 ---")
-        let result1 = try await executor.execute(
+        let result1 = await executor.execute(
             blob: haltProgram,
             pc: 0,
             gas: Gas(1_000_000),
@@ -55,7 +55,7 @@ struct SandboxPoolTests {
         // What we're really testing is that IPC works and worker is reused
 
         print("\n--- Execution 2 ---")
-        let result2 = try await executor.execute(
+        let result2 = await executor.execute(
             blob: haltProgram,
             pc: 0,
             gas: Gas(1_000_000),
@@ -65,7 +65,7 @@ struct SandboxPoolTests {
         print("Result 2: \(result2.exitReason)")
 
         print("\n--- Execution 3 ---")
-        let result3 = try await executor.execute(
+        let result3 = await executor.execute(
             blob: haltProgram,
             pc: 0,
             gas: Gas(1_000_000),
@@ -79,7 +79,7 @@ struct SandboxPoolTests {
 
     /// Test multiple executions to check for worker stability
     @Test("Multiple executions - stability check", .disabled("Temporarily disabled"))
-    func multipleExecutionsStability() async throws {
+    func multipleExecutionsStability() async {
         let config = SandboxPoolConfiguration(
             poolSize: 1,
             maxQueueDepth: 10,
@@ -115,21 +115,16 @@ struct SandboxPoolTests {
 
         for i in 1 ... iterations {
             print("\n--- Execution \(i)/\(iterations) ---")
-            do {
-                let result = try await executor.execute(
-                    blob: haltProgram,
-                    pc: 0,
-                    gas: Gas(1_000_000),
-                    argumentData: nil as Data?,
-                    ctx: nil as (any InvocationContext)?,
-                )
-                print("Result: \(result.exitReason)")
-                #expect(result.exitReason == ExitReason.halt)
-                successCount += 1
-            } catch {
-                print("ERROR: \(error)")
-                throw error
-            }
+            let result = await executor.execute(
+                blob: haltProgram,
+                pc: 0,
+                gas: Gas(1_000_000),
+                argumentData: nil as Data?,
+                ctx: nil as (any InvocationContext)?,
+            )
+            print("Result: \(result.exitReason)")
+            #expect(result.exitReason == ExitReason.halt)
+            successCount += 1
         }
 
         print("\n=== SUCCESS: \(successCount)/\(iterations) executions ===\n")
@@ -138,7 +133,7 @@ struct SandboxPoolTests {
 
     /// Test with small pool size to reduce noise
     @Test("Small pool - 2 workers", .disabled("Temporarily disabled"))
-    func smallPoolTwoWorkers() async throws {
+    func smallPoolTwoWorkers() async {
         let config = SandboxPoolConfiguration(
             poolSize: 2,
             maxQueueDepth: 10,
@@ -172,7 +167,7 @@ struct SandboxPoolTests {
         let iterations = 5
         for i in 1 ... iterations {
             print("\n--- Execution \(i)/\(iterations) ---")
-            let result = try await executor.execute(
+            let result = await executor.execute(
                 blob: haltProgram,
                 pc: 0,
                 gas: Gas(1_000_000),

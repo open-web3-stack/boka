@@ -114,7 +114,8 @@ jobs:
       - name: Switch to branch 'master'
         if: ${{ env.hasBenchmark == '1' }}
         run: |
-          git checkout master
+          git fetch origin master
+          git checkout -B master origin/master
 
       - name: Run benchmarks for branch 'master'
         if: ${{ env.hasBenchmark == '1' }}

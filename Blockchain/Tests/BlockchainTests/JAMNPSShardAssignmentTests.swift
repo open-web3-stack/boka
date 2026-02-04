@@ -524,8 +524,8 @@ struct JAMNPSShardAssignmentTests {
         #expect(totalAssignments == 1600)
 
         // Each shard index should be assigned at most once per validator
-        for (shardIndex, count) in validatorCounts {
-            #expect(count <= 100, "Shard \(shardIndex) assigned \(count) times, expected <= 100")
+        for count in validatorCounts.values {
+            #expect(count <= 100)
         }
     }
 }

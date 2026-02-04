@@ -64,9 +64,9 @@ struct PVMHostCallTests {
         let value = output?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
 
         // sum(5) = 15, doubled by host call = 30
-        #expect(exitReason == .halt, "Expected halt for mode \(mode.description)")
-        #expect(value == 30, "Expected host call to double output: got \(value)")
-        logger.info("\(mode.description) host call test: output=\(value)")
+        #expect(exitReason == .halt)
+        #expect(value == 30)
+        logger.debug("\(mode.description) host call test: output=\(value)")
     }
 
     // MARK: - Host Call Error Handling
@@ -109,7 +109,7 @@ struct PVMHostCallTests {
         )
 
         // Should handle the error gracefully
-        logger.info("\(mode.description) host call error test completed")
+        logger.debug("\(mode.description) host call error test completed")
     }
 
     // MARK: - Host Call Gas Consumption
@@ -168,10 +168,9 @@ struct PVMHostCallTests {
         let gasDiff = abs(Int64(gasUsedInterpreter.value) - Int64(gasUsedSandbox.value))
         #expect(
             gasDiff <= 20,
-            "Host call gas consumption differs significantly: interpreter=\(gasUsedInterpreter), sandbox=\(gasUsedSandbox), diff=\(gasDiff)",
         )
 
-        logger.info("Host call gas parity: interpreter=\(gasUsedInterpreter), sandbox=\(gasUsedSandbox), diff=\(gasDiff)")
+        logger.debug("Host call gas parity: interpreter=\(gasUsedInterpreter), sandbox=\(gasUsedSandbox), diff=\(gasDiff)")
     }
 
     // MARK: - Multiple Host Calls
@@ -187,7 +186,7 @@ struct PVMHostCallTests {
     private func testMultipleHostCalls(mode: PVMExecutionMode) async throws {
         // Test that multiple host calls work correctly
         // This is a placeholder - real test would use a program with multiple host calls
-        logger.info("\(mode.description) multiple host calls test completed")
+        logger.debug("\(mode.description) multiple host calls test completed")
     }
 
     // MARK: - Host Call with Gas Limits
@@ -220,7 +219,7 @@ struct PVMHostCallTests {
         )
 
         // Should either complete successfully or run out of gas
-        logger.info("\(mode.description) host call with gas limit completed")
+        logger.debug("\(mode.description) host call with gas limit completed")
     }
 
     // MARK: - Host Call State Modification
@@ -262,6 +261,6 @@ struct PVMHostCallTests {
             ctx: StateModifyingContext(),
         )
 
-        logger.info("\(mode.description) host call state modification test completed")
+        logger.debug("\(mode.description) host call state modification test completed")
     }
 }

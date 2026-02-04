@@ -44,15 +44,13 @@ struct PVMGasAndMemoryTests {
             ctx: nil,
         )
 
-        #expect(exitReason == .halt, "Program should complete successfully")
-        #expect(gasUsed > Gas(0), "Should consume some gas")
-        #expect(gasUsed < initialGas, "Should not consume more than initial gas")
-
-        let remainingGas = initialGas - gasUsed
+        #expect(exitReason == .halt)
+        #expect(gasUsed > Gas(0))
+        #expect(gasUsed < initialGas)
 
         // Verify gas is reasonable (not too little, not too much)
-        #expect(gasUsed.value > 10, "Should use at least some gas for computation")
-        #expect(gasUsed.value < 50000, "Should not use excessive gas")
+        #expect(gasUsed.value > 10)
+        #expect(gasUsed.value < 50000)
     }
 
     @Test func gasExhaustion_interpreter() async throws {
@@ -77,7 +75,7 @@ struct PVMGasAndMemoryTests {
         // Provide very limited gas
         let limitedGas = Gas(100)
 
-        let (exitReason, gasUsed, _) = await invokePVM(
+        let (exitReason, _, _) = await invokePVM(
             config: config,
             executionMode: mode.executionMode,
             blob: fibonacci,
@@ -88,7 +86,7 @@ struct PVMGasAndMemoryTests {
         )
 
         // Should run out of gas
-        #expect(exitReason == .outOfGas, "Should run out of gas with limited budget")
+        #expect(exitReason == .outOfGas)
     }
 
     // MARK: - Memory Boundary Tests
@@ -110,7 +108,7 @@ struct PVMGasAndMemoryTests {
         for size in argumentSizes {
             let argumentData = Data(repeating: UInt8(truncatingIfNeeded: size % 256), count: size)
 
-            let (exitReason, _, _) = await invokePVM(
+            _ = await invokePVM(
                 config: config,
                 executionMode: mode.executionMode,
                 blob: Data([0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0]),
@@ -162,10 +160,9 @@ struct PVMGasAndMemoryTests {
 
         // All gas values should be identical
         let firstGas = gasValues[0]
-        for (index, gas) in gasValues.enumerated() {
+        for gas in gasValues {
             #expect(
                 gas == firstGas,
-                "\(mode.description) gas inconsistent across runs: run 0 used \(firstGas), run \(index) used \(gas)",
             )
         }
     }
@@ -224,12 +221,8 @@ struct PVMGasAndMemoryTests {
 
             // Gas should be similar
             let gasDiff = abs(Int64(gasInterpreter.value) - Int64(gasSandbox.value))
-            let gasMessage =
-                "\(name): Gas consumption differs significantly between modes: " +
-                "interpreter=\(gasInterpreter), sandbox=\(gasSandbox), diff=\(gasDiff)"
             #expect(
                 gasDiff <= 20,
-                gasMessage,
             )
         }
     }

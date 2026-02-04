@@ -7,40 +7,20 @@ import Utils
 struct ExitReasonTests {
     @Test func exitReasonHalt() {
         let halt = ExitReason.halt
-        switch halt {
-        case .halt:
-            #expect(true)
-        default:
-            #expect(false, "Should be halt")
-        }
+        #expect(halt == .halt)
     }
 
     @Test func exitReasonOutOfGas() {
         let outOfGas = ExitReason.outOfGas
-        switch outOfGas {
-        case .outOfGas:
-            #expect(true)
-        default:
-            #expect(false, "Should be outOfGas")
-        }
+        #expect(outOfGas == .outOfGas)
     }
 
     @Test func exitReasonPanic() {
         let trap = ExitReason.panic(.trap)
-        switch trap {
-        case .panic(.trap):
-            #expect(true)
-        default:
-            #expect(false, "Should be panic trap")
-        }
+        #expect(trap == .panic(.trap))
 
         let invalidInstruction = ExitReason.panic(.invalidInstructionIndex)
-        switch invalidInstruction {
-        case .panic(.invalidInstructionIndex):
-            #expect(true)
-        default:
-            #expect(false, "Should be panic invalidInstructionIndex")
-        }
+        #expect(invalidInstruction == .panic(.invalidInstructionIndex))
     }
 
     @Test func exitReasonEquality() {
@@ -71,10 +51,9 @@ struct ExitReasonTests {
 
         for reason in panicReasons {
             let exitReason = ExitReason.panic(reason)
-            switch exitReason {
-            case let .panic(r):
+            if case let .panic(r) = exitReason {
                 #expect(r == reason)
-            default:
+            } else {
                 Issue.record("Should be panic with reason \(reason)")
             }
         }

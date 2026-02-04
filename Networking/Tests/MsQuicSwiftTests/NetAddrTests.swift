@@ -5,13 +5,19 @@ import TracingUtils
 import Utils
 
 struct NetAddrTests {
+    private func expectAddress(_ netAddr: NetAddr?, ip: String, port: UInt16) {
+        let addr = netAddr?.getAddressAndPort()
+        #expect(addr?.0 == ip)
+        #expect(addr?.1 == port)
+    }
+
     @Test
     func parseValidIPv4() {
         let address = "127.0.0.1:9955"
         let netAddr1 = NetAddr(address: address)
         let netAddr2 = NetAddr(ipAddress: "127.0.0.1", port: 9955)
-        #expect(netAddr1?.getAddressAndPort() == ("127.0.0.1", 9955))
-        #expect(netAddr2?.getAddressAndPort() == ("127.0.0.1", 9955))
+        expectAddress(netAddr1, ip: "127.0.0.1", port: 9955)
+        expectAddress(netAddr2, ip: "127.0.0.1", port: 9955)
     }
 
     @Test
@@ -19,8 +25,8 @@ struct NetAddrTests {
         let address = "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080"
         let netAddr1 = NetAddr(address: address)
         let netAddr2 = NetAddr(ipAddress: "2001:0db8:85a3:0000:0000:8a2e:0370:7334", port: 8080)
-        #expect(netAddr1?.getAddressAndPort() == ("2001:db8:85a3::8a2e:370:7334", 8080))
-        #expect(netAddr2?.getAddressAndPort() == ("2001:db8:85a3::8a2e:370:7334", 8080))
+        expectAddress(netAddr1, ip: "2001:db8:85a3::8a2e:370:7334", port: 8080)
+        expectAddress(netAddr2, ip: "2001:db8:85a3::8a2e:370:7334", port: 8080)
     }
 
     @Test
@@ -30,8 +36,8 @@ struct NetAddrTests {
         let netAddr2 = NetAddr(ipAddress: "2001:db8:85a3::8a2e:370:7334", port: 8080)
         #expect(netAddr1 != nil)
         #expect(netAddr2 != nil)
-        #expect(netAddr1?.getAddressAndPort() == ("2001:db8:85a3::8a2e:370:7334", 8080))
-        #expect(netAddr2?.getAddressAndPort() == ("2001:db8:85a3::8a2e:370:7334", 8080))
+        expectAddress(netAddr1, ip: "2001:db8:85a3::8a2e:370:7334", port: 8080)
+        expectAddress(netAddr2, ip: "2001:db8:85a3::8a2e:370:7334", port: 8080)
     }
 
     @Test
@@ -39,8 +45,8 @@ struct NetAddrTests {
         let address = "[::1]:8080"
         let netAddr1 = NetAddr(address: address)
         let netAddr2 = NetAddr(ipAddress: "::1", port: 8080)
-        #expect(netAddr1?.getAddressAndPort() == ("::1", 8080))
-        #expect(netAddr2?.getAddressAndPort() == ("::1", 8080))
+        expectAddress(netAddr1, ip: "::1", port: 8080)
+        expectAddress(netAddr2, ip: "::1", port: 8080)
     }
 
     @Test

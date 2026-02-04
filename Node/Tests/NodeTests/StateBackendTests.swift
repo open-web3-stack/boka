@@ -69,27 +69,27 @@ final class StateBackendTests {
 
         // Test: Get all keys
         let allKeys = try await stateBackend.getKeys(nil, nil, nil)
-        #expect(allKeys.count == testPairs.count, "[\(backendType.rawValue)] Should return all \(testPairs.count) keys")
+        #expect(allKeys.count == testPairs.count)
 
         for (expectedKey, expectedValue) in testPairs {
             let found = allKeys.first { $0.key == expectedKey.data }
-            #expect(found != nil, "[\(backendType.rawValue)] Key \(expectedKey.toHexString()) should be found")
-            #expect(found?.value == expectedValue, "[\(backendType.rawValue)] Value should match for key \(expectedKey.toHexString())")
+            #expect(found != nil)
+            #expect(found?.value == expectedValue)
         }
 
         // Test: Prefix filtering
         let prefixAResults = try await stateBackend.getKeys(prefixA, nil, nil)
-        #expect(prefixAResults.count == 3, "[\(backendType.rawValue)] Should find 3 keys with prefix A")
+        #expect(prefixAResults.count == 3)
 
         for result in prefixAResults {
-            #expect(result.key.starts(with: prefixA), "[\(backendType.rawValue)] All results should have prefix A")
+            #expect(result.key.starts(with: prefixA))
         }
 
         let prefixBResults = try await stateBackend.getKeys(prefixB, nil, nil)
-        #expect(prefixBResults.count == 2, "[\(backendType.rawValue)] Should find 2 keys with prefix B")
+        #expect(prefixBResults.count == 2)
 
         for result in prefixBResults {
-            #expect(result.key.starts(with: prefixB), "[\(backendType.rawValue)] All results should have prefix B")
+            #expect(result.key.starts(with: prefixB))
         }
 
         // Test: Start key filtering
@@ -99,24 +99,23 @@ final class StateBackendTests {
         // Should find keys >= 0x05, which are the 0xAA and 0xBB prefixed keys (5 total)
         #expect(
             startKeyResults.count == 5,
-            "[\(backendType.rawValue)] Should get exactly 5 keys starting from 0x05 (AA and BB prefixed keys)",
         )
 
         for result in startKeyResults {
             let isSmaller = result.key.lexicographicallyPrecedes(startKey.data)
-            #expect(!isSmaller, "[\(backendType.rawValue)] All keys should be >= start key (0x05)")
+            #expect(!isSmaller)
         }
 
         // Test: Limit
         let limitedKeys = try await stateBackend.getKeys(nil, nil, 3)
-        #expect(limitedKeys.count == 3, "[\(backendType.rawValue)] Should respect the limit of 3")
+        #expect(limitedKeys.count == 3)
 
         // Test: Combined prefix and limit
         let prefixLimitedResults = try await stateBackend.getKeys(prefixA, nil, 2)
-        #expect(prefixLimitedResults.count == 2, "[\(backendType.rawValue)] Should respect both prefix and limit")
+        #expect(prefixLimitedResults.count == 2)
 
         for result in prefixLimitedResults {
-            #expect(result.key.starts(with: prefixA), "[\(backendType.rawValue)] All results should have prefix A")
+            #expect(result.key.starts(with: prefixA))
         }
     }
 
@@ -148,24 +147,24 @@ final class StateBackendTests {
         let results = try await stateBackend.getKeys(batchPrefix, nil, nil)
         let resultKeys = Set(results.map(\.key))
 
-        #expect(results.count == keyCount, "[\(backendType.rawValue)] Should return all \(keyCount) batch keys")
-        #expect(resultKeys == expectedKeys, "[\(backendType.rawValue)] Should return exactly the expected batch keys")
+        #expect(results.count == keyCount)
+        #expect(resultKeys == expectedKeys)
 
         // Test: Large batch with limit
         let limitedResults = try await stateBackend.getKeys(batchPrefix, nil, 100)
-        #expect(limitedResults.count == 100, "[\(backendType.rawValue)] Should respect limit of 100 for large batch")
+        #expect(limitedResults.count == 100)
 
         // Test: Large batch with startKey
         let midKey = Data31(Data([0xFF, 128, 0]) + Data(repeating: 0, count: 28))!
         let startKeyResults = try await stateBackend.getKeys(batchPrefix, midKey, nil)
 
         // Should get roughly half the results (keys >= midKey)
-        #expect(startKeyResults.count > 0, "[\(backendType.rawValue)] Should get some results with startKey in large batch")
-        #expect(startKeyResults.count < keyCount, "[\(backendType.rawValue)] Should get less than total with startKey filter")
+        #expect(startKeyResults.count > 0)
+        #expect(startKeyResults.count < keyCount)
 
         for result in startKeyResults {
             let isSmaller = result.key.lexicographicallyPrecedes(midKey.data)
-            #expect(!isSmaller, "[\(backendType.rawValue)] All results should be >= startKey in large batch")
+            #expect(!isSmaller)
         }
     }
 }

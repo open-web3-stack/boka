@@ -25,7 +25,7 @@ struct JITInstructionParityTests {
     private func compareExecution(
         instructionBytes: [UInt8],
         initialValue _: UInt64 = 0,
-        testName: String,
+        testName _: String,
     ) async throws {
         let config = DefaultPvmConfig()
 
@@ -57,23 +57,17 @@ struct JITInstructionParityTests {
         // Compare exit reasons
         #expect(
             exitReasonInterpreter == exitReasonJIT,
-            "\(testName): Exit reason mismatch - interpreter: \(exitReasonInterpreter), JIT: \(exitReasonJIT)",
         )
 
         // Compare outputs
-        let outputMessage =
-            "\(testName): Output mismatch - interpreter: \(outputInterpreter?.toHexString() ?? "nil"), " +
-            "JIT: \(outputJIT?.toHexString() ?? "nil")"
         #expect(
             outputInterpreter == outputJIT,
-            outputMessage,
         )
 
         // Compare gas usage if both executions completed successfully
         if case .halt = exitReasonInterpreter, case .halt = exitReasonJIT {
             #expect(
                 gasInterpreter == gasJIT,
-                "\(testName): Gas mismatch - interpreter: \(gasInterpreter.value), JIT: \(gasJIT.value)",
             )
         }
     }
@@ -147,10 +141,10 @@ struct JITInstructionParityTests {
         )
 
         // JIT should trap (execution continued past end of program)
-        #expect(exitReasonJIT == .panic(.trap), "JIT should trap: got \(exitReasonJIT)")
+        #expect(exitReasonJIT == .panic(.trap))
 
         // JIT should have no output
         let hasOutputJIT = (outputJIT != nil && !outputJIT!.isEmpty)
-        #expect(!hasOutputJIT, "JIT should have no output")
+        #expect(!hasOutputJIT)
     }
 }

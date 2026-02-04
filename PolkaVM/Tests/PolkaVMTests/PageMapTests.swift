@@ -7,7 +7,7 @@ import Utils
 struct PageMapTests {
     @Test func pageMapCreation() {
         let config = DefaultPvmConfig()
-        let pageMap = PageMap(pageMap: [], config: config)
+        _ = PageMap(pageMap: [], config: config)
         // PageMap should be created successfully
     }
 
@@ -36,7 +36,7 @@ struct PageMapTests {
         let pageSizes = [4096, 8192, 16384, 32768, 65536]
 
         for pageSize in pageSizes {
-            #expect(pageSize % 4096 == 0, "Page size \(pageSize) should be aligned to 4KB")
+            #expect(pageSize % 4096 == 0)
         }
     }
 
@@ -60,7 +60,7 @@ struct PageMapTests {
             (address: 0x2000, length: 0x1000, writable: false),
         ]
 
-        let pageMap = PageMap(
+        _ = PageMap(
             pageMap: pages.map { (address: $0.address, length: $0.length, access: $0.writable ? .readWrite : .readOnly) },
             config: config,
         )

@@ -58,17 +58,11 @@ struct PVMComprehensiveParityTests {
             // Verify exit reasons match
             #expect(
                 exitReasonInterpreter == exitReasonSandbox,
-                "Fibonacci(\(input)): Exit reasons differ - interpreter=\(exitReasonInterpreter), sandbox=\(exitReasonSandbox)",
             )
 
             // Verify outputs match
-            let outputMessage =
-                "Fibonacci(\(input)): Outputs differ - " +
-                "interpreter=\(outputInterpreter?.toHexString() ?? "nil"), " +
-                "sandbox=\(outputSandbox?.toHexString() ?? "nil")"
             #expect(
                 outputInterpreter == outputSandbox,
-                outputMessage,
             )
 
             // Verify expected output
@@ -87,15 +81,13 @@ struct PVMComprehensiveParityTests {
 
             #expect(
                 valueInterpreter == expectedOutput,
-                "Fibonacci(\(input)): Interpreter output mismatch - expected=\(expectedOutput), got=\(valueInterpreter)",
             )
 
             #expect(
                 valueSandbox == expectedOutput,
-                "Fibonacci(\(input)): Sandbox output mismatch - expected=\(expectedOutput), got=\(valueSandbox)",
             )
 
-            logger.info("Fibonacci(\(input)): both modes produced \(valueInterpreter)")
+            logger.debug("Fibonacci(\(input)): both modes produced \(valueInterpreter)")
         }
     }
 
@@ -165,7 +157,7 @@ struct PVMComprehensiveParityTests {
             #expect(valueInterpreter == expectedOutput)
             #expect(valueSandbox == expectedOutput)
 
-            logger.info("SumToN(\(input)): both modes produced \(valueInterpreter)")
+            logger.debug("SumToN(\(input)): both modes produced \(valueInterpreter)")
         }
     }
 
@@ -200,7 +192,7 @@ struct PVMComprehensiveParityTests {
         // Both should panic with trap
         #expect(exitReasonInterpreter == .panic(.trap))
         #expect(exitReasonSandbox == .panic(.trap))
-        logger.info("Error handling parity: both modes correctly panicked on empty program")
+        logger.debug("Error handling parity: both modes correctly panicked on empty program")
     }
 
     // MARK: - Gas Exhaustion Parity
@@ -241,10 +233,9 @@ struct PVMComprehensiveParityTests {
         // Both should run out of gas or fail consistently
         #expect(
             exitReasonInterpreter == exitReasonSandbox,
-            "Gas exhaustion: Exit reasons differ - interpreter=\(exitReasonInterpreter), sandbox=\(exitReasonSandbox)",
         )
 
-        logger.info("Gas exhaustion parity: both modes handled gas limit consistently (exit reason: \(exitReasonInterpreter))")
+        logger.debug("Gas exhaustion parity: both modes handled gas limit consistently (exit reason: \(exitReasonInterpreter))")
     }
 
     // MARK: - Large Argument Parity
@@ -288,15 +279,13 @@ struct PVMComprehensiveParityTests {
             // Both should handle large arguments identically
             #expect(
                 exitReasonInterpreter == exitReasonSandbox,
-                "Large argument (\(size) bytes): Exit reasons differ",
             )
 
             #expect(
                 outputInterpreter == outputSandbox,
-                "Large argument (\(size) bytes): Outputs differ",
             )
 
-            logger.info("Large argument parity (\(size) bytes): both modes handled identically")
+            logger.debug("Large argument parity (\(size) bytes): both modes handled identically")
         }
     }
 
@@ -351,7 +340,6 @@ struct PVMComprehensiveParityTests {
 
             #expect(
                 outputInterpreter == outputSandbox,
-                "Outputs differ for argument=\(argument.toHexString())",
             )
 
             let valueInterpreter = outputInterpreter?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
@@ -360,7 +348,7 @@ struct PVMComprehensiveParityTests {
             #expect(valueInterpreter == expectedOutput)
             #expect(valueSandbox == expectedOutput)
 
-            logger.info("Comprehensive state parity: both modes produced \(valueInterpreter)")
+            logger.debug("Comprehensive state parity: both modes produced \(valueInterpreter)")
         }
     }
 }

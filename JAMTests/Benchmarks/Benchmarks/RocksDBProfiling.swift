@@ -72,7 +72,7 @@ func rocksdbProfilingBenchmarks() {
         let tempDir = try createTempDirectory()
         defer { tempDir.cleanup() }
 
-        let (genesisBlock, genesisState, stateData) = try await createGenesis(config: config)
+        let (genesisBlock, _, stateData) = try await createGenesis(config: config)
 
         let rocksDB = try await RocksDBBackend(
             path: tempDir.url,

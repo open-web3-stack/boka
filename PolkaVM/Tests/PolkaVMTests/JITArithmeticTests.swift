@@ -169,7 +169,6 @@ struct JITArithmeticTests {
 
         #expect(
             differences == nil,
-            "Add64 parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -224,7 +223,6 @@ struct JITArithmeticTests {
 
         #expect(
             differences == nil,
-            "AddImm64 parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -317,7 +315,6 @@ struct JITArithmeticTests {
 
         #expect(
             differences == nil,
-            "Mul64 parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -471,7 +468,6 @@ struct JITArithmeticTests {
 
         #expect(
             differences == nil,
-            "ShloL64 parity mismatch: \(differences ?? "none")",
         )
     }
 
@@ -593,7 +589,6 @@ struct JITArithmeticTests {
 
         #expect(
             differences == nil,
-            "And parity mismatch: \(differences ?? "none")",
         )
     }
 

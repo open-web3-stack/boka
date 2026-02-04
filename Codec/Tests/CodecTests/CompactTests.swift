@@ -80,14 +80,14 @@ struct CompactTests {
 
         do {
             _ = try JamDecoder.decode(Compact<UInt8>.self, from: encoded)
-            #expect(Bool(false), "Expected decoding to throw an error")
+            #expect(Bool(false))
         } catch let decodingError as DecodingError {
             if case let .dataCorrupted(context) = decodingError {
                 #expect(context.debugDescription.contains("Value 256"))
                 #expect(context.debugDescription.contains("out of range"))
                 #expect(context.debugDescription.contains("UInt8"))
             } else {
-                #expect(Bool(false), "Expected dataCorrupted decoding error")
+                #expect(Bool(false))
             }
         }
     }

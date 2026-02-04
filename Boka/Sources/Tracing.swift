@@ -54,23 +54,33 @@ public func parseLevel(_ level: String) -> Logger.Level? {
 }
 
 public enum Tracing {
-    public static func bootstrap(_: String, loggerOnly _: Bool = false) async throws -> [Service] {
+    public static func bootstrap(_: String, loggerOnly: Bool = false) async throws -> [Service] {
         let env = ProcessInfo.processInfo.environment
 
-        let (filters, defaultLevel, minimalLevel) = parse(from: env["LOG_LEVEL"] ?? "") ?? {
+        let logLevelEnv = env["LOG_LEVEL"] ?? ""
+        var (filters, defaultLevel, minimalLevel) = parse(from: logLevelEnv) ?? {
             print("Invalid LOG_LEVEL, using default")
             return (filters: [:], defaultLevel: .info, minimalLevel: .info)
         }()
+
+        if !loggerOnly, logLevelEnv.isEmpty {
+            defaultLevel = .warning
+            minimalLevel = .warning
+        }
+
+        let resolvedFilters = filters
+        let resolvedDefaultLevel = defaultLevel
+        let resolvedMinimalLevel = minimalLevel
 
         LoggingSystem.bootstrap({ label, metadataProvider in
             BokaLogger(
                 // fragment: LogFragment(),
                 fragment: timestampDefaultLoggerFragment(),
                 label: label,
-                level: minimalLevel,
+                level: resolvedMinimalLevel,
                 metadataProvider: metadataProvider,
-                defaultLevel: defaultLevel,
-                filters: filters,
+                defaultLevel: resolvedDefaultLevel,
+                filters: resolvedFilters,
             )
         }, metadataProvider: .otel)
 

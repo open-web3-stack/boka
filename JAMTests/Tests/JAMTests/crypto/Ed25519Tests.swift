@@ -37,6 +37,6 @@ struct ED25519Tests {
         let message = try #require(Data(fromHexString: vector.msg))
         let isValid = publicKey.verify(signature: signature, message: message)
 
-        #expect(isValid, "\(vector.description) should verify correctly")
+        #expect(isValid)
     }
 }

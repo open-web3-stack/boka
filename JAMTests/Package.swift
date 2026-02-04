@@ -33,11 +33,23 @@ let package = Package(
             dependencies: [
                 "Blockchain",
             ],
+            path: ".",
+            exclude: [
+                ".benchmarkBaselines",
+                ".build",
+                ".swiftpm",
+                "Benchmarks",
+                "Tests",
+                "Package.resolved",
+            ],
+            sources: [
+                "Sources/JAMTests",
+            ],
             resources: [
-                .copy("../../jamtestvectors"),
-                .copy("../../jamduna"),
-                .copy("../../javajam"),
-                .copy("../../fuzz"),
+                .copy("jamtestvectors"),
+                .copy("jamduna"),
+                .copy("javajam"),
+                .copy("fuzz"),
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),

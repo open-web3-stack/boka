@@ -51,7 +51,7 @@ struct PVMMultiModeTests {
 
         switch exitReason {
         case .halt:
-            #expect(value == 15, "Expected sum(5) = 15, got \(value)")
+            #expect(value == 15)
         default:
             Issue.record("Expected halt, got \(exitReason) for mode \(mode.description)")
         }
@@ -92,7 +92,7 @@ struct PVMMultiModeTests {
 
         switch exitReason {
         case .halt:
-            #expect(value == 34, "Expected fib(8) = 34, got \(value)")
+            #expect(value == 34)
         default:
             Issue.record("Expected halt, got \(exitReason) for mode \(mode.description)")
         }
@@ -123,8 +123,8 @@ struct PVMMultiModeTests {
             ctx: nil,
         )
 
-        #expect(exitReason == .panic(.trap), "Expected panic for empty program in \(mode.description) mode")
-        #expect(output == nil, "Expected no output for empty program")
+        #expect(exitReason == .panic(.trap))
+        #expect(output == nil)
     }
 
     // MARK: - Gas Consumption Parity Tests
@@ -165,12 +165,8 @@ struct PVMMultiModeTests {
 
         // Gas consumption should be similar (allow small differences for mode overhead)
         let gasDiff = abs(Int64(gasUsedInterpreter.value) - Int64(gasUsedSandbox.value))
-        let gasMessage =
-            "Gas consumption differs significantly between modes: " +
-            "interpreter=\(gasUsedInterpreter), sandbox=\(gasUsedSandbox), diff=\(gasDiff)"
         #expect(
             gasDiff <= 10,
-            gasMessage,
         )
     }
 
@@ -211,12 +207,8 @@ struct PVMMultiModeTests {
         )
 
         // Outputs should be identical
-        let outputMessage =
-            "Output differs between modes: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), " +
-            "sandbox=\(outputSandbox?.toHexString() ?? "nil")"
         #expect(
             outputInterpreter == outputSandbox,
-            outputMessage,
         )
     }
 }

@@ -49,7 +49,7 @@ struct JavajamTests {
                 recoveryCount: recoveryCount,
             )
 
-            #expect(recoveredData == originalData, "reconstructed data should match original data")
+            #expect(recoveredData == originalData)
 
             let generatedShards = try ErasureCoding.chunk(
                 data: originalData,
@@ -57,10 +57,10 @@ struct JavajamTests {
                 recoveryCount: recoveryCount,
             )
 
-            #expect(generatedShards.count == recoveryCount, "should generate expected number of recovery shards")
+            #expect(generatedShards.count == recoveryCount)
 
             for (index, shard) in recoveryShards.enumerated() where index < generatedShards.count {
-                #expect(generatedShards[index] == shard.data, "generated shard at index \(index) should match test data")
+                #expect(generatedShards[index] == shard.data)
             }
         }
     }

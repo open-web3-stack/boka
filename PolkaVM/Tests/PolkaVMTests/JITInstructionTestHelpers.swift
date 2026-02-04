@@ -739,14 +739,8 @@ enum JITTestAssertions {
         sourceLocation: Testing.SourceLocation = #_sourceLocation,
     ) {
         let actual = result.finalRegisters[index]
-        let expectedHex = String(format: "%016X", expected)
-        let actualHex = String(format: "%016X", actual)
-        let message =
-            "Register w\(index.value) mismatch: expected \(expected) (0x\(expectedHex)), " +
-            "got \(actual) (0x\(actualHex))"
         #expect(
             actual == expected,
-            message,
             sourceLocation: sourceLocation,
         )
     }
@@ -770,7 +764,6 @@ enum JITTestAssertions {
     ) {
         #expect(
             result.exitReason == expected,
-            "Exit reason mismatch: expected \(expected), got \(result.exitReason)",
             sourceLocation: sourceLocation,
         )
     }
@@ -787,7 +780,6 @@ enum JITTestAssertions {
 
         #expect(
             toleranceDiff <= tolerance.value,
-            "Gas consumed mismatch: expected ~\(expected), got \(gasConsumed) (diff: \(toleranceDiff))",
             sourceLocation: sourceLocation,
         )
     }
@@ -800,7 +792,6 @@ enum JITTestAssertions {
     ) {
         #expect(
             result.outputData == expected,
-            "Output mismatch: expected \(expected?.toHexString() ?? "nil"), got \(result.outputData?.toHexString() ?? "nil")",
             sourceLocation: sourceLocation,
         )
     }

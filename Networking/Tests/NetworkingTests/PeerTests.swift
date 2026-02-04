@@ -877,7 +877,7 @@ struct PeerTests {
                     to: otherPeer.listenAddress(),
                     role: .validator,
                 ).request(MockRequest(kind: type, data: messageData))
-                #expect(response == [messageData[0] + Data(" response".utf8)], "Peer \(i) should receive correct response")
+                #expect(response == [messageData[0] + Data(" response".utf8)])
             })
         }
 
@@ -999,7 +999,7 @@ struct PeerTests {
         // Check that each peer received the broadcast
         for i in 1 ..< handles.count {
             let receivedData = try await repeatUntil { await handles[i].lastReceivedData }
-            #expect(receivedData == messagedata, "Handle should have received the broadcast message")
+            #expect(receivedData == messagedata)
         }
     }
 }

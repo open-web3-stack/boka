@@ -71,7 +71,7 @@ public struct SegmentRequestMessage: Codable, Sendable {
 extension SegmentRequestMessage: CEMessage {
     public func encode() throws -> [Data] {
         // Message: [Segments-Root ++ len++[Segment Index]]
-        var encoder = JamEncoder()
+        let encoder = JamEncoder()
         try encoder.encode(UInt32(requests.count))
 
         for request in requests {
