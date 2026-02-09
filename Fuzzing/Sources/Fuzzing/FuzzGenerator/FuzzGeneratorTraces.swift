@@ -88,7 +88,7 @@ public class FuzzGeneratorTraces: FuzzGenerator {
 
         var allDecodedTestCases: [JamTestnetTestcase] = []
 
-        /// Find all .bin files with depth of 2
+        // Find all .bin files with depth of 2
         func findBinFiles(in path: String, currentDepth: Int = 0) throws -> [String] {
             guard currentDepth <= 2 else { return [] }
 

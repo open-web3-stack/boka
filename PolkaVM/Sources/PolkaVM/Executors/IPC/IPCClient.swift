@@ -299,7 +299,7 @@ final class IPCClient: @unchecked Sendable {
                 return String(cString: &buffer)
             }
         #else
-            // XSI version (macOS): returns Int32 (0 on success, error code on failure)
+            /// XSI version (macOS): returns Int32 (0 on success, error code on failure)
             let result = strerror_r(err, &buffer, buffer.count)
             if result == 0 {
                 return String(cString: &buffer)

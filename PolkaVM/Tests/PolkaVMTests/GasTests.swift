@@ -48,7 +48,7 @@ struct GasTests {
     }
 
     @Test func gasSendable() {
-        /// Gas should be Sendable
+        // Gas should be Sendable
         func requiresSendable(_ _: some Sendable) {}
         requiresSendable(Gas(100))
     }

@@ -37,9 +37,6 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-                .unsafeFlags([
-                    "-Xcc", "-I../PolkaVM/Sources/asmjit",
-                ]),
             ],
         ),
         .testTarget(
@@ -50,9 +47,6 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-                .unsafeFlags([
-                    "-Xcc", "-I../PolkaVM/Sources/asmjit",
-                ]),
             ],
         ),
     ],

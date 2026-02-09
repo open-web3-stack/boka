@@ -40,7 +40,7 @@ struct ExecutionModeTests {
     }
 
     @Test func executionModeSendable() {
-        /// ExecutionMode should be Sendable
+        // ExecutionMode should be Sendable
         func requiresSendable(_ _: some Sendable) {}
         requiresSendable(ExecutionMode())
         requiresSendable(PVMExecutionMode.interpreter)

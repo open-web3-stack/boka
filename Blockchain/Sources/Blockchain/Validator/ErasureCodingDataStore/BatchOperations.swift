@@ -77,7 +77,7 @@ public actor BatchOperations {
             var activeTasks = 0
             var iterator = erasureRoots.makeIterator()
 
-            /// Helper to add next task
+            // Helper to add next task
             func addNextTask() {
                 guard let erasureRoot = iterator.next() else { return }
 

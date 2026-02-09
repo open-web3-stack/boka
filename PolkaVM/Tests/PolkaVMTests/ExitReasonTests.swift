@@ -33,7 +33,7 @@ struct ExitReasonTests {
     }
 
     @Test func exitReasonSendable() {
-        /// ExitReason should be Sendable
+        // ExitReason should be Sendable
         func requiresSendable(_ _: some Sendable) {}
         requiresSendable(ExitReason.halt)
         requiresSendable(ExitReason.outOfGas)

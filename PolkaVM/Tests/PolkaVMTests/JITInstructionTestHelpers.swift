@@ -73,7 +73,7 @@ enum ProgramBlobBuilder {
         // 7. codeLength (4 bytes, little endian)
         // 8. programCode
 
-        /// Write UInt32 as 3 bytes in little-endian order
+        // Write UInt32 as 3 bytes in little-endian order
         func writeUInt24(_ value: UInt32) {
             var v = value.littleEndian
             withUnsafeBytes(of: &v) {
@@ -83,7 +83,7 @@ enum ProgramBlobBuilder {
             }
         }
 
-        /// Write UInt16 as 2 bytes in little-endian order
+        // Write UInt16 as 2 bytes in little-endian order
         func writeUInt16(_ value: UInt16) {
             var v = value.littleEndian
             withUnsafeBytes(of: &v) {
@@ -92,7 +92,7 @@ enum ProgramBlobBuilder {
             }
         }
 
-        /// Write UInt32 as 4 bytes in little-endian order
+        // Write UInt32 as 4 bytes in little-endian order
         func writeUInt32(_ value: UInt32) {
             var v = value.littleEndian
             withUnsafeBytes(of: &v) {

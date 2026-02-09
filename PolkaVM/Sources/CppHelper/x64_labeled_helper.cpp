@@ -628,7 +628,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
                 jumpOffset |= (uint64_t)codeBuffer[pc + 2 + l_X + i] << (8 * i);
             }
 
-            fprintf(stderr, "[JIT] LoadImmJump: jumpOffset=%llu (0x%llx), l_Y=%u\n", jumpOffset, jumpOffset, l_Y);
+            fprintf(stderr, "[JIT] LoadImmJump: jumpOffset=%lu (0x%lx), l_Y=%u\n", (unsigned long)jumpOffset, (unsigned long)jumpOffset, l_Y);
 
             // Sign-extend offset
             if (l_Y > 0 && l_Y < 8) {
