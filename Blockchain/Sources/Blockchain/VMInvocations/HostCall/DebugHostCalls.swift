@@ -10,7 +10,9 @@ private let logger = Logger(label: "HostCalls.Debug")
 
 /// A host call for passing a debugging message from the service/authorizer to the hosting environment for logging to the node operator.
 public class Log: HostCall {
-    public static var identifier: UInt8 { 100 }
+    public static var identifier: UInt8 {
+        100
+    }
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -98,7 +100,7 @@ public class Log: HostCall {
             target: target,
             message: message ?? Data(),
             core: core,
-            service: service
+            service: service,
         )
 
         switch level {

@@ -43,7 +43,7 @@ public class BlockchainServices: @unchecked Sendable {
     public init(
         config: ProtocolConfigRef = .dev,
         timeProvider: MockTimeProvider = MockTimeProvider(time: 988),
-        keysCount: Int = 12
+        keysCount: Int = 12,
     ) async {
         self.config = config
         self.timeProvider = timeProvider
@@ -59,7 +59,7 @@ public class BlockchainServices: @unchecked Sendable {
         let logMiddleware = LogMiddleware(logger: logger, propagateError: true)
         eventBus = EventBus(
             eventMiddleware: .serial(Middleware(storeMiddleware), Middleware(logMiddleware)),
-            handlerMiddleware: Middleware(logMiddleware)
+            handlerMiddleware: Middleware(logMiddleware),
         )
 
         scheduler = MockScheduler(timeProvider: timeProvider)
@@ -70,7 +70,7 @@ public class BlockchainServices: @unchecked Sendable {
             id: "BlockchainServices.schedulerService",
             config: config,
             eventBus: eventBus,
-            scheduler: scheduler
+            scheduler: scheduler,
         )
 
         schedulerService.scheduleForNextEpoch("BlockchainServices.scheduleForNextEpoch") { [weak self] epoch in
@@ -99,7 +99,7 @@ public class BlockchainServices: @unchecked Sendable {
                 eventBus: eventBus,
                 scheduler: scheduler,
                 dataProvider: dataProvider,
-                dataStore: dataStore
+                dataStore: dataStore,
             )
             _dataAvailabilityServiceRef = _dataAvailabilityService
             await _dataAvailabilityService!.onSyncCompleted()
@@ -116,7 +116,7 @@ public class BlockchainServices: @unchecked Sendable {
                 config: config,
                 dataProvider: dataProvider,
                 timeProvider: timeProvider,
-                eventBus: eventBus
+                eventBus: eventBus,
             )
             _blockchainRef = _blockchain
             return _blockchain!
@@ -134,7 +134,7 @@ public class BlockchainServices: @unchecked Sendable {
                 eventBus: eventBus,
                 keystore: keystore,
                 scheduler: scheduler,
-                safroleTicketPool: SafroleTicketPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
+                safroleTicketPool: SafroleTicketPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus),
             )
             _blockAuthorRef = _blockAuthor
 
@@ -155,7 +155,7 @@ public class BlockchainServices: @unchecked Sendable {
                 scheduler: scheduler,
                 dataProvider: dataProvider,
                 keystore: keystore,
-                dataStore: dataStore
+                dataStore: dataStore,
             )
             _guaranteeingServiceRef = _guaranteeingService
 
@@ -186,7 +186,7 @@ public class BlockchainServices: @unchecked Sendable {
                 slot: timeslot,
                 entropy: Data32(),
                 offenders: [],
-                extrinsics: .dummy(config: config)
+                extrinsics: .dummy(config: config),
             )
 
             for service in targets {
@@ -225,7 +225,7 @@ public class BlockchainServices: @unchecked Sendable {
                 slot: timeslot,
                 entropy: Data32(),
                 offenders: [],
-                extrinsics: .dummy(config: config)
+                extrinsics: .dummy(config: config),
             )
 
             await eventBus.publish(RuntimeEvents.BeforeEpochChange(epoch: epoch, state: res.state))

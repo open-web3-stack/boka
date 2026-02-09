@@ -58,8 +58,8 @@ public class VMStateInterpreter: VMState {
         memory.isReadable(address: UInt32(truncatingIfNeeded: address), length: length)
     }
 
-    // During the course of executing instructions
-    // When an index of ram below 2^16 is required, the machine always panics immediately
+    /// During the course of executing instructions
+    /// When an index of ram below 2^16 is required, the machine always panics immediately
     private func validateAddress(_ address: some FixedWidthInteger) throws {
         if isExecutingInst, UInt32(truncatingIfNeeded: address) < (1 << 16) {
             throw VMStateError.invalidInstructionMemoryAccess

@@ -1,11 +1,10 @@
 import Blockchain
+@testable import RPC
 import Testing
 import TracingUtils
+@testable import Utils
 import Vapor
 import XCTVapor
-
-@testable import RPC
-@testable import Utils
 
 final class StateHandlersTests {
     var app: Application!
@@ -29,7 +28,7 @@ final class StateHandlersTests {
                 .init(integerLiteral: 10),
                 .null,
                 .null,
-            ]
+            ],
         )
         let req = JSONRequest(jsonrpc: "2.0", method: "state_getKeys", params: params, id: 1)
         var buffer = ByteBuffer()

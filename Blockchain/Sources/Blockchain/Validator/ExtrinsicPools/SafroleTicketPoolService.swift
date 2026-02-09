@@ -82,7 +82,7 @@ public final class SafroleTicketPoolService: ServiceBase, @unchecked Sendable {
     public init(
         config: ProtocolConfigRef,
         dataProvider: BlockchainDataProvider,
-        eventBus: EventBus
+        eventBus: EventBus,
     ) async {
         self.dataProvider = dataProvider
 

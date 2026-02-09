@@ -1,9 +1,8 @@
 import Blockchain
 import Foundation
+@testable import Node
 import Testing
 import Utils
-
-@testable import Node
 
 enum ResourceLoader {
     static func loadResource(named name: String) -> URL? {
@@ -13,7 +12,7 @@ enum ResourceLoader {
 }
 
 struct ChainSpecTests {
-    @Test func testPresetLoading() async throws {
+    @Test func presetLoading() async throws {
         // Test loading different presets
         for preset in GenesisPreset.allCases {
             let genesis = Genesis.preset(preset)
@@ -32,7 +31,7 @@ struct ChainSpecTests {
         }
     }
 
-    @Test func testChainSpecFiles() async throws {
+    @Test func chainSpecFiles() async throws {
         // Test the JIP-4 compliant chainspec files
         let testCases = [
             ("spec-minimal.json", GenesisPreset.minimal),
@@ -41,7 +40,7 @@ struct ChainSpecTests {
         ]
 
         for (filename, expectedPreset) in testCases {
-            let specPath = ResourceLoader.loadResource(named: filename)!.path()
+            let specPath = try #require(ResourceLoader.loadResource(named: filename)?.path())
             let genesis: Genesis = .file(path: specPath)
             let chainspec = try await genesis.load()
 
@@ -68,7 +67,7 @@ struct ChainSpecTests {
         #expect(decoded == chainspec)
     }
 
-    @Test func testProtocolParametersDecoding() async throws {
+    @Test func protocolParametersDecoding() async throws {
         let testCases = [
             ("spec-minimal.json", 3), // minimal has 3 validators
             ("spec-dev.json", 6), // dev has 6 validators
@@ -76,7 +75,7 @@ struct ChainSpecTests {
         ]
 
         for (filename, expectedValidators) in testCases {
-            let specPath = ResourceLoader.loadResource(named: filename)!.path()
+            let specPath = try #require(ResourceLoader.loadResource(named: filename)?.path())
             let genesis: Genesis = .file(path: specPath)
             let chainspec = try await genesis.load()
             let config = try chainspec.getConfig()

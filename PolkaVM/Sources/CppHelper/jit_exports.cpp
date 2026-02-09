@@ -2,6 +2,9 @@
 // JIT exports from C++ to Swift for PolkaVM
 
 #include "helper.hh"
+#include <asmjit/a64.h>
+#include <asmjit/x86.h>
+#include <asmjit/core.h>
 #include <cstddef>
 #include <cstring>
 #include <stdio.h>
@@ -49,10 +52,10 @@ template <typename T> T *getTypedAssembler(void *assembler, const char *targetAr
 
 // Gas accounting
 bool jit_emitGasAccounting(
-    void *assembler,
-    const char *target_arch,
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
     uint64_t gas_cost,
-    void *gas_ptr)
+    void* _Nonnull gas_ptr) noexcept
 {
     std::string arch(target_arch);
 
@@ -75,7 +78,7 @@ bool jit_emitGasAccounting(
         a->mov(x86::qword_ptr(gasReg), temp1);
 
         // If gas < 0, jump to out-of-gas handler (which will be patched later)
-        Label outOfGasLabel = a->newLabel();
+        Label outOfGasLabel = a->new_label();
         a->jl(outOfGasLabel);
         a->bind(outOfGasLabel);
 
@@ -99,7 +102,7 @@ bool jit_emitGasAccounting(
         a->str(temp1, a64::ptr(gasReg));
 
         // If gas < 0, jump to out-of-gas handler (which will be patched later)
-        Label outOfGasLabel = a->newLabel();
+        Label outOfGasLabel = a->new_label();
         a->cmp(temp1, 0);
         a->b_lt(outOfGasLabel);
         a->bind(outOfGasLabel);
@@ -111,33 +114,35 @@ bool jit_emitGasAccounting(
 }
 
 // Generate trap instruction
-bool jit_generateTrap(void *assembler, const char *target_arch)
-{
-    std::string arch(target_arch);
+namespace jit_instruction {
+    bool jit_generateTrap(void* _Nonnull assembler, const char* _Nonnull target_arch) noexcept
+    {
+        std::string arch(target_arch);
 
-    if (arch.compare("x86_64") == 0) {
-        auto *a = getTypedAssembler<x86::Assembler>(assembler, target_arch);
-        if (!a)
-            return false;
+        if (arch.compare("x86_64") == 0) {
+            auto *a = getTypedAssembler<x86::Assembler>(assembler, target_arch);
+            if (!a)
+                return false;
 
-        // x86 trap instruction (causes SIGTRAP)
-        a->int3();
-        return true;
-    } else if (arch.compare("aarch64") == 0) {
-        auto *a = getTypedAssembler<a64::Assembler>(assembler, target_arch);
-        if (!a)
-            return false;
+            // x86 trap instruction (causes SIGTRAP)
+            a->int3();
+            return true;
+        } else if (arch.compare("aarch64") == 0) {
+            auto *a = getTypedAssembler<a64::Assembler>(assembler, target_arch);
+            if (!a)
+                return false;
 
-        // ARM breakpoint instruction (causes SIGTRAP)
-        a->brk(0);
-        return true;
+            // ARM breakpoint instruction (causes SIGTRAP)
+            a->brk(0);
+            return true;
+        }
+
+        return false;
     }
-
-    return false;
 }
 
 // Generate jump instruction (direct)
-bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_pc)
+bool jit_generateJump(void* _Nonnull assembler, const char* _Nonnull target_arch, uint32_t target_pc) noexcept
 {
     std::string arch(target_arch);
 
@@ -151,7 +156,7 @@ bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_
         a->mov(pcReg, target_pc);
 
         // Jump to code location (this will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->jmp(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -166,7 +171,7 @@ bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_
         a->mov(pcReg, target_pc);
 
         // Jump to code location (this will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->b(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -177,7 +182,7 @@ bool jit_generateJump(void *assembler, const char *target_arch, uint32_t target_
 }
 
 // Generate jump indirect instruction
-bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t reg_index)
+bool jit_generateJumpIndirect(void* _Nonnull assembler, const char* _Nonnull target_arch, uint8_t reg_index) noexcept
 {
     std::string arch(target_arch);
 
@@ -196,7 +201,7 @@ bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t 
         a->mov(pcReg, x86::eax); // Move 32-bit value to PC
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->jmp(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -216,7 +221,7 @@ bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t 
         a->mov(pcReg, a64::w0); // Move 32-bit value to PC
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->b(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -227,7 +232,7 @@ bool jit_generateJumpIndirect(void *assembler, const char *target_arch, uint8_t 
 }
 
 // Generate ecalli instruction (calls into host)
-bool jit_generateEcalli(void *assembler, const char *target_arch, uint32_t func_idx, void *gas_ptr)
+bool jit_generateEcalli(void* _Nonnull assembler, const char* _Nonnull target_arch, uint32_t func_idx, void* _Nonnull gas_ptr) noexcept
 {
     std::string arch(target_arch);
 
@@ -267,7 +272,7 @@ bool jit_generateEcalli(void *assembler, const char *target_arch, uint32_t func_
         a->cmp(x86::eax, 0xFFFFFFFF);
 
         // If equal, jump to error handler (will be patched later)
-        Label errorLabel = a->newLabel();
+        Label errorLabel = a->new_label();
         a->je(errorLabel);
         a->bind(errorLabel);
 
@@ -312,7 +317,7 @@ bool jit_generateEcalli(void *assembler, const char *target_arch, uint32_t func_
         a->cmp(a64::w0, 0xFFFFFFFF);
 
         // If equal, jump to error handler (will be patched later)
-        Label errorLabel = a->newLabel();
+        Label errorLabel = a->new_label();
         a->b_eq(errorLabel);
         a->bind(errorLabel);
 
@@ -327,11 +332,11 @@ bool jit_generateEcalli(void *assembler, const char *target_arch, uint32_t func_
 
 // Generate load immediate and jump
 bool jit_generateLoadImmJump(
-    void *assembler,
-    const char *target_arch,
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint32_t immediate,
-    uint32_t target_pc)
+    uint32_t target_pc) noexcept
 {
     std::string arch(target_arch);
 
@@ -353,7 +358,7 @@ bool jit_generateLoadImmJump(
         a->mov(pcReg, target_pc);
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->jmp(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -376,7 +381,7 @@ bool jit_generateLoadImmJump(
         a->mov(pcReg, target_pc);
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->b(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -388,11 +393,11 @@ bool jit_generateLoadImmJump(
 
 // Generate load immediate and jump indirect
 bool jit_generateLoadImmJumpInd(
-    void *assembler,
-    const char *target_arch,
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
     uint8_t dest_reg,
     uint32_t immediate,
-    uint8_t jump_reg)
+    uint8_t jump_reg) noexcept
 {
     std::string arch(target_arch);
 
@@ -415,7 +420,7 @@ bool jit_generateLoadImmJumpInd(
         a->mov(pcReg, x86::eax); // Move lower 32 bits to PC
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->jmp(dispatcherLabel);
         a->bind(dispatcherLabel);
 
@@ -440,7 +445,7 @@ bool jit_generateLoadImmJumpInd(
         a->mov(pcReg, a64::w1); // Move lower 32 bits to PC
 
         // Jump to dispatcher (will be patched later)
-        Label dispatcherLabel = a->newLabel();
+        Label dispatcherLabel = a->new_label();
         a->b(dispatcherLabel);
         a->bind(dispatcherLabel);
 

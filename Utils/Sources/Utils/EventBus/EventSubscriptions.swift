@@ -23,7 +23,7 @@ public struct EventSubscriptions: ~Copyable, Sendable {
     public func subscribe<T: Event>(
         _ eventType: T.Type,
         id _: UniqueId,
-        handler: @escaping @Sendable (T) async throws -> Void
+        handler: @escaping @Sendable (T) async throws -> Void,
     ) async -> EventBus.SubscriptionToken {
         let token = await eventBus.subscribe(eventType, handler: handler)
         subscriptionTokens.withLock { $0.append(token) }
@@ -44,7 +44,7 @@ public struct EventSubscriptions: ~Copyable, Sendable {
     public func waitFor<T: Event>(
         _ eventType: T.Type,
         check: @escaping @Sendable (T) -> Bool = { _ in true },
-        timeout: TimeInterval = 10
+        timeout: TimeInterval = 10,
     ) async throws -> T {
         try await eventBus.waitFor(eventType, check: check, timeout: timeout)
     }

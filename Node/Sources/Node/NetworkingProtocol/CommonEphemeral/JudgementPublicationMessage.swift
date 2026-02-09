@@ -15,7 +15,7 @@ public struct JudgementPublicationMessage: Sendable, Equatable, Codable, Hashabl
         validatorIndex: ValidatorIndex,
         validity: UInt8,
         workReportHash: Data32,
-        signature: Ed25519Signature
+        signature: Ed25519Signature,
     ) {
         self.epochIndex = epochIndex
         self.validatorIndex = validatorIndex
@@ -34,7 +34,7 @@ extension JudgementPublicationMessage: CEMessage {
         guard let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "Unexpected data \(data)"
+                debugDescription: "Unexpected data \(data)",
             ))
         }
         return try JamDecoder.decode(JudgementPublicationMessage.self, from: data, withConfig: config)

@@ -3,8 +3,8 @@ import Utils
 public protocol Validate: HasConfig {
     func validate(config: Config) throws
 
-    // only validate self without validating child
-    // used by default implementation of validate
+    /// only validate self without validating child
+    /// used by default implementation of validate
     func validateSelf(config: Config) throws
 }
 

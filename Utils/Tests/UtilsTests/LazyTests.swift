@@ -1,9 +1,8 @@
 import Testing
-
 @testable import Utils
 
 struct LazyTests {
-    @Test func lazyRef() async throws {
+    @Test func lazyRef() async {
         await confirmation { confirm in
             let lazy = Lazy {
                 confirm()

@@ -21,7 +21,7 @@ public final class NetworkManager: Sendable {
     public let syncManager: SyncManager
     public let blockchain: Blockchain
 
-    // Development-only peers that receive all messages
+    /// Development-only peers that receive all messages
     private let devPeers: Set<Either<PeerId, NetAddr>>
 
     // Extracted modules
@@ -33,7 +33,7 @@ public final class NetworkManager: Sendable {
         buildNetwork: (NetworkProtocolHandler) throws -> any NetworkProtocol,
         blockchain: Blockchain,
         eventBus: EventBus,
-        devPeers: Set<NetAddr>
+        devPeers: Set<NetAddr>,
     ) async throws {
         self.blockchain = blockchain
         peerManager = PeerManager(eventBus: eventBus)
@@ -51,7 +51,7 @@ public final class NetworkManager: Sendable {
         let handler = HandlerImpl(
             blockchain: blockchain,
             ceHandlers: ceHandlers,
-            peerManager: peerManager
+            peerManager: peerManager,
         )
         network = try buildNetwork(handler)
 
@@ -60,7 +60,7 @@ public final class NetworkManager: Sendable {
             blockchain: blockchain,
             network: network,
             peerManager: peerManager,
-            eventBus: eventBus
+            eventBus: eventBus,
         )
 
         // Setup development peers first
@@ -91,42 +91,42 @@ public final class NetworkManager: Sendable {
         Task {
             await subscriptions.subscribe(
                 RuntimeEvents.SafroleTicketsGenerated.self,
-                id: "NetworkManager.SafroleTicketsGenerated"
+                id: "NetworkManager.SafroleTicketsGenerated",
             ) { [weak self] event in
                 await self?.on(safroleTicketsGenerated: event)
             }
 
             await subscriptions.subscribe(
                 RuntimeEvents.BlockImported.self,
-                id: "NetworkManager.BlockImported"
+                id: "NetworkManager.BlockImported",
             ) { [weak self] event in
                 await self?.on(blockImported: event)
             }
 
             await subscriptions.subscribe(
                 RuntimeEvents.WorkPackagesSubmitted.self,
-                id: "NetworkManager.WorkPackagesSubmitted"
+                id: "NetworkManager.WorkPackagesSubmitted",
             ) { [weak self] event in
                 await self?.on(workPackagesSubmitted: event)
             }
 
             await subscriptions.subscribe(
                 RuntimeEvents.WorkPackageBundleReady.self,
-                id: "NetworkManager.WorkPackageBundleReady"
+                id: "NetworkManager.WorkPackageBundleReady",
             ) { [weak self] event in
                 await self?.on(workPackageBundleReady: event)
             }
 
             await subscriptions.subscribe(
                 RuntimeEvents.BeforeEpochChange.self,
-                id: "NetworkManager.BeforeEpochChange"
+                id: "NetworkManager.BeforeEpochChange",
             ) { [weak self] event in
                 await self?.on(beforeEpochChange: event)
             }
 
             await subscriptions.subscribe(
                 RuntimeEvents.WorkReportGenerated.self,
-                id: "NetworkManager.WorkReportGenerated"
+                id: "NetworkManager.WorkReportGenerated",
             ) { [weak self] event in
                 await self?.on(workReportGenerated: event)
             }
@@ -143,8 +143,8 @@ public final class NetworkManager: Sendable {
                 message: .safroleTicket1(.init(
                     epochIndex: event.epochIndex,
                     attempt: ticket.ticket.attempt,
-                    proof: ticket.ticket.signature
-                ))
+                    proof: ticket.ticket.signature,
+                )),
             )
         }
     }
@@ -156,8 +156,8 @@ public final class NetworkManager: Sendable {
             kind: .blockAnnouncement,
             message: .blockAnnouncement(BlockAnnouncement(
                 header: event.block.header.asRef(),
-                finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot)
-            ))
+                finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot),
+            )),
         )
     }
 
@@ -168,8 +168,8 @@ public final class NetworkManager: Sendable {
             message: .workPackageSubmission(.init(
                 coreIndex: event.coreIndex,
                 workPackage: event.workPackage.value,
-                extrinsics: event.extrinsics
-            ))
+                extrinsics: event.extrinsics,
+            )),
         )
     }
 
@@ -180,7 +180,7 @@ public final class NetworkManager: Sendable {
             let resp = try await send(to: target, message: .workPackageSharing(.init(
                 coreIndex: event.coreIndex,
                 segmentsRootMappings: event.segmentsRootMappings,
-                bundle: event.bundle
+                bundle: event.bundle,
             )))
 
             guard resp.count == 1, let data = resp.first else {
@@ -195,7 +195,7 @@ public final class NetworkManager: Sendable {
             blockchain.publish(event: RuntimeEvents.WorkPackageBundleReceivedReply(
                 source: target,
                 workReportHash: workReportHash,
-                signature: signature
+                signature: signature,
             ))
         }
     }
@@ -222,8 +222,8 @@ public final class NetworkManager: Sendable {
             message: .workReportDistribution(.init(
                 workReport: event.workReport,
                 slot: event.slot,
-                signatures: event.signatures
-            ))
+                signatures: event.signatures,
+            )),
         )
     }
 
@@ -310,20 +310,20 @@ struct HandlerImpl: NetworkProtocolHandler {
 
     func handle(
         connection: some ConnectionInfoProtocol,
-        upMessage: UPMessage
+        upMessage: UPMessage,
     ) async throws {
         switch upMessage {
         case let .blockAnnouncementHandshake(message):
             logger.trace("received block announcement handshake: \(message)")
             try await peerManager.addPeer(
                 id: PeerId(publicKey: connection.publicKey.unwrap(), address: connection.remoteAddress),
-                handshake: message
+                handshake: message,
             )
         case let .blockAnnouncement(message):
             logger.trace("received block announcement: \(message)")
             try await peerManager.updatePeer(
                 id: PeerId(publicKey: connection.publicKey.unwrap(), address: connection.remoteAddress),
-                message: message
+                message: message,
             )
         }
     }
@@ -331,7 +331,7 @@ struct HandlerImpl: NetworkProtocolHandler {
     func handle(
         connection _: some ConnectionInfoProtocol,
         stream: some StreamProtocol<UPMessage>,
-        kind: UniquePresistentStreamKind
+        kind: UniquePresistentStreamKind,
     ) async throws {
         switch kind {
         case .blockAnnouncement:
@@ -343,20 +343,20 @@ struct HandlerImpl: NetworkProtocolHandler {
                 let header = try await blockchain.dataProvider.getHeader(hash: head)
                 headsWithTimeslot.append(HashAndSlot(
                     hash: head,
-                    timeslot: header.value.timeslot
+                    timeslot: header.value.timeslot,
                 ))
             }
 
             try await stream.send(message: .blockAnnouncementHandshake(.init(
                 finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot),
-                heads: headsWithTimeslot
+                heads: headsWithTimeslot,
             )))
 
             for head in heads {
                 let header = try await blockchain.dataProvider.getHeader(hash: head)
                 try await stream.send(message: .blockAnnouncement(.init(
                     header: header,
-                    finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot)
+                    finalized: HashAndSlot(hash: finalized.hash, timeslot: finalized.timeslot),
                 )))
             }
         }

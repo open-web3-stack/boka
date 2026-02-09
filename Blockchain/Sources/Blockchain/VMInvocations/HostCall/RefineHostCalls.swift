@@ -10,7 +10,9 @@ private let logger = Logger(label: "HostCalls.Refine")
 
 /// Export a segment from memory
 public class Export: HostCall {
-    public static var identifier: UInt8 { 7 }
+    public static var identifier: UInt8 {
+        7
+    }
 
     public let context: RefineContext.ContextType
     public let exportSegmentOffset: UInt64
@@ -48,7 +50,9 @@ public class Export: HostCall {
 
 /// Create an inner PVM
 public class Machine: HostCall {
-    public static var identifier: UInt8 { 8 }
+    public static var identifier: UInt8 {
+        8
+    }
 
     public let context: RefineContext.ContextType
 
@@ -87,7 +91,9 @@ public class Machine: HostCall {
 
 /// Peek (read inner memory into outer memory)
 public class Peek: HostCall {
-    public static var identifier: UInt8 { 9 }
+    public static var identifier: UInt8 {
+        9
+    }
 
     public let context: RefineContext.ContextType
 
@@ -116,7 +122,9 @@ public class Peek: HostCall {
 
 /// Poke (write outer memory into inner memory)
 public class Poke: HostCall {
-    public static var identifier: UInt8 { 10 }
+    public static var identifier: UInt8 {
+        10
+    }
 
     public let context: RefineContext.ContextType
 
@@ -145,7 +153,9 @@ public class Poke: HostCall {
 
 /// Modify pages in the inner PVM
 public class Pages: HostCall {
-    public static var identifier: UInt8 { 11 }
+    public static var identifier: UInt8 {
+        11
+    }
 
     public let context: RefineContext.ContextType
 
@@ -171,7 +181,7 @@ public class Pages: HostCall {
             try context.pvms[regs[0]]!.memory.pages(
                 pageIndex: UInt32(truncatingIfNeeded: regs[1]),
                 pages: Int(regs[2]),
-                variant: regs[3]
+                variant: regs[3],
             )
         }
     }
@@ -179,7 +189,9 @@ public class Pages: HostCall {
 
 /// Invoke an inner PVM
 public class Invoke: HostCall {
-    public static var identifier: UInt8 { 12 }
+    public static var identifier: UInt8 {
+        12
+    }
 
     public let context: RefineContext.ContextType
 
@@ -215,7 +227,7 @@ public class Invoke: HostCall {
             pc: innerPvm.pc,
             registers: Registers(registers),
             gas: Gas(gas),
-            memory: innerPvm.memory
+            memory: innerPvm.memory,
         )
         let engine = Engine(config: DefaultPvmConfig())
         let exitReason = await engine.execute(state: vm)
@@ -244,7 +256,9 @@ public class Invoke: HostCall {
 
 /// Expunge an inner PVM
 public class Expunge: HostCall {
-    public static var identifier: UInt8 { 13 }
+    public static var identifier: UInt8 {
+        13
+    }
 
     public let context: RefineContext.ContextType
 

@@ -1,11 +1,10 @@
 import Blockchain
 import Database
 import Foundation
+@testable import Node
 import Testing
 import TracingUtils
 import Utils
-
-@testable import Node
 
 final class NodeTests {
     let path = {
@@ -23,7 +22,7 @@ final class NodeTests {
 
     @Test func validatorNodeInMemory() async throws {
         let (nodes, scheduler) = try await Topology(
-            nodes: [NodeDescription(isValidator: true)]
+            nodes: [NodeDescription(isValidator: true)],
         ).build(genesis: .preset(.minimal))
 
         let (validatorNode, storeMiddlware) = nodes[0]
@@ -35,7 +34,7 @@ final class NodeTests {
         // Advance time
         for _ in 0 ..< 10 {
             await scheduler.advance(
-                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds)
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds),
             )
             await storeMiddlware.wait()
         }
@@ -54,7 +53,7 @@ final class NodeTests {
 
     @Test func validatorNodeRocksDB() async throws {
         let (nodes, scheduler) = try await Topology(
-            nodes: [NodeDescription(isValidator: true, database: getDatabase(0))]
+            nodes: [NodeDescription(isValidator: true, database: getDatabase(0))],
         ).build(genesis: .preset(.minimal))
 
         let (validatorNode, storeMiddlware) = nodes[0]
@@ -66,7 +65,7 @@ final class NodeTests {
         // Advance time
         for _ in 0 ..< 10 {
             await scheduler.advance(
-                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds)
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds),
             )
             await storeMiddlware.wait()
         }
@@ -99,7 +98,7 @@ final class NodeTests {
                 NodeDescription(isValidator: true, database: getDatabase(0)),
                 NodeDescription(devSeed: 1, database: getDatabase(1)),
             ],
-            connections: [(0, 1)]
+            connections: [(0, 1)],
         ).build(genesis: .preset(.minimal))
 
         let (validatorNode, validatorStoreMiddlware) = nodes[0]
@@ -108,7 +107,7 @@ final class NodeTests {
         // Advance time to produce blocks
         for _ in 0 ..< 10 {
             await scheduler.advance(
-                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds)
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds),
             )
             await validatorStoreMiddlware.wait()
             await nodeStoreMiddlware.wait()
@@ -129,7 +128,7 @@ final class NodeTests {
         // Produce more blocks
         for _ in 0 ..< 10 {
             await scheduler.advance(
-                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds)
+                by: TimeInterval(validatorNode.blockchain.config.value.slotPeriodSeconds),
             )
             await validatorStoreMiddlware.wait()
             await nodeStoreMiddlware.wait()
@@ -166,7 +165,7 @@ final class NodeTests {
             nodes: nodeDescriptions,
             connections: (0 ..< 20).flatMap { i in
                 (i + 1 ..< 20).map { j in (i, j) } // Fully connected topology
-            }
+            },
         ).build(genesis: .preset(.minimal))
 
         let (validator1, validator1StoreMiddlware) = nodes[0]
@@ -185,7 +184,7 @@ final class NodeTests {
         // Advance time to produce blocks
         for _ in 0 ..< 20 {
             await scheduler.advance(
-                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds)
+                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds),
             )
             await validator1StoreMiddlware.wait()
             await validator2StoreMiddlware.wait()
@@ -223,7 +222,7 @@ final class NodeTests {
 
         let (nodes, scheduler) = try await Topology(
             nodes: nodeDescriptions,
-            connections: connections
+            connections: connections,
         ).build(genesis: .preset(.minimal))
 
         let (validator1, _) = nodes[0]
@@ -235,7 +234,7 @@ final class NodeTests {
 
         for _ in 0 ..< 5 {
             await scheduler.advance(
-                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds)
+                by: TimeInterval(validator1.blockchain.config.value.slotPeriodSeconds),
             )
             for (_, middleware) in nodes {
                 await middleware.wait()

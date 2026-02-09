@@ -26,8 +26,8 @@ extension DataInput {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath(),
-                    debugDescription: "Not enough data to perform variable length integer decoding"
-                )
+                    debugDescription: "Not enough data to perform variable length integer decoding",
+                ),
             )
         }
         return res
@@ -40,8 +40,8 @@ extension Data: DataInput {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: codingPath(),
-                    debugDescription: "Not enough data to decode \(length) bytes"
-                )
+                    debugDescription: "Not enough data to decode \(length) bytes",
+                ),
             )
         }
         let res = self[startIndex ..< startIndex + length]

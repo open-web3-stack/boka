@@ -1,8 +1,7 @@
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct ShuffleTestCase: Codable {
     let input: Int
@@ -24,7 +23,7 @@ struct ShuffleTests {
         var input = Array(0 ..< testCase.input)
 
         // Convert entropy hex string to Data32
-        let entropy = Data32(fromHexString: testCase.entropy)!
+        let entropy = try #require(Data32(fromHexString: testCase.entropy))
 
         // Perform shuffle
         input.shuffle(randomness: entropy)

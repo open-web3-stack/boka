@@ -3,20 +3,20 @@ import Utils
 
 public struct ExtrinsicAvailability: Sendable, Equatable, Codable {
     public struct AssuranceItem: Sendable, Equatable, Codable {
-        // a
+        /// a
         public var parentHash: Data32
-        // f
+        /// f
         public var assurance: ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>
-        // v
+        /// v
         public var validatorIndex: ValidatorIndex
-        // s
+        /// s
         public var signature: Ed25519Signature
 
         public init(
             parentHash: Data32,
             assurance: ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>,
             validatorIndex: ValidatorIndex,
-            signature: Ed25519Signature
+            signature: Ed25519Signature,
         ) {
             self.parentHash = parentHash
             self.assurance = assurance
@@ -28,13 +28,13 @@ public struct ExtrinsicAvailability: Sendable, Equatable, Codable {
     public typealias AssurancesList = ConfigLimitedSizeArray<
         AssuranceItem,
         ProtocolConfig.Int0,
-        ProtocolConfig.TotalNumberOfValidators
+        ProtocolConfig.TotalNumberOfValidators,
     >
 
     public var assurances: AssurancesList
 
     public init(
-        assurances: AssurancesList
+        assurances: AssurancesList,
     ) {
         self.assurances = assurances
     }

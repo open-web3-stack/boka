@@ -21,7 +21,7 @@ public struct StorageMonitoringConfig: Sendable {
         monitoringInterval: TimeInterval = 60.0,
         maxStorageBytes: Int = 100 * 1024 * 1024 * 1024, // 100 GB default
         aggressiveCleanupThreshold: Double = 0.85, // 85%
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
     ) {
         self.monitoringInterval = monitoringInterval
         self.maxStorageBytes = maxStorageBytes
@@ -49,7 +49,7 @@ public actor StorageMonitoring {
             Storage monitoring configured: interval=\(config.monitoringInterval)s, \
             maxBytes=\(config.maxStorageBytes), \
             threshold=\(Int(config.aggressiveCleanupThreshold * 100))%
-            """
+            """,
         )
     }
 
@@ -97,7 +97,7 @@ public actor StorageMonitoring {
                     if consecutiveWarnings > 0 {
                         let maxStorageMB = monitoringConfig.maxStorageBytes / 1024 / 1024
                         logger.info(
-                            "Storage pressure returned to normal: \(usage.totalMB) MB / \(maxStorageMB) MB"
+                            "Storage pressure returned to normal: \(usage.totalMB) MB / \(maxStorageMB) MB",
                         )
                         consecutiveWarnings = 0
                     }
@@ -106,20 +106,20 @@ public actor StorageMonitoring {
                     consecutiveWarnings += 1
                     let maxStorageMB = monitoringConfig.maxStorageBytes / 1024 / 1024
                     let usagePercentage = Int(
-                        Double(usage.totalBytes) / Double(monitoringConfig.maxStorageBytes) * 100
+                        Double(usage.totalBytes) / Double(monitoringConfig.maxStorageBytes) * 100,
                     )
                     logger.warning(
-                        "Storage pressure warning: \(usage.totalMB) MB / \(maxStorageMB) MB (\(usagePercentage)% used)"
+                        "Storage pressure warning: \(usage.totalMB) MB / \(maxStorageMB) MB (\(usagePercentage)% used)",
                     )
 
                 case .critical:
                     consecutiveWarnings += 1
                     let maxStorageMB = monitoringConfig.maxStorageBytes / 1024 / 1024
                     let usagePercentage = Int(
-                        Double(usage.totalBytes) / Double(monitoringConfig.maxStorageBytes) * 100
+                        Double(usage.totalBytes) / Double(monitoringConfig.maxStorageBytes) * 100,
                     )
                     logger.error(
-                        "⚠️ CRITICAL storage pressure: \(usage.totalMB) MB / \(maxStorageMB) MB (\(usagePercentage)% used)"
+                        "⚠️ CRITICAL storage pressure: \(usage.totalMB) MB / \(maxStorageMB) MB (\(usagePercentage)% used)",
                     )
 
                     // Perform aggressive cleanup if we haven't recently
@@ -127,7 +127,7 @@ public actor StorageMonitoring {
                         logger.error("Initiating aggressive cleanup due to critical storage pressure")
 
                         let targetBytes = Int(
-                            Double(monitoringConfig.maxStorageBytes) * (1.0 - monitoringConfig.aggressiveCleanupThreshold)
+                            Double(monitoringConfig.maxStorageBytes) * (1.0 - monitoringConfig.aggressiveCleanupThreshold),
                         )
                         let reclaimed = try await storageMonitor.aggressiveCleanup(targetBytes: targetBytes)
 
@@ -141,13 +141,13 @@ public actor StorageMonitoring {
                     consecutiveWarnings += 1
                     let maxStorageMB = monitoringConfig.maxStorageBytes / 1024 / 1024
                     let usagePercentage = Int(
-                        Double(usage.totalBytes) / Double(monitoringConfig.maxStorageBytes) * 100
+                        Double(usage.totalBytes) / Double(monitoringConfig.maxStorageBytes) * 100,
                     )
                     logger.critical(
                         """
                         🚨 EMERGENCY storage pressure: \(usage.totalMB) MB / \(maxStorageMB) MB \
                         (\(usagePercentage)% used) - System may become unstable!
-                        """
+                        """,
                     )
 
                     // Immediate aggressive cleanup

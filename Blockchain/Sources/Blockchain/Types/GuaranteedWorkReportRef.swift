@@ -7,9 +7,18 @@ import Utils
 /// Thread-safety: @unchecked Sendable is inherited from RefWithHash<T>
 /// which provides synchronization for immutable value access
 public final class GuaranteedWorkReportRef: RefWithHash<GuaranteedWorkReport>, @unchecked Sendable {
-    public var workReport: WorkReport { value.workReport }
-    public var slot: UInt32 { value.slot }
-    public var signatures: [ValidatorSignature] { value.signatures }
+    public var workReport: WorkReport {
+        value.workReport
+    }
+
+    public var slot: UInt32 {
+        value.slot
+    }
+
+    public var signatures: [ValidatorSignature] {
+        value.signatures
+    }
+
     override public var description: String {
         "GuaranteedWorkReport(hash: \(workReport.hash()), timeslot: \(slot))"
     }

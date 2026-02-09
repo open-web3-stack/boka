@@ -1,9 +1,8 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import TracingUtils
 import Utils
-
-@testable import Blockchain
 
 struct ErasureCodingServiceTests {
     func makeService() -> ErasureCodingService {
@@ -21,7 +20,7 @@ struct ErasureCodingServiceTests {
         for i in 0 ..< 4104 {
             segmentData[i] = UInt8(truncatingIfNeeded: i)
         }
-        let segment = Data4104(segmentData)!
+        let segment = try #require(Data4104(segmentData))
 
         // Encode
         let shards = try await service.encodeSegments([segment])
@@ -51,7 +50,7 @@ struct ErasureCodingServiceTests {
             for i in 0 ..< 4104 {
                 segmentData[i] = UInt8(truncatingIfNeeded: segIndex * 4104 + i)
             }
-            segments.append(Data4104(segmentData)!)
+            try segments.append(#require(Data4104(segmentData)))
         }
 
         // Encode
@@ -122,7 +121,7 @@ struct ErasureCodingServiceTests {
 
         let reconstructed = try await service.reconstruct(
             shards: shardTuples,
-            originalLength: originalData.count
+            originalLength: originalData.count,
         )
 
         // Should reconstruct to original
@@ -145,7 +144,7 @@ struct ErasureCodingServiceTests {
 
         let reconstructed = try await service.reconstruct(
             shards: shardTuples,
-            originalLength: originalData.count
+            originalLength: originalData.count,
         )
 
         // Should reconstruct to original
@@ -170,7 +169,7 @@ struct ErasureCodingServiceTests {
 
         let reconstructed = try await service.reconstruct(
             shards: shardTuples,
-            originalLength: originalData.count
+            originalLength: originalData.count,
         )
 
         // Should reconstruct to original
@@ -194,7 +193,7 @@ struct ErasureCodingServiceTests {
         await #expect(throws: ErasureCodingError.self) {
             try await service.reconstruct(
                 shards: shardTuples,
-                originalLength: originalData.count
+                originalLength: originalData.count,
             )
         }
     }
@@ -210,7 +209,7 @@ struct ErasureCodingServiceTests {
             for i in 0 ..< 4104 {
                 segmentData[i] = UInt8(truncatingIfNeeded: segIndex * 4104 + i)
             }
-            segments.append(Data4104(segmentData)!)
+            try segments.append(#require(Data4104(segmentData)))
         }
 
         // Encode
@@ -222,7 +221,7 @@ struct ErasureCodingServiceTests {
         // Reconstruct
         let reconstructedSegments = try await service.reconstructSegments(
             shards: shardTuples,
-            segmentCount: 3
+            segmentCount: 3,
         )
 
         // Should reconstruct to original
@@ -246,7 +245,7 @@ struct ErasureCodingServiceTests {
         // Calculate erasure root
         let erasureRoot = try await service.calculateErasureRoot(
             segmentsRoot: segmentsRoot,
-            shards: shards
+            shards: shards,
         )
 
         // Should be a valid 32-byte hash
@@ -255,7 +254,7 @@ struct ErasureCodingServiceTests {
         // Same input should produce same erasure root
         let erasureRoot2 = try await service.calculateErasureRoot(
             segmentsRoot: segmentsRoot,
-            shards: shards
+            shards: shards,
         )
         #expect(erasureRoot == erasureRoot2)
     }
@@ -272,11 +271,11 @@ struct ErasureCodingServiceTests {
 
         let erasureRoot1 = try await service.calculateErasureRoot(
             segmentsRoot: segmentsRoot1,
-            shards: shards
+            shards: shards,
         )
         let erasureRoot2 = try await service.calculateErasureRoot(
             segmentsRoot: segmentsRoot2,
-            shards: shards
+            shards: shards,
         )
 
         // Different segments roots should produce different erasure roots
@@ -293,7 +292,7 @@ struct ErasureCodingServiceTests {
         await #expect(throws: ErasureCodingError.self) {
             try await service.calculateErasureRoot(
                 segmentsRoot: segmentsRoot,
-                shards: invalidShards
+                shards: invalidShards,
             )
         }
     }

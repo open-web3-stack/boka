@@ -25,7 +25,7 @@ public actor AvailabilityVerification {
             // If we can resolve the segment root, the work package is available
             let segment = WorkItem.ImportedDataSegment(
                 root: .workPackageHash(workPackageHash),
-                index: 0
+                index: 0,
             )
             let result = try await dataStore.fetchSegment(segments: [segment], segmentsRootMappings: nil)
             return !result.isEmpty
@@ -45,7 +45,7 @@ public actor AvailabilityVerification {
             // Try to fetch a segment to check availability
             let segment = WorkItem.ImportedDataSegment(
                 root: .workPackageHash(workPackageHash),
-                index: 0
+                index: 0,
             )
             let result = try await dataStore.fetchSegment(segments: [segment], segmentsRootMappings: nil)
 
@@ -65,7 +65,7 @@ public actor AvailabilityVerification {
     /// - Parameter workPackageHashes: The hashes of the work packages to verify
     /// - Returns: Dictionary mapping work package hash to availability status
     public func verifyMultipleWorkPackagesAvailability(
-        workPackageHashes: [Data32]
+        workPackageHashes: [Data32],
     ) async -> [Data32: Bool] {
         var results: [Data32: Bool] = [:]
 

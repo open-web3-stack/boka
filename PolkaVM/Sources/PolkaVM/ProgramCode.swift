@@ -1,5 +1,7 @@
+import Codec
 import CppHelper
 import Foundation
+import TracingUtils
 import Utils
 
 public class ProgramCode {
@@ -22,9 +24,9 @@ public class ProgramCode {
     public let jumpTableEntrySize: UInt8
     public let jumpTable: Data
     public let code: Data
-    private let bitmask: Data
+    let bitmask: Data
 
-    // parsed stuff
+    /// parsed stuff
     public private(set) var basicBlockIndices: Set<UInt32> = []
 
     private final class InstRef {
@@ -39,17 +41,22 @@ public class ProgramCode {
     private var blockGasCosts: [UInt32: Gas] = [:]
 
     private static let cachedTrapInst = CppHelper.Instructions.Trap()
+    private static let logger = Logger(label: "ProgramCode")
 
     public init(_ blob: Data) throws(Error) {
+        // Data is already thread-safe (value semantic, copy-on-write)
         self.blob = blob
 
-        var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
+        var slice = Slice(base: self.blob, bounds: self.blob.startIndex ..< self.blob.endIndex)
         guard let jumpTableEntriesCount = slice.decode(), jumpTableEntriesCount <= Constants.maxJumpTableEntriesCount else {
             throw Error.invalidJumpTableEntriesCount
         }
         guard let encodeSize = slice.next(), encodeSize <= Constants.maxEncodeSize else {
             throw Error.invalidJumpTableEncodeSize
         }
+
+        // Decode codeLength using the same spec-compliant decoder as jumpTableEntriesCount
+        // Format from serialization.tex: variable-length encoding with prefix bytes
         guard let codeLength = slice.decode(), codeLength <= Constants.maxCodeLength else {
             throw Error.invalidCodeLength
         }
@@ -60,31 +67,47 @@ public class ProgramCode {
         let jumpTableEndIndex = slice.startIndex + jumpTableSize
 
         guard jumpTableEndIndex <= slice.endIndex else {
+            Self.logger
+                .error(
+                    "Jump table extends beyond blob: jumpTableSize=\(jumpTableSize), startIndex=\(slice.startIndex), endIndex=\(jumpTableEndIndex), slice.endIndex=\(slice.endIndex)",
+                )
             throw Error.invalidDataLength
         }
 
-        jumpTable = blob[slice.startIndex ..< jumpTableEndIndex]
+        // Data is already thread-safe (value semantic, copy-on-write)
+        jumpTable = self.blob[slice.startIndex ..< jumpTableEndIndex]
 
         let codeEndIndex = jumpTableEndIndex + Int(codeLength)
         guard codeEndIndex <= slice.endIndex else {
+            Self.logger
+                .error(
+                    "Code extends beyond blob: codeLength=\(codeLength), jumpTableEndIndex=\(jumpTableEndIndex), codeEndIndex=\(codeEndIndex), slice.endIndex=\(slice.endIndex)",
+                )
             throw Error.invalidDataLength
         }
 
-        code = blob[jumpTableEndIndex ..< codeEndIndex]
+        // Data is already thread-safe (value semantic, copy-on-write)
+        code = self.blob[jumpTableEndIndex ..< codeEndIndex]
 
         let expectedBitmaskSize = (codeLength + 7) / 8
+        let actualBitmaskSize = slice.endIndex - codeEndIndex
 
-        guard expectedBitmaskSize == slice.endIndex - codeEndIndex else {
+        guard expectedBitmaskSize == actualBitmaskSize else {
+            Self.logger
+                .error(
+                    "Bitmask size mismatch: codeLength=\(codeLength), expected=\(expectedBitmaskSize), actual=\(actualBitmaskSize), blob.count=\(self.blob.count), jumpTableEndIndex=\(jumpTableEndIndex), codeEndIndex=\(codeEndIndex), slice.startIndex=\(slice.startIndex), slice.endIndex=\(slice.endIndex)",
+                )
             throw Error.invalidDataLength
         }
 
         // mark bitmask bits longer than codeLength as 1
-        var bitmaskData = blob[codeEndIndex ..< slice.endIndex]
+        // Create a mutable copy to modify
+        var bitmaskData = Data(self.blob[codeEndIndex ..< slice.endIndex])
         let fullBytes = Int(codeLength) / 8
         let remainingBits = Int(codeLength) % 8
         if remainingBits > 0 {
             let mask: UInt8 = ~0 << remainingBits
-            bitmaskData[codeEndIndex + fullBytes] |= mask
+            bitmaskData[fullBytes] |= mask
         }
         bitmask = bitmaskData
 
@@ -126,7 +149,7 @@ public class ProgramCode {
 
     private func parseInstruction(startIndex: Int, skip: UInt32) throws(Error) -> Instruction {
         let endIndex = startIndex + Int(skip) + 1
-        let data = if endIndex <= code.endIndex {
+        let data: Data = if endIndex <= code.endIndex {
             code[startIndex ..< endIndex]
         } else {
             code[startIndex ..< min(code.endIndex, endIndex)] + Data(repeating: 0, count: endIndex - code.endIndex)
@@ -170,6 +193,27 @@ public class ProgramCode {
         ProgramCode.skip(start: pc, bitmask: bitmask)
     }
 
+    /// Extract all skip values as an array for JIT compilation
+    /// This provides the instruction sizes for variable-length encoded instructions.
+    ///
+    /// Memory Trade-off: This array uses 4 bytes per instruction byte (4x code size).
+    /// For a 100KB program, this adds ~400KB of memory. This is acceptable because:
+    /// 1. It's only computed once during program loading
+    /// 2. It's freed after JIT compilation completes
+    /// 3. It's significantly faster than on-demand calculation from C++
+    ///
+    /// Alternative: Could calculate on-demand in C++ to save memory, but would add
+    /// complexity to the Swift/C++ boundary and slow down compilation.
+    public var skipValues: [UInt32] {
+        var skips: [UInt32] = []
+        skips.reserveCapacity(code.count)
+        for pc in 0 ..< UInt32(code.count) {
+            let skip = skip(pc)
+            skips.append(skip)
+        }
+        return skips
+    }
+
     public static func skip(start: UInt32, bitmask: Data) -> UInt32 {
         let start = start + 1
         let beginIndex = Int(start / 8) + bitmask.startIndex
@@ -190,9 +234,7 @@ public class ProgramCode {
 
         let offsetBits = start % 8
 
-        let idx = min(UInt32((value >> offsetBits).trailingZeroBitCount), Constants.maxInstructionLength)
-
-        return idx
+        return min(UInt32((value >> offsetBits).trailingZeroBitCount), Constants.maxInstructionLength)
     }
 }
 

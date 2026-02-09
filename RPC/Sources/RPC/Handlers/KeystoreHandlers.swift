@@ -42,9 +42,17 @@ public enum KeystoreHandlers {
         public typealias Request = Request1<String>
         public typealias Response = PubKeyItem
 
-        public static var method: String { "keys_create" }
-        public static var requestNames: [String] { ["keyType"] }
-        public static var summary: String? { "Create a new key of the specified type and save it to the keystore." }
+        public static var method: String {
+            "keys_create"
+        }
+
+        public static var requestNames: [String] {
+            ["keyType"]
+        }
+
+        public static var summary: String? {
+            "Create a new key of the specified type and save it to the keystore."
+        }
 
         private let source: KeystoreDataSource
 
@@ -64,8 +72,13 @@ public enum KeystoreHandlers {
         public typealias Request = VoidRequest
         public typealias Response = [PubKeyItem]
 
-        public static var method: String { "keys_list" }
-        public static var summary: String? { "List all public keys in the keystore." }
+        public static var method: String {
+            "keys_list"
+        }
+
+        public static var summary: String? {
+            "List all public keys in the keystore."
+        }
 
         private let source: KeystoreDataSource
 
@@ -82,9 +95,17 @@ public enum KeystoreHandlers {
         public typealias Request = Request2<String, Data>
         public typealias Response = Bool
 
-        public static var method: String { "keys_hasKey" }
-        public static var requestNames: [String] { ["keyType", "publicKey"] }
-        public static var summary: String? { "Check if a public key exists in the keystore." }
+        public static var method: String {
+            "keys_hasKey"
+        }
+
+        public static var requestNames: [String] {
+            ["keyType", "publicKey"]
+        }
+
+        public static var summary: String? {
+            "Check if a public key exists in the keystore."
+        }
 
         private let source: KeystoreDataSource
 

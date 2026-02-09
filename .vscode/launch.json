@@ -99,6 +99,26 @@
 			"target": "SimpleWriteBufferBenchmark",
 			"configuration": "release",
 			"preLaunchTask": "swift: Build Release SimpleWriteBufferBenchmark (JAMTests)"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/PolkaVM",
+			"name": "Debug boka-sandbox (PolkaVM)",
+			"target": "boka-sandbox",
+			"configuration": "debug",
+			"preLaunchTask": "swift: Build Debug boka-sandbox (PolkaVM)"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:boka}/PolkaVM",
+			"name": "Release boka-sandbox (PolkaVM)",
+			"target": "boka-sandbox",
+			"configuration": "release",
+			"preLaunchTask": "swift: Build Release boka-sandbox (PolkaVM)"
 		}
 	]
 }

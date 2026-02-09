@@ -1,10 +1,9 @@
 import Foundation
+@testable import JAMTests
 import PolkaVM
 import Testing
 import TracingUtils
 import Utils
-
-@testable import JAMTests
 
 struct PageMap: Codable {
     var address: UInt32
@@ -77,20 +76,20 @@ struct PVMTests {
     }
 
     @Test(arguments: try loadTests())
-    func testPVM(testCase: Testcase) async throws {
+    func pVM(testCase: Testcase) async throws {
         let decoder = JSONDecoder()
         let testCase = try decoder.decode(PolkaVMTestcase.self, from: testCase.data)
         let program = try ProgramCode(Data(testCase.program))
         let memory = try GeneralMemory(
             pageMap: testCase.initialPageMap.map { (address: $0.address, length: $0.length, writable: $0.isWritable) },
-            chunks: testCase.initialMemory.map { (address: $0.address, data: Data($0.contents)) }
+            chunks: testCase.initialMemory.map { (address: $0.address, data: Data($0.contents)) },
         )
         let vmState = VMStateInterpreter(
             program: program,
             pc: testCase.initialPC,
             registers: Registers(testCase.initialRegs),
             gas: testCase.initialGas,
-            memory: memory
+            memory: memory,
         )
         let engine = Engine(config: DefaultPvmConfig())
         let exitReason = await engine.execute(state: vmState)

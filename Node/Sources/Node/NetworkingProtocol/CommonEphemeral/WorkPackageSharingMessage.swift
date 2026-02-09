@@ -10,7 +10,7 @@ public struct WorkPackageSharingMessage: Sendable, Equatable, Hashable {
     public init(
         coreIndex: CoreIndex,
         segmentsRootMappings: SegmentsRootMappings,
-        bundle: WorkPackageBundle
+        bundle: WorkPackageBundle,
     ) {
         self.coreIndex = coreIndex
         self.segmentsRootMappings = segmentsRootMappings
@@ -35,7 +35,7 @@ extension WorkPackageSharingMessage: CEMessage {
         guard data.count == 2 else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "unexpected data"
+                debugDescription: "unexpected data",
             ))
         }
 

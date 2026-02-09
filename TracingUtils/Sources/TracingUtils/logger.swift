@@ -23,7 +23,7 @@ public func withSpan<T>(
     function: String = #function,
     file fileID: String = #fileID,
     line: UInt = #line,
-    _ operation: (any Span) throws -> T?
+    _ operation: (any Span) throws -> T?,
 ) -> T? {
     withSpan(operationName, context: context(), ofKind: kind, function: function, file: fileID, line: line) { span in
         do {
@@ -44,7 +44,7 @@ public func withSpan<T>(
     function: String = #function,
     file fileID: String = #fileID,
     line: UInt = #line,
-    _ operation: (any Span) async throws -> T?
+    _ operation: (any Span) async throws -> T?,
 ) async -> T? {
     await withSpan(operationName, context: context(), ofKind: kind, function: function, file: fileID, line: line) { span in
         do {

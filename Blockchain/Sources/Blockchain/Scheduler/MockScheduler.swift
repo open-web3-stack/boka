@@ -16,7 +16,7 @@ private final class SchedulerTask: Sendable, Comparable {
         scheduleTime: TimeInterval,
         repeats: TimeInterval?,
         task: @escaping @Sendable () async -> Void,
-        cancel: (@Sendable () -> Void)?
+        cancel: (@Sendable () -> Void)?,
     ) {
         self.id = id
         self.scheduleTime = scheduleTime
@@ -58,7 +58,7 @@ public final class MockScheduler: Scheduler, Sendable {
         delay: TimeInterval,
         repeats: Bool,
         task: @escaping @Sendable () async -> Void,
-        onCancel: (@Sendable () -> Void)?
+        onCancel: (@Sendable () -> Void)?,
     ) -> Cancellable {
         let now = timeProvider.getTimeInterval()
         let scheduleTime = now + delay

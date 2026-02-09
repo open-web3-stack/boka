@@ -45,7 +45,7 @@ public final class RefineContext: InvocationContext {
         serviceAccounts: some ServiceAccounts,
         workPackage: WorkPackage,
         workItemIndex: Int,
-        authorizerTrace: Data
+        authorizerTrace: Data,
     ) {
         self.config = config
         self.context = context
@@ -67,7 +67,7 @@ public final class RefineContext: InvocationContext {
                 context: context,
                 serviceIndex: service,
                 serviceAccounts: ServiceAccountsRef(serviceAccounts),
-                lookupAnchorTimeslot: workPackage.context.lookupAnchor.timeslot
+                lookupAnchorTimeslot: workPackage.context.lookupAnchor.timeslot,
             )
             .call(config: config, state: state)
         case Fetch.identifier:

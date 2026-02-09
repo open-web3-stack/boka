@@ -35,7 +35,7 @@ public enum Ed25519: KeyType {
                     ptrs[0].ptr,
                     ptrs[0].count,
                     out_buf.ptr,
-                    out_buf.count
+                    out_buf.count,
                 )
             } onErr: { err throws(Error) in
                 throw .signFailed(err)
@@ -131,7 +131,7 @@ public enum Ed25519: KeyType {
                     ptrs[0].count,
                     ptrs[1].ptr,
                     ptrs[1].count,
-                    &output
+                    &output,
                 )
             }
 

@@ -72,6 +72,7 @@ public actor InMemoryBackend: StateBackendProtocol {
     public func gc(callback: @Sendable (Data) -> Data32?) async throws {
         // check ref counts and remove keys with 0 ref count
         var keysToRemove: [Data] = []
+
         for (key, count) in refCounts where count == 0 {
             if let value = store[key] {
                 store.removeValue(forKey: key)
@@ -83,8 +84,14 @@ public actor InMemoryBackend: StateBackendProtocol {
                         rawValueRefCounts.removeValue(forKey: rawValueKey)
                     }
                 }
+            } else {
+                // Key is in refCounts but not in store - this is a zombie entry
+                // Clean it up to prevent unbounded growth and repeated warnings
+                logger.warning("GC: Key in refCounts but not in store: \(key.toHexString())")
+                keysToRemove.append(key)
             }
         }
+
         // Remove keys from refCounts to prevent unbounded growth
         for key in keysToRemove {
             refCounts.removeValue(forKey: key)

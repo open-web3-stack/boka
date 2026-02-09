@@ -3,6 +3,11 @@
 
 import CppHelper
 import Foundation
+#if canImport(Glibc)
+    import Glibc
+#elseif canImport(Darwin)
+    import Darwin
+#endif
 import TracingUtils
 import Utils
 
@@ -11,6 +16,7 @@ enum JITError: Error, CustomStringConvertible {
     case invalidFunctionPointer
     case executionFailed(Int32)
     case compilationFailed(Int32)
+    case invalidBranchTarget
     case unsupportedArchitecture
     case memoryAllocationFailed
     case outOfGas
@@ -26,6 +32,8 @@ enum JITError: Error, CustomStringConvertible {
             "JIT execution failed with code: \(code)"
         case let .compilationFailed(code):
             "JIT compilation failed with code: \(code)"
+        case .invalidBranchTarget:
+            "JIT compilation failed: branch target is not at an instruction boundary"
         case .unsupportedArchitecture:
             "Unsupported architecture for JIT compilation"
         case .memoryAllocationFailed:
@@ -47,10 +55,28 @@ enum JITError: Error, CustomStringConvertible {
             .outOfGas
         case let .pageFault(address):
             .pageFault(address)
+        case .invalidBranchTarget:
+            .panic(.invalidBranch)
         case .hostFunctionError:
             .panic(.trap) // Using trap instead of hostFunctionThrewError which doesn't exist
         default:
             .panic(.trap)
+        }
+    }
+}
+
+/// Memory allocation information for proper deallocation
+struct MemoryAllocationInfo {
+    let pointer: UnsafeMutablePointer<UInt8>
+    let size: Int
+    let usesMmap: Bool
+
+    /// Deallocate the memory using the appropriate method
+    func deallocate() {
+        if usesMmap {
+            munmap(pointer, size)
+        } else {
+            pointer.deallocate()
         }
     }
 }
@@ -68,32 +94,172 @@ final class JITExecutor {
     ///   - gas: Gas counter
     ///   - initialPC: Initial program counter
     ///   - invocationContext: Context for host function calls
-    /// - Returns: The exit reason
+    ///   - initialMemory: Initial memory state from StandardProgram (for proper zone initialization)
+    ///   - memoryLayout: Optional rebased memory layout for efficient memory initialization
+    /// - Returns: A tuple of exit reason and memory allocation info (caller must deallocate)
     func execute(
         functionPtr: UnsafeMutableRawPointer,
         registers: inout Registers,
         jitMemorySize: UInt32,
         gas: inout Gas,
         initialPC: UInt32,
-        invocationContext: UnsafeMutableRawPointer?
-    ) throws -> ExitReason {
+        invocationContext: UnsafeMutableRawPointer?,
+        initialMemory: (any Memory)? = nil,
+        memoryLayout: JITMemoryLayout? = nil,
+    ) throws -> (ExitReason, MemoryAllocationInfo) {
         // Create a flat memory buffer for the JIT execution
         logger.debug("Setting up JIT execution environment")
 
         // Prepare VM memory
-        // TODO: Implement proper memory sandboxing by reserving 4GB address space with PROT_NONE
-        //       and then enabling access only to pages that should be accessible to the guest
-        let memoryBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(jitMemorySize))
-        defer {
-            // Clean up memory buffer after execution
-            memoryBuffer.deallocate()
+        // Use compact layout: allocate only what's needed, but use original addresses
+        // This means buffer[0xFF000000] actually needs to exist!
+        let memoryBuffer: UnsafeMutablePointer<UInt8>
+        let usesMmap: Bool
+
+        // Use mmap for large allocations (>= 1GB) to avoid physical memory allocation
+        let largeAllocationThreshold = UInt32(1 * 1024 * 1024 * 1024) // 1GB
+        if jitMemorySize >= largeAllocationThreshold {
+            // Use mmap with MAP_NORESERVE to reserve virtual address space
+            // without allocating physical memory upfront
+            logger.debug("Using mmap for large allocation: \(jitMemorySize) bytes (\(Double(jitMemorySize) / 1024 / 1024 / 1024) GB)")
+
+            // Platform-specific mmap flags: macOS uses MAP_ANON, Linux uses MAP_ANONYMOUS
+            #if os(Linux)
+                let flags = Int32(MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE)
+            #else
+                let flags = Int32(MAP_PRIVATE | MAP_ANON | MAP_NORESERVE)
+            #endif
+            let prot = Int32(PROT_READ | PROT_WRITE)
+
+            let ptr = mmap(
+                nil, // Let kernel choose address
+                Int(jitMemorySize),
+                prot,
+                flags,
+                -1, // No file descriptor
+                0, // No offset
+            )
+
+            if ptr == MAP_FAILED {
+                logger.error("mmap failed: \(errno)")
+                throw JITError.memoryAllocationFailed
+            }
+
+            // mmap returns UnsafeMutableRawPointer? (optional), but MAP_FAILED check ensures it's valid
+            memoryBuffer = UnsafeMutableRawPointer(ptr!).assumingMemoryBound(to: UInt8.self)
+            usesMmap = true
+            logger.debug("✅ mmap reserved \(jitMemorySize) bytes of virtual address space")
+        } else {
+            // Use normal allocation for smaller buffers
+            logger.debug("Allocating compact buffer: \(jitMemorySize) bytes")
+            memoryBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(jitMemorySize))
+            usesMmap = false
         }
 
-        // Initialize memory to zeros
-        memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+        // MEMORY INITIALIZATION: Copy data to appropriate addresses
+        // We use original addresses (e.g., 0xFF000000 for stack), NOT rebased offsets
+        if let layout = memoryLayout {
+            // Copy zone data to original addresses in the buffer
+            logger.debug("Copying zones to original addresses")
+
+            if usesMmap {
+                // For mmap: only zero-initialize and copy zones that actually have data
+                // This is much faster than zeroing 4GB
+                logger.debug("Using mmap - only initializing pages with data")
+            } else {
+                // For normal allocation: zero-initialize the entire buffer
+                memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+            }
+
+            // Copy zones using layout for efficient initialization
+            var totalCopied = 0
+            for zone in layout.zones {
+                logger.debug("  Zone: base=0x\(String(zone.originalBase, radix: 16)), size=\(zone.size), dataCount=\(zone.data.count)")
+
+                let zoneBase = memoryBuffer.advanced(by: Int(zone.originalBase))
+
+                // For mmap, we need to ensure all pages in the zone range are accessible
+                // Even zones with no data need to be touched to ensure the pages are mapped.
+                // This pre-touching is necessary because JIT-compiled code may access any
+                // address in the zone, and we want to avoid page faults during execution.
+                // The cost is acceptable because it's done once during initialization,
+                // and MAP_NORESERVE still saves us from allocating physical memory upfront.
+                if usesMmap, zone.size > 0 {
+                    logger.debug("  Zone has size=\(zone.size), touching pages")
+                    let pageSize = 4096
+                    var pagesTouched = 0
+                    for offset in stride(from: 0, to: Int(zone.size), by: pageSize) {
+                        zoneBase.advanced(by: offset).pointee = 0 // Touch the page
+                        pagesTouched += 1
+                    }
+                    logger.debug("  ✅ Touched \(pagesTouched) pages across zone")
+                }
+
+                // Copy zone data to its original address
+                if !zone.data.isEmpty {
+                    zone.data.withUnsafeBytes { rawBuffer in
+                        if let baseAddress = rawBuffer.baseAddress {
+                            memcpy(zoneBase, baseAddress, zone.data.count)
+                            totalCopied += zone.data.count
+                            logger.debug(
+                                "  Copied zone: \(zone.data.count) bytes to original address 0x\(String(zone.originalBase, radix: 16))",
+                            )
+                        }
+                    }
+                }
+            }
+            logger.debug("✅ Initialized JIT memory: \(totalCopied) bytes copied to original addresses")
+        } else if let initialMemory {
+            // Fallback: Copy from initialMemory (old method - scans entire address space)
+            logger.warning("⚠️ Using legacy memory initialization (no rebased layout provided)")
+            // First, zero-initialize the entire buffer
+            memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+
+            // Copy memory zones from initialMemory to flat JIT buffer
+            // The JIT uses a flat memory model, so we need to copy all zone data
+            // We copy in chunks for efficiency
+            let memorySize = UInt32(jitMemorySize)
+            var address: UInt32 = 0
+            let chunkSize = 4096 // Copy in 4KB chunks
+            var totalCopied = 0
+
+            while address < memorySize {
+                let remainingSize = Int(memorySize - address)
+                let currentChunkSize = min(chunkSize, remainingSize)
+
+                do {
+                    let data = try initialMemory.read(address: address, length: currentChunkSize)
+                    if !data.isEmpty {
+                        data.withUnsafeBytes { rawBuffer in
+                            if let baseAddress = rawBuffer.baseAddress {
+                                memcpy(memoryBuffer.advanced(by: Int(address)), baseAddress, data.count)
+                            }
+                        }
+                        totalCopied += data.count
+                        logger.debug("  Copied \(data.count) bytes at address \(address)")
+                    }
+                } catch {
+                    // Address not readable - already zero-initialized
+                    logger.debug("  Address \(address) not readable (gap in memory)")
+                }
+
+                address += UInt32(currentChunkSize)
+            }
+            logger.debug("✅ Initialized JIT memory from StandardProgram zones: \(totalCopied) bytes copied out of \(jitMemorySize) total")
+        } else {
+            // Initialize memory to zeros (fallback behavior)
+            if usesMmap {
+                // For mmap, only initialize likely-used pages
+                logger.warning("⚠️ Initializing mmap memory to zeros (no initial memory provided)")
+            } else {
+                memoryBuffer.initialize(repeating: 0, count: Int(jitMemorySize))
+            }
+            logger.warning("⚠️ Initialized JIT memory to zeros (no initial memory provided) - this may cause test failures!")
+        }
 
         // Execute the JIT-compiled function
         logger.debug("Executing JIT-compiled function with initial PC: \(initialPC), Gas: \(gas.value)")
+        logger.debug("JIT memory size: \(jitMemorySize), memoryBuffer: \(memoryBuffer)")
 
         var exitCode: Int32
         var gasValue = gas.value // Local copy since we can't modify gas.value directly
@@ -107,7 +273,7 @@ final class JITExecutor {
                 UInt32, // VM memory size
                 UnsafeMutablePointer<UInt64>, // VM gas counter
                 UInt32, // Initial PC
-                UnsafeMutableRawPointer? // Context pointer
+                UnsafeMutableRawPointer?, // Context pointer
             ) -> Int32
 
             // Cast the raw function pointer to the expected type
@@ -120,7 +286,7 @@ final class JITExecutor {
                 jitMemorySize,
                 &gasValue,
                 initialPC,
-                invocationContext
+                invocationContext,
             )
         }
 
@@ -131,23 +297,52 @@ final class JITExecutor {
         logger.debug("JIT execution completed with exit code: \(exitCode)")
 
         // Translate exit code to ExitReason
-        // TODO: Define proper exit codes in the C++ side and ensure they match with Swift expectations
-        switch exitCode {
-        case 0:
-            return .halt
-        case 1:
-            return .outOfGas
-        case 2:
-            // For a host call, we would need to extract the host call index from registers
-            return .hostCall(UInt32(registers[Registers.Index(raw: 0)]))
-        case 3:
-            // For a page fault, we would need to extract the faulting address from registers
-            return .pageFault(UInt32(registers[Registers.Index(raw: 0)]))
-        case -1:
-            return .panic(.trap)
-        default:
+        let exitReason: ExitReason
+
+        if let jitExit = JITExitCode(rawValue: exitCode) {
+            switch jitExit {
+            case .halt:
+                exitReason = .halt
+            case .outOfGas:
+                exitReason = .outOfGas
+            case .fallback:
+                // Previously fallback, now deprecated - treat as panic
+                logger.error("JIT returned exit code 2 (fallback deprecated) - treating as panic")
+                exitReason = .panic(.trap)
+            case .pageFault:
+                // Page fault from bounds checking
+                // For a page fault, we would need to extract the faulting address from registers
+                let r0Value = UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 0)])
+                logger.error("JIT page fault: R0 = 0x\(String(r0Value, radix: 16)), gas = \(gas.value)")
+                exitReason = .pageFault(r0Value)
+            case .trap:
+                exitReason = .panic(.trap)
+            case .hostRequestedHalt:
+                exitReason = .halt
+            case .hostPageFault:
+                // Page fault from host call - extract faulting address from R0
+                exitReason = .pageFault(UInt32(truncatingIfNeeded: registers[Registers.Index(raw: 0)]))
+            case .gasExhausted:
+                exitReason = .outOfGas
+            case .hostFunctionThrewError:
+                // Map to jitExecutionError
+                exitReason = .panic(.jitExecutionError)
+            case .hostFunctionNotFound:
+                // Map to jitInvalidFunctionPointer
+                exitReason = .panic(.jitInvalidFunctionPointer)
+            }
+        } else {
             logger.error("Unknown JIT exit code: \(exitCode)")
-            return .panic(.trap)
+            exitReason = .panic(.trap)
         }
+
+        // Return exit reason and memory allocation info for proper deallocation
+        let memoryInfo = MemoryAllocationInfo(
+            pointer: memoryBuffer,
+            size: Int(jitMemorySize),
+            usesMmap: usesMmap,
+        )
+
+        return (exitReason, memoryInfo)
     }
 }

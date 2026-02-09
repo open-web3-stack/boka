@@ -11,3 +11,24 @@ public struct ExecutionMode: OptionSet, Sendable {
     /// Determine if the program should be sandboxed
     public static let sandboxed = ExecutionMode(rawValue: 1 << 1)
 }
+
+/// Enumeration of PVM execution modes for testing
+public enum PVMExecutionMode: String, CaseIterable, Sendable {
+    case interpreter
+    case sandbox
+
+    /// Convert to PolkaVM ExecutionMode
+    public var executionMode: ExecutionMode {
+        switch self {
+        case .interpreter:
+            [] // Empty = interpreter mode
+        case .sandbox:
+            .sandboxed
+        }
+    }
+
+    /// Human-readable description
+    public var description: String {
+        rawValue
+    }
+}

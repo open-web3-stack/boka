@@ -7,7 +7,9 @@ struct DefaultKey: CodingKey {
         self.stringValue = stringValue
     }
 
-    init?(intValue _: Int) { nil }
+    init?(intValue _: Int) {
+        nil
+    }
 
     init(for type: (some Any).Type) {
         stringValue = "<\(type)>"

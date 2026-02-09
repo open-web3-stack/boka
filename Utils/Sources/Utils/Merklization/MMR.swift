@@ -1,6 +1,6 @@
 import Codec
 
-// Merkle Mountain Range
+/// Merkle Mountain Range
 public struct MMR: Sendable, Equatable, Codable {
     public var peaks: [Data32?]
 

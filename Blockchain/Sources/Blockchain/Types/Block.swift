@@ -21,7 +21,7 @@ extension Block: Dummy {
     public static func dummy(config: Config) -> Block {
         Block(
             header: Header.dummy(config: config),
-            extrinsic: Extrinsic.dummy(config: config)
+            extrinsic: Extrinsic.dummy(config: config),
         )
     }
 }

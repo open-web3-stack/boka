@@ -23,7 +23,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
         eventBus: EventBus,
         keystore: KeyStore,
         scheduler: Scheduler,
-        safroleTicketPool: SafroleTicketPoolService
+        safroleTicketPool: SafroleTicketPoolService,
     ) async {
         self.dataProvider = dataProvider
         self.keystore = keystore
@@ -38,7 +38,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
 
     public func createNewBlock(
         timeslot: TimeslotIndex,
-        claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>
+        claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>,
     ) async throws -> BlockRef {
         let parentHash = await dataProvider.bestHead.hash
 
@@ -74,7 +74,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
             disputes: ExtrinsicDisputes.dummy(config: config), // Disputes included in this block
             preimages: ExtrinsicPreimages.dummy(config: config), // Preimage revelations
             availability: ExtrinsicAvailability.dummy(config: config), // Availability votes/claims
-            reports: ExtrinsicGuarantees.dummy(config: config) // Work report guarantees
+            reports: ExtrinsicGuarantees.dummy(config: config), // Work report guarantees
         )
 
         let (ticket, publicKey): (TicketItemAndOutput?, Bandersnatch.PublicKey) = switch claim {
@@ -110,7 +110,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
             slot: timeslot,
             entropy: Bandersnatch.getIetfSignatureOutput(signature: vrfSignature),
             offenders: state.value.judgements.punishSet,
-            extrinsics: extrinsic.tickets
+            extrinsics: extrinsic.tickets,
         )
 
         let unsignedHeader = Header.Unsigned(
@@ -122,7 +122,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
             winningTickets: safroleResult.ticketsMark,
             authorIndex: ValidatorIndex(authorIndex),
             vrfSignature: vrfSignature,
-            offendersMarkers: [] // Judged offenders who will be marked in this block
+            offendersMarkers: [], // Judged offenders who will be marked in this block
         )
 
         let encodedHeader = try JamEncoder.encode(unsignedHeader)
@@ -131,20 +131,20 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
             try secretKey.ietfVRFSign(
                 vrfInputData: SigningContext.safroleTicketInputData(
                     entropy: sealEntropy,
-                    attempt: ticket.ticket.attempt
+                    attempt: ticket.ticket.attempt,
                 ),
-                auxData: encodedHeader
+                auxData: encodedHeader,
             )
         } else {
             try secretKey.ietfVRFSign(
                 vrfInputData: SigningContext.fallbackSealInputData(entropy: sealEntropy),
-                auxData: encodedHeader
+                auxData: encodedHeader,
             )
         }
 
         let header = Header(
             unsigned: unsignedHeader,
-            seal: seal
+            seal: seal,
         )
         let block = Block(header: header, extrinsic: extrinsic)
         return BlockRef(block)
@@ -152,7 +152,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
 
     private func newBlock(
         timeslot: TimeslotIndex,
-        claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>
+        claim: Either<(TicketItemAndOutput, Bandersnatch.PublicKey), Bandersnatch.PublicKey>,
     ) async {
         await withSpan("BlockAuthor.newBlock", logger: logger) { _ in
             // Note: Block creation should complete within a single timeslot

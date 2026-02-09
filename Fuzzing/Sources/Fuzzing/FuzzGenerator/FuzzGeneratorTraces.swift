@@ -24,7 +24,7 @@ public class FuzzGeneratorTraces: FuzzGenerator {
 
     public func generatePreState(
         timeslot: TimeslotIndex,
-        config _: ProtocolConfigRef
+        config _: ProtocolConfigRef,
     ) async throws -> (stateRoot: Data32, keyValues: [FuzzKeyValue]) {
         let testIndex = Int(timeslot)
         guard testIndex >= 0, testIndex < testCases.count else {
@@ -44,7 +44,7 @@ public class FuzzGeneratorTraces: FuzzGenerator {
 
     public func generatePostState(
         timeslot: TimeslotIndex,
-        config _: ProtocolConfigRef
+        config _: ProtocolConfigRef,
     ) async throws -> (stateRoot: Data32, keyValues: [FuzzKeyValue]) {
         let testIndex = Int(timeslot)
         guard testIndex >= 0, testIndex < testCases.count else {

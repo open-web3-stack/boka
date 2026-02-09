@@ -16,7 +16,7 @@ public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable, Hasha
         self.value = value
     }
 
-    // Initializer for converting from other integer types to `T` with saturation
+    /// Initializer for converting from other integer types to `T` with saturation
     public init(_ value: some FixedWidthInteger & BinaryInteger) {
         self.value = T(clamping: value)
     }
@@ -111,10 +111,6 @@ public struct SaturatingNumber<T: FixedWidthInteger & Sendable>: Sendable, Hasha
 extension SaturatingNumber: Comparable, Equatable {
     public static func < (lhs: SaturatingNumber, rhs: SaturatingNumber) -> Bool {
         lhs.value < rhs.value
-    }
-
-    public static func == (lhs: SaturatingNumber, rhs: SaturatingNumber) -> Bool {
-        lhs.value == rhs.value
     }
 }
 

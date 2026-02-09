@@ -2,19 +2,19 @@ import Codec
 import Utils
 
 public struct AvailabilitySpecifications: Sendable, Equatable, Codable {
-    // p
+    /// p
     public var workPackageHash: Data32
 
-    // l
+    /// l
     public var length: DataLength
 
-    // u
+    /// u
     public var erasureRoot: Data32
 
-    // e
+    /// e
     public var segmentRoot: Data32
 
-    // n
+    /// n
     public var segmentCount: UInt16
 
     public init(
@@ -22,7 +22,7 @@ public struct AvailabilitySpecifications: Sendable, Equatable, Codable {
         length: DataLength,
         erasureRoot: Data32,
         segmentRoot: Data32,
-        segmentCount: UInt16
+        segmentCount: UInt16,
     ) {
         self.workPackageHash = workPackageHash
         self.length = length
@@ -40,7 +40,7 @@ extension AvailabilitySpecifications: Dummy {
             length: 0,
             erasureRoot: Data32(),
             segmentRoot: Data32(),
-            segmentCount: 0
+            segmentCount: 0,
         )
     }
 }

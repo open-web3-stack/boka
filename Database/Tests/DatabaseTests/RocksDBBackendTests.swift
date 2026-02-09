@@ -22,7 +22,7 @@ final class RocksDBBackendTests {
             path: path,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: [:]
+            genesisStateData: [:],
         )
     }
 
@@ -32,7 +32,7 @@ final class RocksDBBackendTests {
     }
 
     @Test
-    func testGenesisBlockInitialization() async throws {
+    func genesisBlockInitialization() async throws {
         // Verify genesis block was properly stored
         let exists = try await backend.hasBlock(hash: genesisBlock.hash)
         #expect(exists == true)
@@ -50,7 +50,7 @@ final class RocksDBBackendTests {
     }
 
     @Test
-    func testBlockOperations() async throws {
+    func blockOperations() async throws {
         // Create and add a new block
         let block1 = BlockRef.dummy(config: config, parent: genesisBlock)
 
@@ -75,7 +75,7 @@ final class RocksDBBackendTests {
     }
 
     @Test
-    func testChainReorganization() async throws {
+    func chainReorganization() async throws {
         // Create two competing chains
         let block1 = BlockRef.dummy(config: config, parent: genesisBlock)
 

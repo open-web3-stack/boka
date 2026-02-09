@@ -1,9 +1,8 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import TracingUtils
 import Utils
-
-@testable import Blockchain
 
 struct BlockAuthorTests {
     func setup() async throws -> (BlockchainServices, BlockAuthor, Runtime) {
@@ -32,12 +31,12 @@ struct BlockAuthorTests {
             slot: timeslot,
             entropy: Data32(),
             offenders: [],
-            extrinsics: .dummy(config: config)
+            extrinsics: .dummy(config: config),
         )
 
         let idx = timeslot % UInt32(config.value.epochLength)
-        let key = res.state.ticketsOrKeys.right!.array[Int(idx)]
-        let pubkey = try! Bandersnatch.PublicKey(data: key)
+        let key = try #require(res.state.ticketsOrKeys.right?.array[Int(idx)])
+        let pubkey = try Bandersnatch.PublicKey(data: key)
 
         await blockAuthor.onBeforeEpoch(epoch: timeslot.timeslotToEpochIndex(config: config), safroleState: res.state)
 
@@ -47,7 +46,7 @@ struct BlockAuthorTests {
         // Verify block
         try _ = await runtime.apply(block: block, state: genesisState, context: .init(
             timeslot: timeslot + 1,
-            stateRoot: stateRoot
+            stateRoot: stateRoot,
         ))
     }
 
@@ -64,7 +63,7 @@ struct BlockAuthorTests {
 
         state.safroleState.ticketsVerifier = try Bandersnatch.RingCommitment(
             ring: state.currentValidators.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) },
-            ctx: Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
+            ctx: Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators)),
         ).data
 
         let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
@@ -72,7 +71,8 @@ struct BlockAuthorTests {
         // get the validator key
         let idx = timeslot % UInt32(config.value.epochLength)
         let devKey = try DevKeyStore.getDevKey(seed: idx % UInt32(config.value.totalNumberOfValidators))
-        let secretKey = await keystore.get(Bandersnatch.self, publicKey: devKey.bandersnatch)!
+        let keySecret = await keystore.get(Bandersnatch.self, publicKey: devKey.bandersnatch)
+        let secretKey = try #require(keySecret)
 
         let ticket = try SafroleService.generateTickets(
             count: 1,
@@ -80,14 +80,14 @@ struct BlockAuthorTests {
             entropy: state.entropyPool.t2,
             ringContext: Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators)),
             secret: secretKey,
-            idx: UInt32(idx)
+            idx: UInt32(idx),
         )[0]
 
         var validatorTickets = Array(repeating: Ticket.dummy(config: config), count: config.value.epochLength)
 
         validatorTickets[Int(idx)] = Ticket(
             id: ticket.output,
-            attempt: ticket.ticket.attempt
+            attempt: ticket.ticket.attempt,
         )
 
         state.safroleState.ticketsOrKeys = try .left(ConfigFixedSizeArray(config: config, array: validatorTickets))
@@ -103,7 +103,7 @@ struct BlockAuthorTests {
         // Verify block
         try _ = await runtime.apply(block: block, state: newStateRef, context: .init(
             timeslot: timeslot + 1,
-            stateRoot: newStateRef.value.stateRoot
+            stateRoot: newStateRef.value.stateRoot,
         ))
     }
 
@@ -124,14 +124,14 @@ struct BlockAuthorTests {
         #expect(events.count == 1)
         #expect(events.first is RuntimeEvents.BlockAuthored)
 
-        let block = events.first as! RuntimeEvents.BlockAuthored
+        let block = try #require(events.first as? RuntimeEvents.BlockAuthored)
 
         let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
 
         // Verify block
         try _ = await runtime.apply(block: block.block, state: genesisState, context: .init(
             timeslot: timeslot + 1,
-            stateRoot: genesisState.value.stateRoot
+            stateRoot: genesisState.value.stateRoot,
         ))
     }
 

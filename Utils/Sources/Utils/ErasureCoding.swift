@@ -18,8 +18,8 @@ public enum ErasureCoding {
         public static let INNER_SHARD_SIZE: Int = 2
     }
 
-    // Note that `Shard` and `InnerShard` have the same data structure, but `Shard`s are larger data and for external usage,
-    // and `InnerShard`s are smaller data that are used in ffi to do the actual erasure coding
+    /// Note that `Shard` and `InnerShard` have the same data structure, but `Shard`s are larger data and for external usage,
+    /// and `InnerShard`s are smaller data that are used in ffi to do the actual erasure coding
     public struct Shard {
         public let data: Data
         public let index: UInt32
@@ -55,7 +55,7 @@ public enum ErasureCoding {
             return result
         }
 
-        public init(data: Data, index: UInt32) throws(Error) {
+        init(data: Data, index: UInt32) throws(Error) {
             var ptr: OpaquePointer!
 
             try FFIUtils.call(data) { ptrs in
@@ -163,7 +163,7 @@ public enum ErasureCoding {
                     UInt(originalCount),
                     UInt(parityCount), // Number of parity shards to generate
                     UInt(shardSize),
-                    recoveryBuffer.baseAddress
+                    recoveryBuffer.baseAddress,
                 )
             }
         }
@@ -188,7 +188,7 @@ public enum ErasureCoding {
         originalCount: Int,
         recoveryCount: Int,
         recovery: [InnerShard],
-        shardSize: Int
+        shardSize: Int,
     ) throws -> [Data] {
         guard recoveryCount >= originalCount else { throw Error.invalidShardsCount }
         let parityCount = recoveryCount - originalCount
@@ -269,7 +269,7 @@ public enum ErasureCoding {
                         recoveryBuffer.baseAddress,
                         UInt(recoveryOpaquePtrs.count),
                         UInt(shardSize),
-                        outputBuffer.baseAddress
+                        outputBuffer.baseAddress,
                     )
                 }
             }
@@ -336,7 +336,7 @@ public enum ErasureCoding {
         basicSize: Int,
         originalCount: Int,
         recoveryCount: Int,
-        originalLength: Int? = nil
+        originalLength: Int? = nil,
     ) throws -> Data {
         guard !shards.isEmpty else { return Data() }
         guard basicSize % 2 == 0 else { throw Error.invalidBasicSize(basicSize) }
@@ -372,7 +372,7 @@ public enum ErasureCoding {
                 originalCount: originalCount,
                 recoveryCount: recoveryCount,
                 recovery: recoveryShards,
-                shardSize: Constants.INNER_SHARD_SIZE
+                shardSize: Constants.INNER_SHARD_SIZE,
             )
 
             result2d.append(originalShards)

@@ -2,7 +2,6 @@
 
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct TestEvent: Event {
@@ -17,7 +16,7 @@ struct AnotherTestEvent: Event {
 struct EventBusTests {
     let eventBus = EventBus()
 
-    @Test func testBasicWaitFor() async throws {
+    @Test func basicWaitFor() async throws {
         let testEvent = TestEvent(id: 1, value: "test")
 
         // Start waiting for the event in a separate task
@@ -37,7 +36,7 @@ struct EventBusTests {
         #expect(receivedEvent.value == testEvent.value)
     }
 
-    @Test func testWaitForWithCustomCheck() async throws {
+    @Test func waitForWithCustomCheck() async throws {
         // Start waiting for an event with id = 2
         let waitTask = Task {
             try await eventBus.waitFor(TestEvent.self) { event in
@@ -61,7 +60,7 @@ struct EventBusTests {
         #expect(receivedEvent.value == "correct event")
     }
 
-    @Test func testWaitForTimeout() async throws {
+    @Test func waitForTimeout() async throws {
         await #expect(throws: ContinuationError.timeout) {
             // Wait for an event with a short timeout
             _ = try await eventBus.waitFor(TestEvent.self, timeout: 0.1)
@@ -69,7 +68,7 @@ struct EventBusTests {
         }
     }
 
-    @Test func testMultipleConcurrentWaits() async throws {
+    @Test func multipleConcurrentWaits() async throws {
         // Start waiting for two different event types
         let waitTask1 = Task {
             try await eventBus.waitFor(TestEvent.self)
@@ -98,7 +97,7 @@ struct EventBusTests {
         #expect(receivedEvent2.name == "another test")
     }
 
-    @Test func testMultipleWaitsForSameEventType() async throws {
+    @Test func multipleWaitsForSameEventType() async throws {
         // Start multiple waits with different check conditions
         let waitTask1 = Task {
             try await eventBus.waitFor(TestEvent.self) { event in
@@ -129,7 +128,7 @@ struct EventBusTests {
         #expect(receivedEvent2.value == "second")
     }
 
-    @Test func testWaitForContinuesAfterUnsubscribe() async throws {
+    @Test func waitForContinuesAfterUnsubscribe() async throws {
         // Subscribe to events
         let token = await eventBus.subscribe(TestEvent.self) { _ in
             // Do nothing

@@ -39,7 +39,7 @@ public func stateMerklize(kv: [Data31: Data], i: Int = 0) throws(MerklizeError) 
         }
     }
 
-    /// bit at i, returns true if it is 1
+    // bit at i, returns true if it is 1
     func bit(_ data: Data, _ i: Int) throws(MerklizeError) -> Bool {
         let byteIndex = i / 8
         guard byteIndex < data.count else {

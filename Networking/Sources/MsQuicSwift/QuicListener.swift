@@ -17,7 +17,7 @@ public final class QuicListener: Sendable {
         registration: QuicRegistration,
         configuration: QuicConfiguration,
         listenAddress: NetAddr,
-        alpns: [Data]
+        alpns: [Data],
     ) throws {
         id = "QuicListener".uniqueId
         logger = Logger(label: id)
@@ -33,7 +33,7 @@ public final class QuicListener: Sendable {
                 registration.ptr,
                 handler,
                 nil,
-                &ptr
+                &ptr,
             )
         }
 
@@ -48,7 +48,7 @@ public final class QuicListener: Sendable {
             for (i, alpnPtr) in alpnPtrs.enumerated() {
                 buffer[i].Length = UInt32(alpnPtr.count)
                 buffer[i].Buffer = UnsafeMutablePointer(
-                    mutating: alpnPtr.bindMemory(to: UInt8.self).baseAddress!
+                    mutating: alpnPtr.bindMemory(to: UInt8.self).baseAddress!,
                 )
             }
 
@@ -72,7 +72,7 @@ public final class QuicListener: Sendable {
                 ptr.value,
                 UInt32(QUIC_PARAM_LISTENER_LOCAL_ADDRESS),
                 &size,
-                &address
+                &address,
             )
         }
         return NetAddr(quicAddr: address)
@@ -98,7 +98,7 @@ private final class ListenerHandle: Sendable {
             api.pointee.SetCallbackHandler(
                 ptr,
                 handlerPtr,
-                Unmanaged.passRetained(self).toOpaque() // !! retain +1
+                Unmanaged.passRetained(self).toOpaque(), // !! retain +1
             )
         }
     }
@@ -119,7 +119,7 @@ private final class ListenerHandle: Sendable {
                 handler: listener.handler,
                 registration: listener.registration,
                 configuration: listener.configuration,
-                connection: ptr!
+                connection: ptr!,
             )
 
             guard let connection else {
@@ -134,8 +134,8 @@ private final class ListenerHandle: Sendable {
                 negotiatedAlpn: Data(bytes: evtInfo.pointee.NegotiatedAlpn, count: Int(evtInfo.pointee.NegotiatedAlpnLength)),
                 serverName: evtInfo.pointee.ServerNameLength == 0 ? "" : String(
                     bytes: Data(bytes: evtInfo.pointee.ServerName, count: Int(evtInfo.pointee.ServerNameLength)),
-                    encoding: .utf8
-                ) ?? ""
+                    encoding: .utf8,
+                ) ?? "",
             )
 
             return listener.handler.newConnection(listener, connection: connection, info: info)
@@ -160,7 +160,7 @@ private final class ListenerHandle: Sendable {
 private func listenerCallback(
     connection _: OpaquePointer?,
     context: UnsafeMutableRawPointer?,
-    event: UnsafeMutablePointer<QUIC_LISTENER_EVENT>?
+    event: UnsafeMutablePointer<QUIC_LISTENER_EVENT>?,
 ) -> UInt32 {
     let handle = Unmanaged<ListenerHandle>.fromOpaque(context!)
         .takeUnretainedValue()

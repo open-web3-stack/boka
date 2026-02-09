@@ -23,7 +23,7 @@ struct NetworkManagerTests {
             },
             blockchain: services.blockchain,
             eventBus: services.eventBus,
-            devPeers: devPeers
+            devPeers: devPeers,
         )
 
         self.networkManager = networkManager
@@ -36,11 +36,11 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testSafroleTicketsGeneration() async throws {
+    func safroleTicketsGeneration() async throws {
         // Generate safole tickets
         let tickets = [ExtrinsicTickets.TicketItem(
             attempt: 0,
-            signature: .init()
+            signature: .init(),
         )]
 
         let epochIndex = EpochIndex(0)
@@ -52,10 +52,10 @@ struct NetworkManagerTests {
             items: tickets.map { ticket in
                 TicketItemAndOutput(
                     ticket: ticket,
-                    output: Data32()
+                    output: Data32(),
                 )
             },
-            publicKey: key.bandersnatch
+            publicKey: key.bandersnatch,
         ))
 
         // Wait for event processing
@@ -65,21 +65,21 @@ struct NetworkManagerTests {
         #expect(network.networkKey == "mock_network_key")
         // Verify network calls
         #expect(
-            network.contain(calls: [
-                .init(function: "connect", parameters: ["address": devPeers.first!, "role": PeerRole.validator]),
+            try network.contain(calls: [
+                .init(function: "connect", parameters: ["address": #require(devPeers.first), "role": PeerRole.validator]),
                 .init(function: "sendToPeer", parameters: [
                     "message": CERequest.safroleTicket1(SafroleTicketMessage(
                         epochIndex: epochIndex,
                         attempt: tickets[0].attempt,
-                        proof: tickets[0].signature
+                        proof: tickets[0].signature,
                     )),
                 ]),
-            ])
+            ]),
         )
     }
 
     @Test
-    func testWorkPackageBundleReady() async throws {
+    func workPackageBundleReady() async throws {
         let bundle = WorkPackageBundle.dummy(config: services.config)
         let key = try DevKeyStore.getDevKey(seed: 0)
         let segmentsRootMappings = [SegmentsRootMapping(workPackageHash: Data32(repeating: 1), segmentsRoot: Data32(repeating: 2))]
@@ -97,7 +97,7 @@ struct NetworkManagerTests {
                 target: key.ed25519.data,
                 coreIndex: 1,
                 bundle: bundle,
-                segmentsRootMappings: segmentsRootMappings
+                segmentsRootMappings: segmentsRootMappings,
             ))
         try? await Task.sleep(for: .milliseconds(1000))
 
@@ -114,7 +114,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testBlockBroadcast() async throws {
+    func blockBroadcast() async throws {
         // Import a block
         let block = BlockRef.dummy(config: services.config, parent: services.genesisBlock)
         let state = StateRef.dummy(config: services.config, block: block)
@@ -124,7 +124,7 @@ struct NetworkManagerTests {
         await services.eventBus.publish(RuntimeEvents.BlockImported(
             block: block,
             state: state,
-            parentState: services.genesisState
+            parentState: services.genesisState,
         ))
 
         // Wait for event processing
@@ -137,15 +137,15 @@ struct NetworkManagerTests {
                     "kind": UniquePresistentStreamKind.blockAnnouncement,
                     "message": UPMessage.blockAnnouncement(.init(
                         header: block.header.asRef(),
-                        finalized: HashAndSlot(hash: block.header.parentHash, timeslot: 0)
+                        finalized: HashAndSlot(hash: block.header.parentHash, timeslot: 0),
                     )),
                 ]),
-            ])
+            ]),
         )
     }
 
     @Test
-    func testPeersCount() async throws {
+    func testPeersCount() {
         // Configure simulated peers count
         let expectedPeersCount = 5
         network.state.write { $0.simulatedPeersCount = expectedPeersCount }
@@ -155,12 +155,12 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleCERequest() async throws {
+    func handleCERequest() async throws {
         // Setup mock data
         let blockRequest = BlockRequest(
             hash: services.genesisBlock.hash,
             direction: .descendingInclusive,
-            maxBlocks: 10
+            maxBlocks: 10,
         )
 
         // Test handling block request
@@ -179,7 +179,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testWorkPackagesSubmitted() async throws {
+    func workPackagesSubmitted() async {
         // Create work package and extrinsics
         let workPackage = WorkPackageRef.dummy(config: services.config)
         let extrinsics = [Data(repeating: 5, count: 32)]
@@ -189,7 +189,7 @@ struct NetworkManagerTests {
         await services.eventBus.publish(RuntimeEvents.WorkPackagesSubmitted(
             coreIndex: coreIndex,
             workPackage: workPackage,
-            extrinsics: extrinsics
+            extrinsics: extrinsics,
         ))
 
         // Wait for event processing
@@ -200,19 +200,19 @@ struct NetworkManagerTests {
                 "message": CERequest.workPackageSubmission(.init(
                     coreIndex: coreIndex,
                     workPackage: workPackage.value,
-                    extrinsics: extrinsics
+                    extrinsics: extrinsics,
                 )),
             ]),
         ]))
     }
 
     @Test
-    func testProcessingBlockRequest() async throws {
+    func processingBlockRequest() async throws {
         // Setup mock data
         let blockRequest = BlockRequest(
             hash: services.genesisBlock.hash,
             direction: .descendingInclusive,
-            maxBlocks: 10
+            maxBlocks: 10,
         )
 
         // Test handling block request
@@ -232,7 +232,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testWorkPackageBundleReadyInvalidResponse() async throws {
+    func workPackageBundleReadyInvalidResponse() async {
         // Here, we configure the mock network to provide an empty response.
         // That should trigger the "WorkPackageSharing response is invalid" path,
         // preventing publication of a WorkPackageBundleReceivedReply event.
@@ -245,14 +245,14 @@ struct NetworkManagerTests {
         let bundle = WorkPackageBundle.dummy(config: services.config)
         let segmentsRootMappings = [SegmentsRootMapping(
             workPackageHash: Data32(),
-            segmentsRoot: Data32()
+            segmentsRoot: Data32(),
         )]
 
         await services.blockchain.publish(event: RuntimeEvents.WorkPackageBundleReady(
             target: target,
             coreIndex: 321,
             bundle: bundle,
-            segmentsRootMappings: segmentsRootMappings
+            segmentsRootMappings: segmentsRootMappings,
         ))
 
         // Wait for async processing
@@ -264,7 +264,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleWorkPackageSubmission() async throws {
+    func handleWorkPackageSubmission() async throws {
         // Create work package and extrinsics
         let workPackage = WorkPackageRef.dummy(config: services.config)
         let extrinsics = [Data(repeating: 5, count: 32)]
@@ -274,7 +274,7 @@ struct NetworkManagerTests {
         let submissionMessage = CERequest.workPackageSubmission(.init(
             coreIndex: coreIndex,
             workPackage: workPackage.value,
-            extrinsics: extrinsics
+            extrinsics: extrinsics,
         ))
 
         // Process the request
@@ -299,7 +299,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testPeerNotFoundWhenBroadcastingWorkPackageBundle() async throws {
+    func peerNotFoundWhenBroadcastingWorkPackageBundle() async {
         // In this test, we publish a WorkPackageBundleReady event
         // with a target that doesn't match any known peer (i.e., not the dev peer),
         // so the send call should fail with .peerNotFound internally.
@@ -314,7 +314,7 @@ struct NetworkManagerTests {
             target: randomKey,
             coreIndex: 123,
             bundle: bundle,
-            segmentsRootMappings: segmentsRootMappings
+            segmentsRootMappings: segmentsRootMappings,
         ))
 
         // Wait for async processing
@@ -326,7 +326,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleWorkReportDistribution() async throws {
+    func handleWorkReportDistribution() async throws {
         let workReport = WorkReport.dummy(config: services.config)
         // Slot must be within valid range: current slot (0) allows 0-5 before and 0-3 after
         // So valid range is [max(0, 0-5), 0+3] = [0, 3]
@@ -336,7 +336,7 @@ struct NetworkManagerTests {
         let distributionMessage = CERequest.workReportDistribution(WorkReportDistributionMessage(
             workReport: workReport,
             slot: slot,
-            signatures: signatures
+            signatures: signatures,
         ))
 
         let message = try WorkReportDistributionMessage.decode(data: distributionMessage.encode(), config: services.config)
@@ -351,14 +351,14 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleInvalidWorkReportDistribution() async throws {
+    func handleInvalidWorkReportDistribution() async throws {
         let workReport = WorkReport.dummy(config: services.config)
         let slot: UInt32 = 123
         let signatures = [ValidatorSignature(validatorIndex: 0, signature: Ed25519Signature(repeating: 20))]
         let distributionMessage = CERequest.workReportDistribution(WorkReportDistributionMessage(
             workReport: workReport,
             slot: slot,
-            signatures: signatures
+            signatures: signatures,
         ))
 
         let message = try WorkReportDistributionMessage.decode(data: distributionMessage.encode(), config: services.config)
@@ -372,11 +372,11 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleWorkReportRequest() async throws {
+    func handleWorkReportRequest() async throws {
         let workReportHash = Data32(repeating: 1)
 
         let requestMessage = CERequest.workReportRequest(WorkReportRequestMessage(
-            workReportHash: workReportHash
+            workReportHash: workReportHash,
         ))
 
         let message = try WorkReportRequestMessage.decode(data: requestMessage.encode(), config: services.config)
@@ -389,7 +389,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleAuditShardRequest() async throws {
+    func handleAuditShardRequest() async throws {
         let testErasureRoot = Data32(repeating: 1)
         let testShardIndex: UInt16 = 2
         let testBundleShard = Data([0x01, 0x02, 0x03])
@@ -398,7 +398,7 @@ struct NetworkManagerTests {
 
         let requestMessage = CERequest.auditShardRequest(AuditShardRequestMessage(
             erasureRoot: testErasureRoot,
-            shardIndex: testShardIndex
+            shardIndex: testShardIndex,
         ))
 
         let message = try AuditShardRequestMessage.decode(data: requestMessage.encode(), config: services.config)
@@ -426,7 +426,7 @@ struct NetworkManagerTests {
             erasureRoot: testErasureRoot,
             shardIndex: testShardIndex,
             bundleShard: testBundleShard,
-            justification: testJustification
+            justification: testJustification,
         )
 
         #expect(successResponse.requestId == generatedRequestId)
@@ -437,7 +437,7 @@ struct NetworkManagerTests {
 
         let failureResponse = RuntimeEvents.AuditShardRequestReceivedResponse(
             requestId: generatedRequestId,
-            error: testError
+            error: testError,
         )
 
         #expect(failureResponse.requestId == generatedRequestId)
@@ -447,7 +447,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleSegmentShardRequest() async throws {
+    func handleSegmentShardRequest() async throws {
         let testErasureRoot = Data32(repeating: 1)
         let testShardIndex: UInt16 = 2
         let testSegmentIndices: [UInt16] = [1, 2, 3]
@@ -457,7 +457,7 @@ struct NetworkManagerTests {
         let requestMessage = try SegmentShardRequestMessage(
             erasureRoot: testErasureRoot,
             shardIndex: testShardIndex,
-            segmentIndices: testSegmentIndices
+            segmentIndices: testSegmentIndices,
         )
 
         let requestMessage1 = CERequest.segmentShardRequest1(requestMessage)
@@ -489,14 +489,14 @@ struct NetworkManagerTests {
 
         let successResponse = RuntimeEvents.SegmentShardRequestReceivedResponse(
             requestId: generatedRequestId,
-            segments: testSegments
+            segments: testSegments,
         )
         #expect(successResponse.requestId == generatedRequestId)
         #expect(try successResponse.result.get().count == testSegments.count)
 
         let failureResponse = RuntimeEvents.SegmentShardRequestReceivedResponse(
             requestId: generatedRequestId,
-            error: testError
+            error: testError,
         )
         #expect(failureResponse.requestId == generatedRequestId)
         #expect(throws: NSError.self) {
@@ -505,11 +505,11 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleAssuranceDistributionMessage() async throws {
+    func handleAssuranceDistributionMessage() async throws {
         let testHeaderHash = Data32(repeating: 1)
         let testBitfield = try ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>(
             config: services.config,
-            data: Data(repeating: 0, count: (services.config.value.totalNumberOfCores + 7) >> 3)
+            data: Data(repeating: 0, count: (services.config.value.totalNumberOfCores + 7) >> 3),
         )
 
         let testSignature = Ed25519Signature(repeating: 2)
@@ -517,7 +517,7 @@ struct NetworkManagerTests {
         let requestMessage = CERequest.assuranceDistribution(AssuranceDistributionMessage(
             headerHash: testHeaderHash,
             bitfield: testBitfield,
-            signature: testSignature
+            signature: testSignature,
         ))
 
         let message = try AssuranceDistributionMessage.decode(data: requestMessage.encode(), config: services.config)
@@ -537,7 +537,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandlePreimageAnnouncementMessage() async throws {
+    func handlePreimageAnnouncementMessage() async throws {
         let testServiceID: UInt32 = 42
         let testPreimageHash = Data32(repeating: 1)
         let testPreimageLength: UInt32 = 256
@@ -545,7 +545,7 @@ struct NetworkManagerTests {
         let requestMessage = CERequest.preimageAnnouncement(PreimageAnnouncementMessage(
             serviceID: testServiceID,
             hash: testPreimageHash,
-            preimageLength: testPreimageLength
+            preimageLength: testPreimageLength,
         ))
 
         let message = try PreimageAnnouncementMessage.decode(data: requestMessage.encode(), config: services.config)
@@ -565,13 +565,13 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandlePreimageRequestMessage() async throws {
+    func handlePreimageRequestMessage() async throws {
         let testPreimageHash = Data32(repeating: 1)
         let testPreimage = Data([0x01, 0x02, 0x03])
         let testError = NSError(domain: "test", code: 404)
 
         let requestMessage = CERequest.preimageRequest(PreimageRequestMessage(
-            hash: testPreimageHash
+            hash: testPreimageHash,
         ))
 
         let message = try PreimageRequestMessage.decode(data: requestMessage.encode(), config: services.config)
@@ -593,14 +593,14 @@ struct NetworkManagerTests {
 
         let successResponse = RuntimeEvents.PreimageRequestReceivedResponse(
             hash: testPreimageHash,
-            preimage: testPreimage
+            preimage: testPreimage,
         )
         #expect(successResponse.hash == testPreimageHash)
         #expect(try successResponse.result.get() == testPreimage)
 
         let failureResponse = RuntimeEvents.PreimageRequestReceivedResponse(
             hash: testPreimageHash,
-            error: testError
+            error: testError,
         )
         #expect(failureResponse.hash == testPreimageHash)
         #expect(throws: NSError.self) {
@@ -609,7 +609,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleJudgementPublication() async throws {
+    func handleJudgementPublication() async throws {
         let testEpochIndex: EpochIndex = 123
         let testValidatorIndex: ValidatorIndex = 5
         let testValidity: UInt8 = 1 // Valid
@@ -621,7 +621,7 @@ struct NetworkManagerTests {
             validatorIndex: testValidatorIndex,
             validity: testValidity,
             workReportHash: testWorkReportHash,
-            signature: testSignature
+            signature: testSignature,
         ))
 
         let message = try JudgementPublicationMessage.decode(data: requestMessage.encode(), config: services.config)
@@ -647,13 +647,13 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleFirstTrancheAnnouncement() async throws {
+    func handleFirstTrancheAnnouncement() async throws {
         let testHeaderHash = Data32(repeating: 0xAA)
         let testAnnouncement = Announcement(
             workReports: [
                 .init(coreIndex: 1, workReportHash: Data32(repeating: 0xBB)),
             ],
-            signature: Ed25519Signature(repeating: 0xCC)
+            signature: Ed25519Signature(repeating: 0xCC),
         )
 
         let testEvidence = Evidence.firstTranche(Data96(repeating: 0xDD))
@@ -662,7 +662,7 @@ struct NetworkManagerTests {
             headerHash: testHeaderHash,
             tranche: 0,
             announcement: testAnnouncement,
-            evidence: testEvidence
+            evidence: testEvidence,
         ))
 
         let message = try AuditAnnouncementMessage.decode(data: requestMessage.encode(), config: services.config)
@@ -686,23 +686,23 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleSubsequentTrancheAnnouncement() async throws {
+    func handleSubsequentTrancheAnnouncement() async throws {
         let previousAnnouncement = Announcement(
             workReports: [
                 .init(coreIndex: 1, workReportHash: Data32(repeating: 0x55)),
             ],
-            signature: Ed25519Signature(repeating: 0x66)
+            signature: Ed25519Signature(repeating: 0x66),
         )
 
         let testNoShow = Evidence.NoShow(
             validatorIndex: 1,
-            previousAnnouncement: previousAnnouncement
+            previousAnnouncement: previousAnnouncement,
         )
 
         let testEvidence = Evidence.subsequentTranche([
             .init(
                 bandersnatchSig: Data96(repeating: 0xEE),
-                noShows: [testNoShow]
+                noShows: [testNoShow],
             ),
         ])
 
@@ -713,9 +713,9 @@ struct NetworkManagerTests {
                 workReports: [
                     .init(coreIndex: 2, workReportHash: Data32(repeating: 0x11)),
                 ],
-                signature: Ed25519Signature(repeating: 0x22)
+                signature: Ed25519Signature(repeating: 0x22),
             ),
-            evidence: testEvidence
+            evidence: testEvidence,
         )
 
         _ = try await network.handler.handle(ceRequest: .auditAnnouncement(message))
@@ -735,7 +735,7 @@ struct NetworkManagerTests {
     }
 
     @Test
-    func testHandleStateRequest() async throws {
+    func handleStateRequest() async throws {
         let testHeaderHash = Data32(repeating: 0x11)
         let testStartKey = Data31(repeating: 0x22)
         let testEndKey = Data31(repeating: 0x33)
@@ -745,7 +745,7 @@ struct NetworkManagerTests {
             headerHash: testHeaderHash,
             startKey: testStartKey,
             endKey: testEndKey,
-            maxSize: testMaxSize
+            maxSize: testMaxSize,
         ))
 
         let message = try StateRequest.decode(data: requestMessage.encode(), config: services.config)
@@ -775,13 +775,13 @@ struct NetworkManagerTests {
             requestId: generateRequestId,
             headerHash: testHeaderHash,
             boundaryNodes: testNodes,
-            keyValuePairs: testKVPairs
+            keyValuePairs: testKVPairs,
         )
         #expect(response.requestId == generateRequestId)
         #expect(try response.result.get().headerHash == testHeaderHash)
         let responseFail = RuntimeEvents.StateRequestReceivedResponse(
             requestId: generateRequestId,
-            error: NSError(domain: "test", code: 1)
+            error: NSError(domain: "test", code: 1),
         )
         #expect(throws: NSError.self) {
             try responseFail.result.get()

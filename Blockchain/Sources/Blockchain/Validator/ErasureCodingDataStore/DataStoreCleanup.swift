@@ -6,9 +6,17 @@ private let logger = Logger(label: "DataStoreCleanup")
 /// Actor for thread-safe counters
 private actor Counter {
     private var value: Int = 0
-    func increment() -> Int { value += 1; return value }
-    func add(_ delta: Int) -> Int { value += delta; return value }
-    func get() -> Int { value }
+    func increment() -> Int {
+        value += 1; return value
+    }
+
+    func add(_ delta: Int) -> Int {
+        value += delta; return value
+    }
+
+    func get() -> Int {
+        value
+    }
 }
 
 /// Cleanup operations for audit and D³L entries
@@ -23,7 +31,7 @@ public actor DataStoreCleanup {
 
     public init(
         dataStore: any DataStoreProtocol,
-        filesystemStore: FilesystemDataStore
+        filesystemStore: FilesystemDataStore,
     ) {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
@@ -62,7 +70,7 @@ public actor DataStoreCleanup {
         // Use iterator-based cleanup to process entries in batches
         _ = try await dataStore.cleanupAuditEntriesIteratively(
             before: cutoffDate,
-            batchSize: 100
+            batchSize: 100,
         ) { batch in
             for entry in batch {
                 // Delete from filesystem
@@ -134,7 +142,7 @@ public actor DataStoreCleanup {
         try await saveCleanupState()
 
         logger.info(
-            "Cleanup: deleted \(deletedCount) audit entries before epoch \(cutoffEpoch), reclaimed \(bytesReclaimed) bytes in \(duration)s"
+            "Cleanup: deleted \(deletedCount) audit entries before epoch \(cutoffEpoch), reclaimed \(bytesReclaimed) bytes in \(duration)s",
         )
 
         return (deletedCount, bytesReclaimed)
@@ -158,7 +166,7 @@ public actor DataStoreCleanup {
         // Use iterator-based cleanup to process entries in batches
         _ = try await dataStore.cleanupD3LEntriesIteratively(
             before: cutoffDate,
-            batchSize: 100
+            batchSize: 100,
         ) { batch in
             for entry in batch {
                 // Delete from filesystem
@@ -227,7 +235,7 @@ public actor DataStoreCleanup {
         try await saveCleanupState()
 
         logger.info(
-            "Cleanup: deleted \(deletedEntries) D³L entries before epoch \(cutoffEpoch), \(deletedSegments) segments in \(duration)s"
+            "Cleanup: deleted \(deletedEntries) D³L entries before epoch \(cutoffEpoch), \(deletedSegments) segments in \(duration)s",
         )
 
         return (deletedEntries, deletedSegments)
@@ -260,7 +268,7 @@ public actor DataStoreCleanup {
                 Loaded cleanup state: auditEpoch=\(cleanupState.auditCleanupEpoch), \
                 d3lEpoch=\(cleanupState.d3lCleanupEpoch), \
                 inProgress=\(cleanupState.isInProgress)
-                """
+                """,
             )
         } else {
             // No saved state found, use defaults
@@ -283,7 +291,7 @@ public actor DataStoreCleanup {
         // Resume audit cleanup
         if cleanupState.auditCleanupEpoch > 0 {
             let (deleted, bytes) = try await cleanupAuditEntriesBeforeEpoch(
-                cutoffEpoch: cleanupState.auditCleanupEpoch
+                cutoffEpoch: cleanupState.auditCleanupEpoch,
             )
 
             logger.info("Resumed audit cleanup: deleted \(deleted) entries, \(bytes) bytes")
@@ -292,7 +300,7 @@ public actor DataStoreCleanup {
         // Resume D³L cleanup
         if cleanupState.d3lCleanupEpoch > 0 {
             let (deleted, segments) = try await cleanupD3LEntriesBeforeEpoch(
-                cutoffEpoch: cleanupState.d3lCleanupEpoch
+                cutoffEpoch: cleanupState.d3lCleanupEpoch,
             )
 
             logger.info("Resumed D³L cleanup: deleted \(deleted) entries, \(segments) segments")

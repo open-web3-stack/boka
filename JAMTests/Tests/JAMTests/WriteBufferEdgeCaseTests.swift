@@ -8,14 +8,14 @@ struct WriteBufferEdgeCaseTests {
     // MARK: - Timing Tests
 
     @Test("Write buffer flushes based on time interval")
-    func testTimeBasedFlush() async throws {
+    func timeBasedFlush() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 1000, // Large buffer
-            writeBufferFlushInterval: 0.05 // Very short interval for testing (50ms)
+            writeBufferFlushInterval: 0.05, // Very short interval for testing (50ms)
         )
 
         // Add single item
@@ -35,14 +35,14 @@ struct WriteBufferEdgeCaseTests {
         let stats = await trie.getWriteBufferStats()
         #expect(stats != nil)
         // Buffer should be empty or have only the last item
-        #expect(stats!.currentSize <= 1)
+        #expect(try #require(stats?.currentSize) <= 1)
     }
 
     @Test("Write buffer uses monotonic clock")
-    func testMonotonicClock() async throws {
+    func monotonicClock() {
         let buffer = WriteBuffer(
             maxBufferSize: 1000,
-            flushInterval: 1.0
+            flushInterval: 1.0,
         )
 
         // Add item to set lastFlushTime
@@ -66,7 +66,7 @@ struct WriteBufferEdgeCaseTests {
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: bufferSize,
-            writeBufferFlushInterval: 10.0
+            writeBufferFlushInterval: 10.0,
         )
 
         // Add exactly max buffer size items
@@ -82,15 +82,15 @@ struct WriteBufferEdgeCaseTests {
         let stats = await trie.getWriteBufferStats()
         #expect(stats != nil)
         // Buffer size could be 0 (auto-flushed) or bufferSize (not yet flushed)
-        #expect(stats!.currentSize == 0 || stats!.currentSize == bufferSize)
+        #expect(stats?.currentSize == 0 || stats!.currentSize == bufferSize)
     }
 
     @Test("Write buffer handles zero minimum flush interval")
-    func testZeroFlushInterval() async throws {
+    func zeroFlushInterval() async throws {
         // Write buffer should enforce minimum of 0.1 seconds
         let buffer = WriteBuffer(
             maxBufferSize: 100,
-            flushInterval: 0.0 // Should be clamped to 0.1
+            flushInterval: 0.0, // Should be clamped to 0.1
         )
 
         _ = buffer.add(key: Data31.random(), value: Data())
@@ -102,10 +102,10 @@ struct WriteBufferEdgeCaseTests {
     }
 
     @Test("Write buffer handles very large flush interval")
-    func testLargeFlushInterval() async throws {
+    func largeFlushInterval() {
         let buffer = WriteBuffer(
             maxBufferSize: 100,
-            flushInterval: 3600.0 // 1 hour
+            flushInterval: 3600.0, // 1 hour
         )
 
         _ = buffer.add(key: Data31.random(), value: Data())
@@ -117,10 +117,10 @@ struct WriteBufferEdgeCaseTests {
     // MARK: - Statistics Tests
 
     @Test("Write buffer tracks statistics accurately")
-    func testStatisticsAccuracy() async throws {
+    func statisticsAccuracy() {
         let buffer = WriteBuffer(
             maxBufferSize: 10,
-            flushInterval: 1.0
+            flushInterval: 1.0,
         )
 
         // Add some items
@@ -143,7 +143,7 @@ struct WriteBufferEdgeCaseTests {
     }
 
     @Test("Write buffer resets statistics correctly")
-    func testResetStatistics() async throws {
+    func resetStatistics() {
         let buffer = WriteBuffer(maxBufferSize: 10, flushInterval: 1.0)
 
         // Add items and flush
@@ -166,7 +166,7 @@ struct WriteBufferEdgeCaseTests {
     }
 
     @Test("Write buffer calculates utilization correctly")
-    func testUtilizationCalculation() async throws {
+    func utilizationCalculation() {
         let buffer = WriteBuffer(maxBufferSize: 100, flushInterval: 1.0)
 
         for _ in 0 ..< 50 {
@@ -188,14 +188,14 @@ struct WriteBufferEdgeCaseTests {
     // MARK: - Auto Flush Tests
 
     @Test("Write buffer auto-flushes when size limit reached")
-    func testAutoFlushBySize() async throws {
+    func autoFlushBySize() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 3,
-            writeBufferFlushInterval: 10.0
+            writeBufferFlushInterval: 10.0,
         )
 
         // Add 4 items (buffer size is 3, should auto-flush)
@@ -207,15 +207,15 @@ struct WriteBufferEdgeCaseTests {
         try await trie.update(updates)
 
         let stats = await trie.getWriteBufferStats()
-        #expect(stats!.totalFlushes >= 1)
-        #expect(stats!.autoFlushes >= 1)
+        #expect(try #require(stats?.totalFlushes) >= 1)
+        #expect(try #require(stats?.autoFlushes) >= 1)
     }
 
     @Test("Write buffer combines size and time triggers")
-    func testCombinedFlushTriggers() async throws {
+    func combinedFlushTriggers() async throws {
         let buffer = WriteBuffer(
             maxBufferSize: 100,
-            flushInterval: 0.1
+            flushInterval: 0.1,
         )
 
         // Add some items but not enough to trigger size flush
@@ -232,14 +232,14 @@ struct WriteBufferEdgeCaseTests {
     // MARK: - Clear Tests
 
     @Test("Write buffer clears without flushing")
-    func testClearWithoutFlush() async throws {
+    func clearWithoutFlush() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 100,
-            writeBufferFlushInterval: 10.0
+            writeBufferFlushInterval: 10.0,
         )
 
         // Add items
@@ -251,20 +251,20 @@ struct WriteBufferEdgeCaseTests {
         try await trie.update(updates)
 
         let stats1 = await trie.getWriteBufferStats()
-        #expect(stats1!.currentSize == 10)
+        #expect(stats1?.currentSize == 10)
 
         // Clear without flushing (data loss!)
         await trie.clearWriteBuffer()
 
         let stats2 = await trie.getWriteBufferStats()
-        #expect(stats2!.currentSize == 0)
-        #expect(stats2!.totalUpdates == 10) // Stats still track updates
+        #expect(stats2?.currentSize == 0)
+        #expect(stats2?.totalUpdates == 10) // Stats still track updates
     }
 
     // MARK: - Empty State Tests
 
     @Test("Write buffer handles empty state correctly")
-    func testEmptyState() async throws {
+    func emptyState() {
         let buffer = WriteBuffer(maxBufferSize: 10, flushInterval: 1.0)
 
         #expect(buffer.isEmpty == true)
@@ -280,7 +280,7 @@ struct WriteBufferEdgeCaseTests {
     }
 
     @Test("Write buffer maintains state after clear")
-    func testStateAfterClear() async throws {
+    func stateAfterClear() {
         let buffer = WriteBuffer(maxBufferSize: 10, flushInterval: 1.0)
 
         // Add and clear multiple times
@@ -298,11 +298,11 @@ struct WriteBufferEdgeCaseTests {
     // MARK: - Error Handling Tests
 
     @Test("Write buffer handles negative buffer size gracefully")
-    func testNegativeBufferSize() async throws {
+    func negativeBufferSize() {
         // Write buffer should enforce minimum of 1
         let buffer = WriteBuffer(
             maxBufferSize: -10, // Should be clamped to 1
-            flushInterval: 1.0
+            flushInterval: 1.0,
         )
 
         // Add items
@@ -317,14 +317,14 @@ struct WriteBufferEdgeCaseTests {
     // MARK: - Performance Tests
 
     @Test("Write buffer handles rapid additions")
-    func testRapidAdditions() async throws {
+    func rapidAdditions() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 1000,
-            writeBufferFlushInterval: 1.0
+            writeBufferFlushInterval: 1.0,
         )
 
         // Rapid additions
@@ -336,20 +336,20 @@ struct WriteBufferEdgeCaseTests {
         try await trie.update(updates)
 
         let stats = await trie.getWriteBufferStats()
-        #expect(stats!.totalUpdates == 100)
+        #expect(stats?.totalUpdates == 100)
     }
 
     // MARK: - Integration Tests
 
     @Test("Write buffer integrates with StateTrie save")
-    func testIntegrationWithSave() async throws {
+    func integrationWithSave() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 100,
-            writeBufferFlushInterval: 10.0
+            writeBufferFlushInterval: 10.0,
         )
 
         // Add items to buffer
@@ -373,12 +373,12 @@ struct WriteBufferEdgeCaseTests {
     }
 
     @Test("Write buffer works correctly when disabled")
-    func testDisabledWriteBuffer() async throws {
+    func disabledWriteBuffer() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
-            enableWriteBuffer: false // Disabled
+            enableWriteBuffer: false, // Disabled
         )
 
         // Add items

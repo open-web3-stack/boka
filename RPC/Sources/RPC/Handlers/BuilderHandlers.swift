@@ -18,9 +18,17 @@ public enum BuilderHandlers {
         public typealias Request = Request3<CoreIndex, Data, [Data]>
         public typealias Response = Bool
 
-        public static var method: String { "builder_submitWorkPackage" }
-        public static var requestNames: [String] { ["coreIndex", "workPackage", "extrinsics"] }
-        public static var summary: String? { "Submit a new work package for inclusion in the blockchain." }
+        public static var method: String {
+            "builder_submitWorkPackage"
+        }
+
+        public static var requestNames: [String] {
+            ["coreIndex", "workPackage", "extrinsics"]
+        }
+
+        public static var summary: String? {
+            "Submit a new work package for inclusion in the blockchain."
+        }
 
         private let source: BuilderDataSource
 

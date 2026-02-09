@@ -12,7 +12,7 @@ public protocol Instruction {
     func gasCost() -> Gas
     func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome
 
-    // protected method
+    /// protected method
     func _executeImpl(context: ExecutionContext) throws -> ExecOutcome
 }
 

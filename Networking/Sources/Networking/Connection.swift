@@ -48,7 +48,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
     public let remoteAddress: NetAddr
     private let lastActive: Atomic<TimeInterval> = Atomic(0)
     let persistentStreams: ThreadSafeContainer<
-        [Handler.PresistentHandler.StreamKind: Stream<Handler>]
+        [Handler.PresistentHandler.StreamKind: Stream<Handler>],
     > = .init([:])
     let initiatedByLocal: Bool
     private let state: ThreadSafeContainer<ConnectionState> = .init(.connecting(continuations: []))
@@ -194,7 +194,7 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
         var data = try request.encode()
         logger.trace(
             "sending request",
-            metadata: ["request": "\(request)", "dataChunks": "\(data.count)", "totalSize": "\(data.reduce(0) { $0 + $1.count })"]
+            metadata: ["request": "\(request)", "dataChunks": "\(data.count)", "totalSize": "\(data.reduce(0) { $0 + $1.count })"],
         )
         let kind = request.kind
         let stream = try createStream(kind: kind)
@@ -237,14 +237,14 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
 
     func runPresistentStreamLoop(
         stream: Stream<Handler>,
-        kind: Handler.PresistentHandler.StreamKind
+        kind: Handler.PresistentHandler.StreamKind,
     ) {
         persistentStreamRunLoop(
             kind: kind,
             logger: logger,
             handler: impl.persistentStreamHandler,
             connection: self,
-            stream: stream
+            stream: stream,
         )
     }
 
@@ -282,14 +282,14 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
                         existingStream.close(abort: false)
                         logger.info(
                             "Reset older UP stream with lower ID",
-                            metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"]
+                            metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"],
                         )
                     } else {
                         // The existing stream has a higher ID or is equal, so reset the new one
                         stream.close(abort: false)
                         logger.info(
                             "Duplicate UP stream detected, closing new stream with lower or equal ID",
-                            metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"]
+                            metadata: ["existingStreamId": "\(existingStream.stream.id)", "newStreamId": "\(stream.stream.id)"],
                         )
                         return // Exit without replacing the existing stream
                     }
@@ -343,8 +343,8 @@ public final class Connection<Handler: StreamHandler>: Sendable, ConnectionInfoP
     }
 }
 
-// expect length prefixed data
-// stream close is an error
+/// expect length prefixed data
+/// stream close is an error
 private func receiveData(stream: Stream<some StreamHandler>) async throws -> Data {
     let data = try await receiveMaybeData(stream: stream)
     guard let data else {
@@ -353,7 +353,7 @@ private func receiveData(stream: Stream<some StreamHandler>) async throws -> Dat
     return data
 }
 
-// stream close is not an error
+/// stream close is not an error
 private func receiveMaybeData(stream: Stream<some StreamHandler>) async throws -> Data? {
     let lengthData = await stream.receive(count: 4)
     guard let lengthData else {
@@ -376,7 +376,7 @@ func persistentStreamRunLoop<Handler: StreamHandler>(
     logger: Logger,
     handler: Handler.PresistentHandler,
     connection: Connection<Handler>,
-    stream: Stream<Handler>
+    stream: Stream<Handler>,
 ) {
     Task.detached {
         do {
@@ -384,12 +384,12 @@ func persistentStreamRunLoop<Handler: StreamHandler>(
         } catch {
             logger.error(
                 "Failed to setup persistent stream",
-                metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "error": "\(error)"]
+                metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "error": "\(error)"],
             )
         }
         logger.debug(
             "Starting persistent stream run loop",
-            metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
+            metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"],
         )
         var decoder = handler.createDecoder(kind: kind)
         do {
@@ -408,7 +408,7 @@ func persistentStreamRunLoop<Handler: StreamHandler>(
 
         logger.debug(
             "Ending persistent stream run loop",
-            metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"]
+            metadata: ["connectionId": "\(connection.id)", "streamId": "\(stream.id)", "kind": "\(kind)"],
         )
     }
 }

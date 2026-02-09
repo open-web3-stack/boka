@@ -10,7 +10,7 @@ public struct WorkReportDistributionMessage: Codable, Sendable, Equatable, Hasha
     public init(
         workReport: WorkReport,
         slot: UInt32,
-        signatures: [ValidatorSignature]
+        signatures: [ValidatorSignature],
     ) {
         self.workReport = workReport
         self.slot = slot
@@ -27,7 +27,7 @@ extension WorkReportDistributionMessage: CEMessage {
         guard data.count == 1, let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "unexpected data"
+                debugDescription: "unexpected data",
             ))
         }
         return try JamDecoder.decode(WorkReportDistributionMessage.self, from: data, withConfig: config)

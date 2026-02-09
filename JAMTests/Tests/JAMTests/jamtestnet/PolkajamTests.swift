@@ -1,7 +1,6 @@
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct PolkajamTests {
     @Test(arguments: try JamTestnet.loadTests(path: "traces/fallback", src: .w3f))

@@ -22,7 +22,7 @@ public struct Statistics: Sendable, Equatable, Codable {
             preimages: UInt32,
             preimagesBytes: UInt32,
             guarantees: UInt32,
-            assurances: UInt32
+            assurances: UInt32,
         ) {
             self.blocks = blocks
             self.tickets = tickets
@@ -96,10 +96,10 @@ public struct Statistics: Sendable, Equatable, Codable {
     public var accumulator: ConfigFixedSizeArray<Validator, ProtocolConfig.TotalNumberOfValidators>
     public var previous: ConfigFixedSizeArray<Validator, ProtocolConfig.TotalNumberOfValidators>
 
-    // core statistics
+    /// core statistics
     public var core: ConfigFixedSizeArray<Core, ProtocolConfig.TotalNumberOfCores>
 
-    // service statistics
+    /// service statistics
     @CodingAs<SortedKeyValues<UInt32, Service>> public var service: [UInt32: Service]
 }
 
@@ -108,15 +108,15 @@ extension Statistics: Dummy {
     public static func dummy(config: Config) -> Statistics {
         Statistics(
             accumulator: try! ConfigFixedSizeArray(
-                config: config, defaultValue: Validator.dummy(config: config)
+                config: config, defaultValue: Validator.dummy(config: config),
             ),
             previous: try! ConfigFixedSizeArray(
-                config: config, defaultValue: Validator.dummy(config: config)
+                config: config, defaultValue: Validator.dummy(config: config),
             ),
             core: try! ConfigFixedSizeArray(
-                config: config, defaultValue: Core.dummy(config: config)
+                config: config, defaultValue: Core.dummy(config: config),
             ),
-            service: [:]
+            service: [:],
         )
     }
 }
@@ -130,7 +130,7 @@ extension Statistics.Validator: Dummy {
             preimages: 0,
             preimagesBytes: 0,
             guarantees: 0,
-            assurances: 0
+            assurances: 0,
         )
     }
 }
@@ -146,7 +146,7 @@ extension Statistics.Core: Dummy {
             extrinsicsSize: 0,
             exportsCount: 0,
             packageSize: 0,
-            gasUsed: 0
+            gasUsed: 0,
         )
     }
 }

@@ -11,15 +11,27 @@ final class ExecutorBackendInterpreter: ExecutorBackend {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx: (any InvocationContext)?
-    ) async -> ExitReason {
+        ctx: (any InvocationContext)?,
+    ) async -> VMExecutionResult {
         do {
             let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
             let engine = Engine(config: config, invocationContext: ctx)
-            return await engine.execute(state: state)
+            let exitReason = await engine.execute(state: state)
+            let gasUsed = gas - Gas(state.getGas())
+            return VMExecutionResult(
+                exitReason: exitReason,
+                gasUsed: gasUsed,
+                outputData: nil,
+                finalRegisters: state.getRegisters(),
+                finalPC: state.pc,
+            )
         } catch {
             logger.error("Execution failed with error: \(error)")
-            return .panic(.trap)
+            return VMExecutionResult(
+                exitReason: .panic(.trap),
+                gasUsed: gas,
+                outputData: nil,
+            )
         }
     }
 }

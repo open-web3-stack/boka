@@ -27,7 +27,7 @@ public struct Extrinsic: Sendable, Equatable, Codable {
         disputes: ExtrinsicDisputes,
         preimages: ExtrinsicPreimages,
         availability: ExtrinsicAvailability,
-        reports: ExtrinsicGuarantees
+        reports: ExtrinsicGuarantees,
     ) {
         self.tickets = tickets
         self.disputes = disputes
@@ -45,7 +45,7 @@ extension Extrinsic: Dummy {
             disputes: ExtrinsicDisputes.dummy(config: config),
             preimages: ExtrinsicPreimages.dummy(config: config),
             availability: ExtrinsicAvailability.dummy(config: config),
-            reports: ExtrinsicGuarantees.dummy(config: config)
+            reports: ExtrinsicGuarantees.dummy(config: config),
         )
     }
 }
@@ -62,7 +62,7 @@ extension Extrinsic {
                     try JamEncoder.encode(item.workReport.hash(), item.timeslot, item.credential)
                 }).blake2b256hash(),
                 JamEncoder.encode(availability).blake2b256hash(),
-                JamEncoder.encode(disputes).blake2b256hash()
+                JamEncoder.encode(disputes).blake2b256hash(),
             ).blake2b256hash()
         } catch {
             logger.error("Failed to encode extrinsic, returning empty hash", metadata: ["error": "\(error)"])

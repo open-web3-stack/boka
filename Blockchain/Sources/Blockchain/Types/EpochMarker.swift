@@ -10,7 +10,7 @@ public struct EpochMarker: Sendable, Equatable, Codable {
     public var ticketsEntropy: Data32
     public var validators: ConfigFixedSizeArray<
         Keys,
-        ProtocolConfig.TotalNumberOfValidators
+        ProtocolConfig.TotalNumberOfValidators,
     >
 
     public init(
@@ -18,8 +18,8 @@ public struct EpochMarker: Sendable, Equatable, Codable {
         ticketsEntropy: Data32,
         validators: ConfigFixedSizeArray<
             Keys,
-            ProtocolConfig.TotalNumberOfValidators
-        >
+            ProtocolConfig.TotalNumberOfValidators,
+        >,
     ) {
         self.entropy = entropy
         self.ticketsEntropy = ticketsEntropy
@@ -34,7 +34,7 @@ extension EpochMarker: Dummy {
         EpochMarker(
             entropy: Data32(),
             ticketsEntropy: Data32(),
-            validators: try! ConfigFixedSizeArray(config: config, defaultValue: Keys(bandersnatch: Data32(), ed25519: Data32()))
+            validators: try! ConfigFixedSizeArray(config: config, defaultValue: Keys(bandersnatch: Data32(), ed25519: Data32())),
         )
     }
 }

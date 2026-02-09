@@ -34,8 +34,8 @@ extension UInt32: BinaryCodable {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
-                    debugDescription: "Invalid data length"
-                )
+                    debugDescription: "Invalid data length",
+                ),
             )
         }
         return data.withUnsafeBytes { ptr in
@@ -58,8 +58,8 @@ extension Set<Data32>: BinaryCodable {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
-                    debugDescription: "Invalid data length"
-                )
+                    debugDescription: "Invalid data length",
+                ),
             )
         }
         var set = Set<Element>()

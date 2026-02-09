@@ -1,10 +1,9 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import Node
 import Testing
 import Utils
-
-@testable import Node
 
 final class BlockAnnouncementDecoderTests {
     @Test
@@ -24,7 +23,7 @@ final class BlockAnnouncementDecoderTests {
         aa2da18c3b580f5067d810035df13056b2e28c4c331a7a53094e97a2b8bceff223ecd34b6cffd2d9a
         """
         let hex = hexString.replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
-        let data = Data(fromHexString: hex)!
+        let data = try #require(Data(fromHexString: hex))
         let config = ProtocolConfigRef.minimal
         #expect(throws: DecodingError.self) {
             _ = try JamDecoder.decode(BlockAnnouncement.self, from: data, withConfig: config)
@@ -51,7 +50,7 @@ final class BlockAnnouncementDecoderTests {
         7814a120617700e1f984af1cb3698f00000000
         """
         let hex = hexString.replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
-        let data = Data(fromHexString: hex)!
+        let data = try #require(Data(fromHexString: hex))
         let config = ProtocolConfigRef.minimal
         #expect(throws: DecodingError.self) {
             _ = try JamDecoder.decode(BlockAnnouncement.self, from: data, withConfig: config)

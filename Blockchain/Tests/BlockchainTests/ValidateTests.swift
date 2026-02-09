@@ -1,7 +1,7 @@
 @testable import Blockchain
 import Testing
 
-// @retroactive to slient Equtable warning
+/// @retroactive to slient Equtable warning
 extension ValidateError: Swift.Equatable {
     public static func == (lhs: ValidateError, rhs: ValidateError) -> Bool {
         String(describing: lhs) == String(describing: rhs)

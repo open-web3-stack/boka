@@ -94,6 +94,6 @@ public struct D3LEntry: Sendable, Codable {
 }
 
 public protocol DataStoreNetworkProtocol: Sendable {
-    // Use CE139/CE140 to fetch remote chunk
+    /// Use CE139/CE140 to fetch remote chunk
     func fetchRemoteChunk(erasureRoot: Data32, shardIndex: UInt16, segmentIndices: [UInt16]) async throws -> Data12?
 }

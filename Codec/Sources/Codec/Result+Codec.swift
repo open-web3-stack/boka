@@ -18,8 +18,8 @@ extension Result: @retroactive Codable where Success: Codable, Failure: Codable 
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: decoder.codingPath,
-                        debugDescription: "Invalid Result: unknown variant \(variant)"
-                    )
+                        debugDescription: "Invalid Result: unknown variant \(variant)",
+                    ),
                 )
             }
         } else {
@@ -35,8 +35,8 @@ extension Result: @retroactive Codable where Success: Codable, Failure: Codable 
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: container.codingPath,
-                        debugDescription: "Invalid Result: must contain either success or failure"
-                    )
+                        debugDescription: "Invalid Result: must contain either success or failure",
+                    ),
                 )
             }
         }

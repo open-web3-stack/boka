@@ -10,7 +10,7 @@ let package = Package(
     products: [
         .library(
             name: "Fuzzing",
-            targets: ["Fuzzing"]
+            targets: ["Fuzzing"],
         ),
     ],
     dependencies: [
@@ -33,7 +33,7 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ]
+            ],
         ),
         .testTarget(
             name: "FuzzingTests",
@@ -43,8 +43,8 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ]
+            ],
         ),
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageModes: [.version("6")],
 )

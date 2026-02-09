@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct ArrayTests {
@@ -36,28 +35,28 @@ struct ArrayTests {
     // MARK: - Shuffle Tests
 
     @Test("shuffle with empty array does nothing")
-    func shuffleEmptyArray() {
+    func shuffleEmptyArray() throws {
         var arr: [Int] = []
         let original = arr
-        let entropy = Data32(fromHexString: "0000000000000000000000000000000000000000000000000000000000000000")!
+        let entropy = try #require(Data32(fromHexString: "0000000000000000000000000000000000000000000000000000000000000000"))
         arr.shuffle(randomness: entropy)
         #expect(arr == original)
     }
 
     @Test("shuffle with single element does nothing")
-    func shuffleSingleElement() {
+    func shuffleSingleElement() throws {
         var arr = [42]
         let original = arr
-        let entropy = Data32(fromHexString: "0000000000000000000000000000000000000000000000000000000000000000")!
+        let entropy = try #require(Data32(fromHexString: "0000000000000000000000000000000000000000000000000000000000000000"))
         arr.shuffle(randomness: entropy)
         #expect(arr == original)
     }
 
     @Test("shuffle with two elements works correctly")
-    func shuffleTwoElements() {
+    func shuffleTwoElements() throws {
         var arr = [1, 2]
         // Use entropy that will swap the elements
-        let entropy = Data32(fromHexString: "0100000000000000000000000000000000000000000000000000000000000000")!
+        let entropy = try #require(Data32(fromHexString: "0100000000000000000000000000000000000000000000000000000000000000"))
         arr.shuffle(randomness: entropy)
         // Verify the shuffle actually ran without error
         #expect(arr.count == 2)
@@ -65,8 +64,8 @@ struct ArrayTests {
     }
 
     @Test("shuffle is deterministic with same randomness")
-    func shuffleDeterministic() {
-        let entropy = Data32(fromHexString: "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF")!
+    func shuffleDeterministic() throws {
+        let entropy = try #require(Data32(fromHexString: "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"))
         var arr1 = Array(0 ..< 10)
         var arr2 = Array(0 ..< 10)
 
@@ -77,10 +76,10 @@ struct ArrayTests {
     }
 
     @Test("shuffle produces different results with different randomness")
-    func shuffleDifferentRandomness() {
+    func shuffleDifferentRandomness() throws {
         // Use two valid zero entropy strings with a small difference
-        let entropy1 = Data32(fromHexString: "0000000000000000000000000000000000000000000000000000000000000000")!
-        let entropy2 = Data32(fromHexString: "0000000000000000000000000000000000000000000000000000000000000001")!
+        let entropy1 = try #require(Data32(fromHexString: "0000000000000000000000000000000000000000000000000000000000000000"))
+        let entropy2 = try #require(Data32(fromHexString: "0000000000000000000000000000000000000000000000000000000000000001"))
 
         var arr1 = Array(0 ..< 10)
         var arr2 = Array(0 ..< 10)
@@ -93,8 +92,8 @@ struct ArrayTests {
     }
 
     @Test("shuffle maintains all elements")
-    func shuffleMaintainsElements() {
-        let entropy = Data32(fromHexString: "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890")!
+    func shuffleMaintainsElements() throws {
+        let entropy = try #require(Data32(fromHexString: "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"))
         var arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         let original = arr
 
@@ -105,10 +104,10 @@ struct ArrayTests {
     }
 
     @Test("shuffle with specific known test case")
-    func shuffleKnownTestCase() {
+    func shuffleKnownTestCase() throws {
         // Test with known entropy and expected output
         // This matches the test vectors from the W3F shuffle tests
-        let entropy = Data32(fromHexString: "7EB019B95DB4045EE60CA49725D04376F131272B08048536192BCAD2D14C26F9")!
+        let entropy = try #require(Data32(fromHexString: "7EB019B95DB4045EE60CA49725D04376F131272B08048536192BCAD2D14C26F9"))
         var arr = Array(0 ..< 10)
 
         arr.shuffle(randomness: entropy)
@@ -121,8 +120,8 @@ struct ArrayTests {
     }
 
     @Test("shuffle preserves array count")
-    func shufflePreservesCount() {
-        let entropy = Data32(fromHexString: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")!
+    func shufflePreservesCount() throws {
+        let entropy = try #require(Data32(fromHexString: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"))
         let originalCounts = [1, 2, 5, 10, 100]
 
         for count in originalCounts {
@@ -134,9 +133,9 @@ struct ArrayTests {
     }
 
     @Test("shuffle can be applied multiple times")
-    func shuffleMultipleTimes() {
-        let entropy1 = Data32(fromHexString: "1111111111111111111111111111111111111111111111111111111111111111")!
-        let entropy2 = Data32(fromHexString: "2222222222222222222222222222222222222222222222222222222222222222")!
+    func shuffleMultipleTimes() throws {
+        let entropy1 = try #require(Data32(fromHexString: "1111111111111111111111111111111111111111111111111111111111111111"))
+        let entropy2 = try #require(Data32(fromHexString: "2222222222222222222222222222222222222222222222222222222222222222"))
 
         var arr = Array(0 ..< 20)
         let original = arr
@@ -157,8 +156,8 @@ struct ArrayTests {
     }
 
     @Test("shuffle with large array")
-    func shuffleLargeArray() {
-        let entropy = Data32(fromHexString: "9999999999999999999999999999999999999999999999999999999999999999")!
+    func shuffleLargeArray() throws {
+        let entropy = try #require(Data32(fromHexString: "9999999999999999999999999999999999999999999999999999999999999999"))
         var arr = Array(0 ..< 1000)
         let original = arr
 
@@ -171,7 +170,7 @@ struct ArrayTests {
     }
 
     @Test("shuffle with custom sequence randomness")
-    func shuffleWithCustomSequence() {
+    func shuffleWithCustomSequence() throws {
         // Create a custom randomness sequence that produces predictable values
         struct PredictableRandomness: Sequence, IteratorProtocol {
             var values: [UInt32]
@@ -193,7 +192,7 @@ struct ArrayTests {
         // through the public API. This test documents that the shuffle implementation
         // accepts any Sequence<UInt32> internally, even though the public API uses Data32
 
-        let entropy = Data32(fromHexString: "0000000000000000000000000000000000000000000000000000000000000000")!
+        let entropy = try #require(Data32(fromHexString: "0000000000000000000000000000000000000000000000000000000000000000"))
         var arr = [10, 20, 30, 40, 50]
         arr.shuffle(randomness: entropy)
         // Just verify it runs without error

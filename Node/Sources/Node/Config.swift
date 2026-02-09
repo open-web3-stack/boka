@@ -37,7 +37,7 @@ public enum Database {
                 path: path,
                 config: chainspec.getConfig(),
                 genesisBlock: chainspec.getBlock(),
-                genesisStateData: chainspec.getState()
+                genesisStateData: chainspec.getState(),
             )
             let dataProvider = try await BlockchainDataProvider(backend)
             // TODO: implement RocksDBDataStoreBackend
@@ -53,7 +53,7 @@ public enum Database {
             let genesisStateRef = StateRef(genesisState)
             let dataProvider = try await BlockchainDataProvider(InMemoryDataProvider(
                 genesisState: genesisStateRef,
-                genesisBlock: genesisBlock
+                genesisBlock: genesisBlock,
             ))
             let dataStore = DataStore(InMemoryDataStoreBackend(), InMemoryDataStoreBackend())
             return (dataProvider, dataStore)
@@ -79,7 +79,7 @@ public struct Config {
         name: String? = nil,
         database: Database = .inMemory,
         keystoreType: KeyStoreType = .inMemory,
-        availability: AvailabilityConfig = .default
+        availability: AvailabilityConfig = .default,
     ) {
         self.rpc = rpc
         self.network = network
@@ -119,7 +119,7 @@ public struct AvailabilityConfig: Sendable {
             d3lRetentionEpochs: 672,
             maxCachedSegments: 1000,
             maxOpenFiles: 1000,
-            enableFilesystemStorage: true
+            enableFilesystemStorage: true,
         )
     }
 }

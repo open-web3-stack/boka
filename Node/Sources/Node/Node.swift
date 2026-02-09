@@ -23,7 +23,7 @@ public class Node {
         genesis: Genesis,
         eventBus: EventBus,
         keystore: KeyStore,
-        scheduler: Scheduler = DispatchQueueScheduler(timeProvider: SystemTimeProvider())
+        scheduler: Scheduler = DispatchQueueScheduler(timeProvider: SystemTimeProvider()),
     ) async throws {
         self.config = config
 
@@ -39,7 +39,7 @@ public class Node {
             config: protocolConfig,
             dataProvider: dataProvider,
             timeProvider: scheduler.timeProvider,
-            eventBus: eventBus
+            eventBus: eventBus,
         )
         self.blockchain = blockchain
 
@@ -51,12 +51,12 @@ public class Node {
                     config: config.network,
                     protocolConfig: blockchain.config,
                     genesisHeader: blockchain.dataProvider.genesisBlockHash,
-                    handler: handler
+                    handler: handler,
                 )
             },
             blockchain: blockchain,
             eventBus: eventBus,
-            devPeers: Set(config.peers)
+            devPeers: Set(config.peers),
         )
 
         let nodeDataSource = NodeDataSource(
@@ -64,7 +64,7 @@ public class Node {
             chainDataProvider: dataProvider,
             networkManager: network,
             keystore: keystore,
-            name: config.name
+            name: config.name,
         )
 
         rpcServer = try config.rpc.map {

@@ -12,7 +12,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "JAMTests",
-            targets: ["JAMTests"]
+            targets: ["JAMTests"],
         ),
     ],
     dependencies: [
@@ -41,7 +41,7 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ]
+            ],
         ),
         .testTarget(
             name: "JAMTestsTests",
@@ -56,7 +56,7 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ]
+            ],
         ),
         .executableTarget(
             name: "Benchmarks",
@@ -81,5 +81,5 @@ let package = Package(
             ],
         ),
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageModes: [.version("6")],
 )

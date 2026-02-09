@@ -1,20 +1,19 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import TracingUtils
 import Utils
 
-@testable import Blockchain
-
 struct GuaranteeingServiceTests {
     func setup(
         config: ProtocolConfigRef = .dev,
         time: TimeInterval = 988,
-        keysCount: Int = 12
+        keysCount: Int = 12,
     ) async throws -> BlockchainServices {
         await BlockchainServices(
             config: config,
             timeProvider: MockTimeProvider(time: time),
-            keysCount: keysCount
+            keysCount: keysCount,
         )
     }
 
@@ -36,14 +35,14 @@ struct GuaranteeingServiceTests {
             validatorQueue: state.value.validatorQueue,
             ticketsAccumulator: state.value.safroleState.ticketsAccumulator,
             ticketsOrKeys: state.value.safroleState.ticketsOrKeys,
-            ticketsVerifier: state.value.safroleState.ticketsVerifier
+            ticketsVerifier: state.value.safroleState.ticketsVerifier,
         )
 
         await guaranteeingService.onBeforeEpoch(epoch: epoch, safroleState: postState)
 
         // Verify the signing key is properly set
         let publicKey = try DevKeyStore.getDevKey(seed: 0).ed25519
-        let signingKey = guaranteeingService.signingKey.value!
+        let signingKey = try #require(guaranteeingService.signingKey.value)
 
         #expect(signingKey.0 == 0)
         #expect(signingKey.1.publicKey == publicKey)
@@ -65,7 +64,7 @@ struct GuaranteeingServiceTests {
             validatorQueue: state.value.validatorQueue,
             ticketsAccumulator: state.value.safroleState.ticketsAccumulator,
             ticketsOrKeys: state.value.safroleState.ticketsOrKeys,
-            ticketsVerifier: state.value.safroleState.ticketsVerifier
+            ticketsVerifier: state.value.safroleState.ticketsVerifier,
         )
 
         let epoch = state.value.timeslot.timeslotToEpochIndex(config: services.config)
@@ -79,7 +78,7 @@ struct GuaranteeingServiceTests {
         let secondValidator = postState.currentValidators.array[1]
         postState.currentValidators = try ConfigFixedSizeArray(
             config: services.config,
-            array: [secondValidator] + postState.currentValidators.array.dropFirst().dropFirst() + [postState.currentValidators.array[0]]
+            array: [secondValidator] + postState.currentValidators.array.dropFirst().dropFirst() + [postState.currentValidators.array[0]],
         )
 
         await guaranteeingService.onBeforeEpoch(epoch: epoch, safroleState: postState)
@@ -89,7 +88,7 @@ struct GuaranteeingServiceTests {
         #expect(secondSigningKey != nil)
 
         if firstSigningKey != nil, secondSigningKey != nil {
-            #expect(secondSigningKey!.0 != firstSigningKey!.0)
+            #expect(try #require(secondSigningKey?.0) != firstSigningKey!.0)
         }
     }
 
@@ -108,7 +107,7 @@ struct GuaranteeingServiceTests {
             validatorQueue: state.value.validatorQueue,
             ticketsAccumulator: state.value.safroleState.ticketsAccumulator,
             ticketsOrKeys: state.value.safroleState.ticketsOrKeys,
-            ticketsVerifier: state.value.safroleState.ticketsVerifier
+            ticketsVerifier: state.value.safroleState.ticketsVerifier,
         )
 
         let epoch = state.value.timeslot.timeslotToEpochIndex(config: services.config)
@@ -130,19 +129,19 @@ struct GuaranteeingServiceTests {
         // Create a valid mapping
         let validMapping = SegmentsRootMapping(
             workPackageHash: workPackage.hash(),
-            segmentsRoot: Data32.random()
+            segmentsRoot: Data32.random(),
         )
 
         // Test with invalid work package hash
         let invalidMapping = SegmentsRootMapping(
             workPackageHash: Data32.random(),
-            segmentsRoot: Data32.random()
+            segmentsRoot: Data32.random(),
         )
 
         // Test with empty segments root
         let emptyRootMapping = SegmentsRootMapping(
             workPackageHash: workPackage.hash(),
-            segmentsRoot: Data32()
+            segmentsRoot: Data32(),
         )
 
         try guaranteeingService.validateSegmentsRootMapping(validMapping, for: workPackage)
@@ -175,7 +174,7 @@ struct GuaranteeingServiceTests {
 
         workPackage.workItems = try ConfigLimitedSizeArray(
             config: services.config,
-            array: [workItemWithImports]
+            array: [workItemWithImports],
         )
 
         // Create bundle with matching segment count
@@ -183,7 +182,7 @@ struct GuaranteeingServiceTests {
             workPackage: workPackage,
             extrinsics: [],
             importSegments: [Data4104(), Data4104()],
-            justifications: []
+            justifications: [],
         )
 
         // Create bundle with mismatched segment count
@@ -191,7 +190,7 @@ struct GuaranteeingServiceTests {
             workPackage: workPackage,
             extrinsics: [],
             importSegments: [Data4104()], // Only one segment
-            justifications: []
+            justifications: [],
         )
 
         try guaranteeingService.validateImportedSegments(bundleWithCorrectSegments)
@@ -241,7 +240,7 @@ struct GuaranteeingServiceTests {
             validatorQueue: state.value.validatorQueue,
             ticketsAccumulator: state.value.safroleState.ticketsAccumulator,
             ticketsOrKeys: state.value.safroleState.ticketsOrKeys,
-            ticketsVerifier: state.value.safroleState.ticketsVerifier
+            ticketsVerifier: state.value.safroleState.ticketsVerifier,
         )
 
         await guaranteeingService.onBeforeEpoch(epoch: epoch, safroleState: postState)
@@ -252,14 +251,14 @@ struct GuaranteeingServiceTests {
             workPackage: workPackage,
             extrinsics: [],
             importSegments: [],
-            justifications: []
+            justifications: [],
         )
 
         // Create valid mapping
         let mappings: SegmentsRootMappings = [
             SegmentsRootMapping(
                 workPackageHash: workPackage.hash(),
-                segmentsRoot: Data32.random()
+                segmentsRoot: Data32.random(),
             ),
         ]
 
@@ -268,14 +267,14 @@ struct GuaranteeingServiceTests {
             _ = try await guaranteeingService.processWorkPackageBundle(
                 coreIndex: CoreIndex.max,
                 segmentsRootMappings: mappings,
-                bundle: bundle
+                bundle: bundle,
             )
         }
     }
 
     // MARK: - Event Handling Tests
 
-    @Test func testHandleWorkPackageBundleReceived() async throws {
+    @Test func handleWorkPackageBundleReceived() async throws {
         let services = try await setup(keysCount: 1)
         let guaranteeingService = await services.guaranteeingService
         let storeMiddleware = services.storeMiddleware
@@ -292,7 +291,7 @@ struct GuaranteeingServiceTests {
             validatorQueue: state.value.validatorQueue,
             ticketsAccumulator: state.value.safroleState.ticketsAccumulator,
             ticketsOrKeys: state.value.safroleState.ticketsOrKeys,
-            ticketsVerifier: state.value.safroleState.ticketsVerifier
+            ticketsVerifier: state.value.safroleState.ticketsVerifier,
         )
 
         await guaranteeingService.onBeforeEpoch(epoch: epoch, safroleState: postState)
@@ -303,14 +302,14 @@ struct GuaranteeingServiceTests {
             workPackage: workPackage,
             extrinsics: [],
             importSegments: [],
-            justifications: []
+            justifications: [],
         )
 
         // Create mappings
         let mappings: SegmentsRootMappings = [
             SegmentsRootMapping(
                 workPackageHash: workPackage.hash(),
-                segmentsRoot: Data32.random()
+                segmentsRoot: Data32.random(),
             ),
         ]
 
@@ -318,7 +317,7 @@ struct GuaranteeingServiceTests {
         let event = RuntimeEvents.WorkPackageBundleReceived(
             coreIndex: 0,
             bundle: bundle,
-            segmentsRootMappings: mappings
+            segmentsRootMappings: mappings,
         )
 
         await services.eventBus.publish(event)

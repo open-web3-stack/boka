@@ -6,7 +6,7 @@ public func isAuthorized(
     config: ProtocolConfigRef,
     serviceAccounts: some ServiceAccounts,
     package: WorkPackage,
-    coreIndex: CoreIndex
+    coreIndex: CoreIndex,
 ) async throws -> (Result<Data, WorkResultError>, Gas) {
     let args = try JamEncoder.encode(coreIndex)
     let codeBlob = try await package.authorizationCode(serviceAccounts: serviceAccounts)
@@ -24,7 +24,7 @@ public func isAuthorized(
         pc: 0,
         gas: config.value.workPackageIsAuthorizedGas,
         argumentData: args,
-        ctx: ctx
+        ctx: ctx,
     )
 
     let result: Result<Data, WorkResultError> = switch exitReason {

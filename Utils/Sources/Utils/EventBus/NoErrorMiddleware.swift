@@ -1,5 +1,5 @@
 private struct NoErrorMiddleware: MiddlewareProtocol {
-    public func handle<T: Sendable>(_ event: T, next: MiddlewareHandler<T>) async throws {
+    func handle<T: Sendable>(_ event: T, next: MiddlewareHandler<T>) async throws {
         do {
             try await next(event)
         } catch {

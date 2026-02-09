@@ -54,7 +54,7 @@ extension LimitedSizeArray: ExpressibleByArrayLiteral {
 
 extension LimitedSizeArray: Equatable where T: Equatable {
     public static func == (
-        lhs: LimitedSizeArray<T, TMinLength, TMaxLength>, rhs: LimitedSizeArray<T, TMinLength, TMaxLength>
+        lhs: LimitedSizeArray<T, TMinLength, TMaxLength>, rhs: LimitedSizeArray<T, TMinLength, TMaxLength>,
     ) -> Bool {
         lhs.array == rhs.array
     }
@@ -162,8 +162,8 @@ extension LimitedSizeArray: Decodable where T: Decodable {
                 throw DecodingError.dataCorrupted(
                     DecodingError.Context(
                         codingPath: container.codingPath,
-                        debugDescription: "Unable to decode length"
-                    )
+                        debugDescription: "Unable to decode length",
+                    ),
                 )
             }
             length = intValue

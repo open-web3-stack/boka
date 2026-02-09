@@ -12,7 +12,7 @@ public actor ReconstructionService {
 
     public init(
         dataStore: any DataStoreProtocol,
-        erasureCoding: ErasureCodingService
+        erasureCoding: ErasureCodingService,
     ) {
         self.dataStore = dataStore
         self.erasureCoding = erasureCoding
@@ -63,7 +63,7 @@ public actor ReconstructionService {
             localShards: localShards,
             missingShards: missingShards,
             canReconstructLocally: canReconstruct,
-            reconstructionPercentage: Double(localShards) / Double(cEcOriginalCount) * 100.0
+            reconstructionPercentage: Double(localShards) / Double(cEcOriginalCount) * 100.0,
         )
     }
 
@@ -77,14 +77,14 @@ public actor ReconstructionService {
             let available = try await dataStore.getShardCount(erasureRoot: erasureRoot)
             throw ErasureCodingStoreError.insufficientShards(
                 available: available,
-                required: cEcOriginalCount
+                required: cEcOriginalCount,
             )
         }
 
         let availableIndices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
         let shards = try await dataStore.getShards(
             erasureRoot: erasureRoot,
-            shardIndices: Array(availableIndices.prefix(cEcOriginalCount))
+            shardIndices: Array(availableIndices.prefix(cEcOriginalCount)),
         )
 
         return try await erasureCoding.reconstruct(shards: shards, originalLength: originalLength)

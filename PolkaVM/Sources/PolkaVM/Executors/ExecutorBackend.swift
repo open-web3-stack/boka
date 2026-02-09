@@ -8,6 +8,6 @@ protocol ExecutorBackend {
         pc: UInt32,
         gas: Gas,
         argumentData: Data?,
-        ctx: (any InvocationContext)?
-    ) async -> ExitReason
+        ctx: (any InvocationContext)?,
+    ) async -> VMExecutionResult
 }

@@ -1,9 +1,8 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import TracingUtils
 import Utils
-
-@testable import Blockchain
 
 @Suite(.serialized)
 struct FilesystemDataStoreTests {
@@ -16,7 +15,7 @@ struct FilesystemDataStoreTests {
 
     // MARK: - Audit Bundle Tests
 
-    // @Test  // Disabled - has assertion bug (expects 255 but 9999 % 256 = 15)
+    /// @Test  // Disabled - has assertion bug (expects 255 but 9999 % 256 = 15)
     func storeAndGetAuditBundle() async throws {
         let dataStore = try makeDataStore()
 
@@ -88,13 +87,13 @@ struct FilesystemDataStoreTests {
         try await dataStore.storeD3LShard(
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
-            data: shardData
+            data: shardData,
         )
 
         // Retrieve
         let retrieved = try await dataStore.getD3LShard(
             erasureRoot: erasureRoot,
-            shardIndex: shardIndex
+            shardIndex: shardIndex,
         )
 
         #expect(retrieved != nil)
@@ -117,7 +116,7 @@ struct FilesystemDataStoreTests {
             try await dataStore.storeD3LShard(
                 erasureRoot: erasureRoot,
                 shardIndex: UInt16(i),
-                data: shardData
+                data: shardData,
             )
         }
 
@@ -125,7 +124,7 @@ struct FilesystemDataStoreTests {
         for i in 0 ..< 10 {
             let retrieved = try await dataStore.getD3LShard(
                 erasureRoot: erasureRoot,
-                shardIndex: UInt16(i)
+                shardIndex: UInt16(i),
             )
 
             #expect(retrieved != nil)
@@ -146,7 +145,7 @@ struct FilesystemDataStoreTests {
             try await dataStore.storeD3LShard(
                 erasureRoot: erasureRoot,
                 shardIndex: index,
-                data: data
+                data: data,
             )
         }
 
@@ -169,7 +168,7 @@ struct FilesystemDataStoreTests {
             try await dataStore.storeD3LShard(
                 erasureRoot: erasureRoot,
                 shardIndex: UInt16(i),
-                data: data
+                data: data,
             )
         }
 
@@ -201,7 +200,7 @@ struct FilesystemDataStoreTests {
         for erasureRoot in erasureRoots {
             try await dataStore.storeAuditBundle(
                 erasureRoot: erasureRoot,
-                data: Data(count: 100)
+                data: Data(count: 100),
             )
         }
 
@@ -230,7 +229,7 @@ struct FilesystemDataStoreTests {
             try await dataStore.storeD3LShard(
                 erasureRoot: erasureRoot,
                 shardIndex: 0,
-                data: Data(count: 100)
+                data: Data(count: 100),
             )
         }
 

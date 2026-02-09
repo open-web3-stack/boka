@@ -12,7 +12,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "Utils",
-            targets: ["Utils"]
+            targets: ["Utils"],
         ),
     ],
     dependencies: [
@@ -43,28 +43,28 @@ let package = Package(
             ],
             linkerSettings: [
                 .unsafeFlags(["-L../.lib"]),
-            ]
+            ],
         ),
         .target(
             name: "SHA3IUF",
             sources: ["sha3.h", "sha3.c"],
-            publicHeadersPath: "."
+            publicHeadersPath: ".",
         ),
         .systemLibrary(
             name: "bls",
-            path: "Sources"
+            path: "Sources",
         ),
         .systemLibrary(
             name: "bandersnatch_vrfs",
-            path: "Sources"
+            path: "Sources",
         ),
         .systemLibrary(
             name: "erasure_coding",
-            path: "Sources"
+            path: "Sources",
         ),
         .systemLibrary(
             name: "ed25519_zebra_ffi",
-            path: "Sources"
+            path: "Sources",
         ),
         .testTarget(
             name: "UtilsTests",
@@ -74,5 +74,5 @@ let package = Package(
             ],
         ),
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageModes: [.version("6")],
 )

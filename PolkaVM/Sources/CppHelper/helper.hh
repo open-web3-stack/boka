@@ -5,7 +5,9 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <asmjit/asmjit.h>
+#include <unordered_map>
+#include <asmjit/core.h>
+#include "opcodes.hh"
 
 // JIT instruction generation interface
 // This is the C++ implementation of the JITInstructionGenerator protocol
@@ -18,35 +20,35 @@ namespace jit_instruction {
         const char* _Nonnull target_arch,
         uint64_t gas_cost,
         void* _Nonnull gas_ptr
-    );
+    ) noexcept;
 
     // Generate trap instruction
     bool jit_generateTrap(
         void* _Nonnull assembler,
         const char* _Nonnull target_arch
-    );
+    ) noexcept;
 
     // Generate jump instruction
     bool jit_generateJump(
         void* _Nonnull assembler,
         const char* _Nonnull target_arch,
         uint32_t target_pc
-    );
+    ) noexcept;
 
     // Generate jump indirect instruction
     bool jit_generateJumpIndirect(
         void* _Nonnull assembler,
         const char* _Nonnull target_arch,
         uint8_t reg_index
-    );
+    ) noexcept;
 
     // Generate ecalli instruction (calls into host)
     bool jit_generateEcalli(
         void* _Nonnull assembler,
         const char* _Nonnull target_arch,
         uint32_t func_idx,
-        void* _Nonnull gas_ptr
-    );
+        void* _Nullable gas_ptr
+    ) noexcept;
 
     // Generate load immediate and jump
     bool jit_generateLoadImmJump(
@@ -55,7 +57,7 @@ namespace jit_instruction {
         uint8_t dest_reg,
         uint32_t immediate,
         uint32_t target_pc
-    );
+    ) noexcept;
 
     // Generate load immediate and jump indirect
     bool jit_generateLoadImmJumpInd(
@@ -64,7 +66,7 @@ namespace jit_instruction {
         uint8_t dest_reg,
         uint32_t immediate,
         uint8_t jump_reg
-    );
+    ) noexcept;
 }
 
 // Function signature matching JITHostFunctionFnSwift in ExecutorBackendJIT.swift
@@ -84,6 +86,26 @@ struct JITHostFunctionTable {
     JITHostFunctionFn dispatchHostCall;
     void* _Nonnull ownerContext; // Opaque pointer to Swift ExecutorBackendJIT
     void* _Nullable invocationContext; // Opaque pointer to InvocationContext
+
+    // Jump table support for JumpInd instruction
+    const uint8_t* _Nullable jumpTableData; // Pointer to jump table data
+    uint32_t jumpTableSize; // Total size of jump table in bytes
+    uint8_t jumpTableEntrySize; // Size of each entry in bytes (1, 2, 3, or 4)
+    uint32_t jumpTableEntriesCount; // Number of entries in the jump table
+    uint32_t alignmentFactor; // Dynamic address alignment factor
+
+    // Dispatcher jump table for indirect jumps without a PVM jump table
+    // Maps PC values to compiled code addresses (computed goto)
+    void* _Nullable* _Nullable dispatcherJumpTable; // Array of code pointers, indexed by PC
+    uint32_t dispatcherJumpTableSize; // Number of entries in dispatcher table
+
+    // Heap tracking for sbrk instruction
+    uint32_t heapEnd; // Current end of heap (matches StandardMemory.heapZone.endAddress)
+
+    // Memory protection bitmaps for page-level access control
+    // Each bitmap is 128KB (2^20 bits = 1 bit per 4KB page for 2^32 byte address space)
+    uint8_t* _Nullable readMap;   // Bitmap of readable pages (bit N = page N is readable)
+    uint8_t* _Nullable writeMap;  // Bitmap of writable pages (bit N = page N is writable)
 };
 
 // Trampoline for JIT code to call Swift host functions
@@ -94,4 +116,151 @@ uint32_t pvm_host_call_trampoline(
     uint64_t* _Nonnull guest_registers_ptr,
     uint8_t* _Nonnull guest_memory_base_ptr,
     uint32_t guest_memory_size,
-    uint64_t* _Nonnull guest_gas_ptr);
+    uint64_t* _Nonnull guest_gas_ptr) noexcept;
+
+// RuntimeContext holds all per-execution C++ state
+// Owned by Swift, passed to all C++ functions as void*
+// No global state - completely thread-safe through isolation
+struct RuntimeContext {
+    asmjit::JitRuntime* _Nonnull runtime;
+    std::unordered_map<void*, std::pair<void**, size_t>> dispatcherTables;
+
+    RuntimeContext() : runtime(new asmjit::JitRuntime()) {}
+
+    ~RuntimeContext() {
+        // Clean up dispatcher tables
+        for (auto& entry : dispatcherTables) {
+            if (entry.second.first) {
+                free(entry.second.first);
+            }
+        }
+        dispatcherTables.clear();
+        delete runtime;
+    }
+};
+
+// Create a new RuntimeContext (called from Swift)
+extern "C" void* _Nonnull createRuntimeContext() noexcept;
+
+// Destroy a RuntimeContext (called from Swift)
+extern "C" void destroyRuntimeContext(void* _Nonnull context) noexcept;
+
+// Get dispatcher jump table for a compiled function
+// Returns pointer to array of code addresses, or null if not found
+// outSize is set to the number of entries in the table
+extern "C" void* _Nullable * _Nullable getDispatcherTable(
+    void* _Nonnull context,
+    void* _Nonnull funcPtr,
+    size_t* _Nonnull outSize) noexcept;
+
+// Set dispatcher jump table for a compiled function
+// This is called to register the dispatcher table after compilation
+extern "C" void setDispatcherTable(
+    void* _Nonnull context,
+    void* _Nonnull funcPtr,
+    void* _Nullable * _Nullable table,
+    size_t size) noexcept;
+
+// Update page map bitmaps to mark a region as readable/writable
+// This is called during initialization and by sbrk to mark heap pages as accessible
+extern "C" void pvm_update_page_map(
+    JITHostFunctionTable* _Nonnull ctx,
+    uint32_t start,
+    uint32_t size,
+    bool readable,
+    bool writable) noexcept;
+
+// ============================================================================
+// MARK: - Export/Import API for Persistent Caching
+// ============================================================================
+
+/// Get compiled code information for export
+/// Returns metadata about compiled code needed for caching
+///
+/// @param funcPtr Compiled function pointer
+/// @param dispatcherTableOut Output: dispatcher table pointer
+/// @param dispatcherTableSizeOut Output: size of dispatcher table
+/// @param hasDispatcherTableOut Output: 1 if has dispatcher table, 0 otherwise
+/// @return 0 on success, error code on failure
+extern "C" int32_t getCompiledCodeInfo(
+    void* _Nonnull context,
+    void* _Nonnull funcPtr,
+    void* _Nullable * _Nullable * _Nonnull dispatcherTableOut,
+    size_t* _Nonnull dispatcherTableSizeOut,
+    int* _Nonnull hasDispatcherTableOut) noexcept;
+
+/// Store compiled code metadata
+/// Associates bytecode hash with compiled function pointer
+///
+/// @param bytecodeHash Hash of the bytecode
+/// @param funcPtr Compiled function pointer
+/// @param codeSize Size of compiled code
+/// @return 0 on success, error code on failure
+extern "C" int32_t setCompiledCodeMetadata(
+    uint64_t bytecodeHash,
+    void* _Nonnull funcPtr,
+    size_t codeSize) noexcept;
+
+// ============================================================================
+// MARK: - Memory Management (Dispatcher Table Cleanup)
+// ============================================================================
+
+/// Free the dispatcher table associated with a JIT-compiled function
+/// @param context Runtime context owning the dispatcher table
+/// @param funcPtr Function pointer returned by compilePolkaVMCode_x64_labeled
+/// @note Safe to call with nullptr or function pointers that don't have tables
+extern "C" void freeDispatcherTable(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept;
+
+/// Free ALL dispatcher tables
+/// Useful for process cleanup or memory pressure situations
+/// @param context Runtime context whose dispatcher tables should be freed
+extern "C" void freeAllDispatcherTables(void* _Nonnull context) noexcept;
+
+/// Release JIT-compiled code memory (frees machine code allocated by AsmJit)
+/// @param context Runtime context owning the JIT runtime
+/// @param funcPtr Function pointer to release
+/// @note Safe to call with nullptr
+/// @warning After calling this, the function pointer becomes invalid and must not be called
+extern "C" void releaseJITFunction(
+    void* _Nonnull context,
+    void* _Nullable funcPtr) noexcept;
+
+
+// Compile a range of bytecode instructions to machine code
+// This is the main entry point for JIT compilation from the C++ layer
+// - Parameters:
+//   - assembler: The AsmJit assembler instance
+//   - target_arch: Target architecture ("x86_64" or "aarch64")
+//   - bytecode: Pointer to the bytecode buffer
+//   - bytecode_size: Size of the bytecode buffer
+//   - start_pc: Starting program counter
+//   - end_pc: Ending program counter (exclusive)
+// - Returns: true if successful, false otherwise
+bool compile_bytecode_range(
+    void* _Nonnull assembler,
+    const char* _Nonnull target_arch,
+    const uint8_t* _Nonnull bytecode,
+    size_t bytecode_size,
+    uint32_t start_pc,
+    uint32_t end_pc
+) noexcept;
+
+// Basic block boundary detection
+// Returns true if the given opcode ends a basic block
+inline bool is_block_ending_instruction(uint8_t opcode) noexcept {
+    // Block-ending instructions (matching instruction_dispatcher.cpp implementation)
+    using namespace PVM;
+    return opcode_is(opcode, Opcode::Trap) ||
+           opcode_is(opcode, Opcode::Halt) ||
+           opcode_is(opcode, Opcode::Jump) ||
+           opcode_is(opcode, Opcode::JumpInd) ||
+           opcode_is(opcode, Opcode::LoadImmJump) ||
+           opcode_is(opcode, Opcode::BranchEq) ||
+           opcode_is(opcode, Opcode::BranchNe);
+}
+
+// Get the size of an instruction in bytes
+// Returns 0 if the opcode is unknown
+uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, size_t bytecode_size) noexcept;

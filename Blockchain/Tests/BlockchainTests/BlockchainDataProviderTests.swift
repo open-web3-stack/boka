@@ -1,8 +1,7 @@
+@testable import Blockchain
 import Testing
 import TracingUtils
 import Utils
-
-@testable import Blockchain
 
 struct BlockchainDataProviderTests {
     let config = ProtocolConfigRef.mainnet
@@ -19,7 +18,7 @@ struct BlockchainDataProviderTests {
 
     // MARK: - Initialization Tests
 
-    @Test func testInitialization() async throws {
+    @Test func initialization() async throws {
         #expect(await provider.bestHead.hash == genesisBlock.hash)
         #expect(await provider.finalizedHead.hash == genesisBlock.hash)
         #expect(try await provider.getHeads() == [genesisBlock.hash])
@@ -27,7 +26,7 @@ struct BlockchainDataProviderTests {
 
     // MARK: - Block Tests
 
-    @Test func testBlockOperations() async throws {
+    @Test func blockOperations() async throws {
         // Test block addition
         let block = BlockRef.dummy(config: config, parent: genesisBlock)
         try await provider.add(block: block)
@@ -45,7 +44,7 @@ struct BlockchainDataProviderTests {
         #expect(blocks.contains(block.hash))
     }
 
-    @Test func testBlockOperationsErrors() async throws {
+    @Test func blockOperationsErrors() async throws {
         let nonExistentHash = Data32.random()
 
         // Test getting non-existent block
@@ -69,7 +68,7 @@ struct BlockchainDataProviderTests {
 
     // MARK: - State Tests
 
-    @Test func testStateOperations() async throws {
+    @Test func stateOperations() async throws {
         // Test state addition
         let block = BlockRef.dummy(config: config, parent: genesisBlock)
         let state = StateRef.dummy(config: config, block: block)
@@ -85,7 +84,7 @@ struct BlockchainDataProviderTests {
         #expect(await bestState.value.stateRoot == state.value.stateRoot)
     }
 
-    @Test func testStateOperationsErrors() async throws {
+    @Test func stateOperationsErrors() async throws {
         let nonExistentHash = Data32.random()
 
         // Test getting non-existent state
@@ -104,7 +103,7 @@ struct BlockchainDataProviderTests {
 
     // MARK: - Head Management Tests
 
-    @Test func testHeadManagement() async throws {
+    @Test func headManagement() async throws {
         // Create a chain of blocks
         let block1 = BlockRef.dummy(config: config, parent: genesisBlock)
         let block2 = BlockRef.dummy(config: config, parent: block1)
@@ -132,7 +131,7 @@ struct BlockchainDataProviderTests {
         #expect(try await provider.hasBlock(hash: fork.hash) == false)
     }
 
-    @Test func testHeadManagementErrors() async throws {
+    @Test func headManagementErrors() async throws {
         let nonExistentHash = Data32.random()
 
         // Test setting non-existent block as finalized head
@@ -143,7 +142,7 @@ struct BlockchainDataProviderTests {
 
     // MARK: - Block Number Tests
 
-    @Test func testBlockNumberOperations() async throws {
+    @Test func blockNumberOperations() async throws {
         let block1 = BlockRef.dummy(config: config, parent: genesisBlock)
         let block2 = BlockRef.dummy(config: config, parent: block1)
 
@@ -160,7 +159,7 @@ struct BlockchainDataProviderTests {
         #expect(blocksAtNumber1.contains(block1.hash))
     }
 
-    @Test func testBlockNumberErrors() async throws {
+    @Test func blockNumberErrors() async throws {
         let nonExistentHash = Data32.random()
 
         // Test getting number of non-existent block
@@ -171,7 +170,7 @@ struct BlockchainDataProviderTests {
 
     // MARK: - Removal Tests
 
-    @Test func testRemovalOperations() async throws {
+    @Test func removalOperations() async throws {
         let block = BlockRef.dummy(config: config, parent: genesisBlock)
         let state = StateRef.dummy(config: config, block: block)
 
@@ -192,7 +191,7 @@ struct BlockchainDataProviderTests {
         let guaranteedReport = GuaranteedWorkReport(
             workReport: workReport,
             slot: 1,
-            signatures: []
+            signatures: [],
         )
         let reportRef = guaranteedReport.asRef()
 

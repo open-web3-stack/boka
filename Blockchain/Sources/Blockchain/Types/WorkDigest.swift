@@ -43,7 +43,7 @@ public struct WorkDigest: Sendable, Equatable, Codable {
         importsCount: UInt,
         exportsCount: UInt,
         extrinsicsCount: UInt,
-        extrinsicsSize: UInt
+        extrinsicsSize: UInt,
     ) {
         self.serviceIndex = serviceIndex
         self.codeHash = codeHash
@@ -71,7 +71,7 @@ extension WorkDigest: Dummy {
             importsCount: 0,
             exportsCount: 0,
             extrinsicsCount: 0,
-            extrinsicsSize: 0
+            extrinsicsSize: 0,
         )
     }
 }

@@ -15,7 +15,7 @@ extension State {
                 bandersnatch: keySet.bandersnatch.data,
                 ed25519: keySet.ed25519.data,
                 bls: keySet.bls.data,
-                metadata: Data128(addrData)!
+                metadata: Data128(addrData)!,
             ))
         }
         state.safroleState.nextValidators = try ConfigFixedSizeArray(config: config, array: devKeys)
@@ -38,7 +38,7 @@ extension State {
             headerHash: block.hash,
             superPeak: Data32(),
             stateRoot: Data32(),
-            lookup: [Data32: Data32]()
+            lookup: [Data32: Data32](),
         ))
 
         return (StateRef(state), block)

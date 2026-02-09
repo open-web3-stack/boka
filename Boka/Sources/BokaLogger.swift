@@ -20,7 +20,7 @@ public struct BokaLogger<T: LoggerFragment>: LogHandler, Sendable {
         metadata: Logger.Metadata = [:],
         metadataProvider: Logger.MetadataProvider?,
         defaultLevel: Logger.Level = .info,
-        filters: [String: Logger.Level] = [:]
+        filters: [String: Logger.Level] = [:],
     ) {
         self.fragment = fragment
         self.label = label
@@ -44,7 +44,7 @@ public struct BokaLogger<T: LoggerFragment>: LogHandler, Sendable {
         source: String,
         file: String,
         function: String,
-        line: UInt
+        line: UInt,
     ) {
         let labelLevel = levelFor(label: label)
         if labelLevel > level {
@@ -63,7 +63,7 @@ public struct BokaLogger<T: LoggerFragment>: LogHandler, Sendable {
             label: label,
             loggerLevel: logLevel,
             loggerMetadata: self.metadata,
-            metadataProvider: metadataProvider
+            metadataProvider: metadataProvider,
         )
 
         fragment.write(&record, to: &output)

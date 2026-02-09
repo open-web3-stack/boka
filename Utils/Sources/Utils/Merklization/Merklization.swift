@@ -1,16 +1,16 @@
 import Foundation
 
 public enum Merklization {
-    // roundup of half
+    /// roundup of half
     private static func half(_ i: Int) -> Int {
         (i + 1) / 2
     }
 
-    private static func binaryMerklizeHelper<T, U>(
+    private static func binaryMerklizeHelper<T: RandomAccessCollection<U>, U: DataPtrRepresentable>(
         _ nodes: T,
-        hasher: Hashing.Type = Blake2b256.self
+        hasher: Hashing.Type = Blake2b256.self,
     ) -> MaybeEither<U, Data32>
-        where T: RandomAccessCollection<U>, T.Index == Int, U: DataPtrRepresentable
+        where T.Index == Int
     {
         switch nodes.count {
         case 0:
@@ -25,12 +25,12 @@ public enum Merklization {
             return .init(right: hasher.hash(
                 "node",
                 binaryMerklizeHelper(l, hasher: hasher).value,
-                binaryMerklizeHelper(r, hasher: hasher).value
+                binaryMerklizeHelper(r, hasher: hasher).value,
             ))
         }
     }
 
-    // well-balanced binary Merkle function defined in GP E.1.1
+    /// well-balanced binary Merkle function defined in GP E.1.1
     public static func binaryMerklize<T: RandomAccessCollection<Data>>(_ nodes: T, hasher: Hashing.Type = Blake2b256.self) -> Data32
         where T.Index == Int
     {
@@ -42,13 +42,13 @@ public enum Merklization {
         }
     }
 
-    private static func traceImpl<T, U>(
+    private static func traceImpl<T: RandomAccessCollection<U>, U: DataPtrRepresentable>(
         _ nodes: T,
         index: T.Index,
         hasher: Hashing.Type,
-        output: (MaybeEither<U, Data32>) -> Void
+        output: (MaybeEither<U, Data32>) -> Void,
     )
-        where T: RandomAccessCollection<U>, T.Index == Int, U: DataPtrRepresentable
+        where T.Index == Int
     {
         if nodes.count == 0 {
             return
@@ -77,16 +77,16 @@ public enum Merklization {
             selectPart(left: false, nodes: nodes, index: index),
             index: index - selectIndex(nodes: nodes, index: index),
             hasher: hasher,
-            output: output
+            output: output,
         )
     }
 
-    public static func trace<T, U>(
+    public static func trace<T: RandomAccessCollection<U>, U: DataPtrRepresentable>(
         _ nodes: T,
         index: T.Index,
-        hasher: Hashing.Type = Blake2b256.self
+        hasher: Hashing.Type = Blake2b256.self,
     ) -> [Either<U, Data32>]
-        where T: RandomAccessCollection<U>, T.Index == Int, U: DataPtrRepresentable
+        where T.Index == Int
     {
         var res: [Either<U, Data32>] = []
         traceImpl(nodes, index: index, hasher: hasher) { res.append($0.value) }
@@ -95,7 +95,7 @@ public enum Merklization {
 
     private static func constancyPreprocessor(
         _ nodes: some RandomAccessCollection<Data>,
-        hasher: Hashing.Type = Blake2b256.self
+        hasher: Hashing.Type = Blake2b256.self,
     ) -> [Data32] {
         let length = UInt32(nodes.count)
         let newLength = Int(max(1, length).nextPowerOfTwo ?? 0)
@@ -111,7 +111,7 @@ public enum Merklization {
         return res
     }
 
-    // constant-depth binary merkle function defined in GP E.1.2
+    /// constant-depth binary merkle function defined in GP E.1.2
     public static func constantDepthMerklize<T: RandomAccessCollection<Data>>(_ nodes: T, hasher: Hashing.Type = Blake2b256.self) -> Data32
         where T.Index == Int
     {
@@ -133,14 +133,14 @@ public enum Merklization {
         return max(0, log2Value - size)
     }
 
-    // provides the Merkle path to a single page
-    public static func generateJustification<T>(
+    /// provides the Merkle path to a single page
+    public static func generateJustification<T: RandomAccessCollection<Data>>(
         _ nodes: T,
         size: Int,
         index: T.Index, // page index
-        hasher: Hashing.Type = Blake2b256.self
+        hasher: Hashing.Type = Blake2b256.self,
     ) -> [Data32]
-        where T: RandomAccessCollection<Data>, T.Index == Int
+        where T.Index == Int
     {
         var res: [Data32] = []
         let pageSize = 1 << size
@@ -150,14 +150,14 @@ public enum Merklization {
         return Array(res.prefix(calculatePathLength(size: size, nodesCount: nodes.count)))
     }
 
-    // provides a single page of leaves, themselves hashed, prefixed data
-    public static func leafPage<T>(
+    /// provides a single page of leaves, themselves hashed, prefixed data
+    public static func leafPage<T: RandomAccessCollection<Data>>(
         _ nodes: T,
         size: Int,
         index: T.Index,
-        hasher: Hashing.Type = Blake2b256.self
+        hasher: Hashing.Type = Blake2b256.self,
     ) -> [Data32]
-        where T: RandomAccessCollection<Data>, T.Index == Int
+        where T.Index == Int
     {
         let pageSize = 1 << size
         var res: [Data32] = []

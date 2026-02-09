@@ -18,12 +18,12 @@ public struct SegmentShardRequestMessage: Codable, Sendable, Equatable, Hashable
     public init(
         erasureRoot: Data32,
         shardIndex: UInt16,
-        segmentIndices: [UInt16]
+        segmentIndices: [UInt16],
     ) throws {
         guard segmentIndices.count <= Self.maxSegmentShardsPerRequest else {
             throw SegmentShardError.segmentIndicesExceedLimit(
                 maxAllowed: Self.maxSegmentShardsPerRequest,
-                actual: segmentIndices.count
+                actual: segmentIndices.count,
             )
         }
         self.erasureRoot = erasureRoot
@@ -41,7 +41,7 @@ extension SegmentShardRequestMessage: CEMessage {
         guard let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "unexpected data \(data)"
+                debugDescription: "unexpected data \(data)",
             ))
         }
         return try JamDecoder.decode(SegmentShardRequestMessage.self, from: data, withConfig: config)

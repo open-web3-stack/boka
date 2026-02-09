@@ -17,7 +17,7 @@ public struct Announcement: Codable, Sendable, Equatable, Hashable {
 
     public init(
         workReports: [WorkReportIdentifier],
-        signature: Ed25519Signature
+        signature: Ed25519Signature,
     ) {
         self.workReports = workReports
         self.signature = signature

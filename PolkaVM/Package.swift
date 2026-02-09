@@ -11,12 +11,17 @@ let package = Package(
     products: [
         .library(
             name: "PolkaVM",
-            targets: ["PolkaVM"]
+            targets: ["PolkaVM"],
+        ),
+        .executable(
+            name: "boka-sandbox",
+            targets: ["Sandbox"],
         ),
     ],
     dependencies: [
         .package(path: "../Utils"),
         .package(path: "../TracingUtils"),
+        .package(path: "../Codec"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
     ],
@@ -26,40 +31,77 @@ let package = Package(
             dependencies: [
                 "Utils",
                 "TracingUtils",
+                "Codec",
                 "CppHelper",
                 .product(name: "Logging", package: "swift-log"),
             ],
+            cSettings: [
+                .headerSearchPath("../asmjit"),
+            ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ]
+            ],
+        ),
+        .executableTarget(
+            name: "Sandbox",
+            dependencies: [
+                "PolkaVM",
+                "Utils",
+                "TracingUtils",
+                .product(name: "Logging", package: "swift-log"),
+            ],
+            sources: ["main.swift"],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx),
+            ],
         ),
         .testTarget(
             name: "PolkaVMTests",
             dependencies: [
                 "PolkaVM",
                 "CppHelper",
+                "Codec",
                 .product(name: "Testing", package: "swift-testing"),
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ]
+            ],
         ),
         .target(
             name: "CppHelper",
             dependencies: [
-                "asmjit",
+            ],
+            exclude: [
+                "asmjit/tools",
+                "asmjit/.github",
+                "asmjit/db",
+                "asmjit/asmjit-testing",
+                "asmjit/module.modulemap",
+                "asmjit/configure.sh",
+                "asmjit/configure_sanitizers.sh",
+                "asmjit/configure_vs2022_x64.bat",
+                "asmjit/configure_vs2022_x86.bat",
+                "asmjit/CMakeLists.txt",
+                "asmjit/CMakePresets.json",
+                "asmjit/.git",
+                "asmjit/.gitignore",
+                "asmjit/.editorconfig",
+                "asmjit/LICENSE.md",
+                "asmjit/README.md",
+                "asmjit/CONTRIBUTING.md",
+                "asmjit/asmjit/asmjit.natvis",
+                "asmjit/include",
             ],
             sources: ["."],
-            publicHeadersPath: "."
-        ),
-        .target(
-            name: "asmjit",
-            sources: ["src/asmjit"],
-            publicHeadersPath: "src",
+            publicHeadersPath: ".",
             cxxSettings: [
-                .unsafeFlags(["-Wno-incomplete-umbrella"]),
-            ]
+                .headerSearchPath("asmjit"),
+                .unsafeFlags([
+                    "-std=c++20",
+                ]),
+                .define("ASMJIT_STATIC"),
+            ],
         ),
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageModes: [.version("6")],
 )

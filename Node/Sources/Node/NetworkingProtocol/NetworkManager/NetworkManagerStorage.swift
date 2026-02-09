@@ -43,7 +43,7 @@ public actor NetworkManagerStorage {
                 if let addr = NetAddr(address: validator.metadataString) {
                     peerIdByPublicKey[validator.ed25519] = PeerId(
                         publicKey: validator.ed25519.data,
-                        address: addr
+                        address: addr,
                     )
                 }
             }
@@ -53,7 +53,7 @@ public actor NetworkManagerStorage {
                 if let addr = NetAddr(address: validator.metadataString) {
                     peerIdByPublicKey[validator.ed25519] = PeerId(
                         publicKey: validator.ed25519.data,
-                        address: addr
+                        address: addr,
                     )
                 }
             }

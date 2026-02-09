@@ -34,7 +34,7 @@ public actor JAMNPSShardAssignment {
     public func getShardAssignment(
         validatorIndex: UInt16,
         coreIndex: UInt16,
-        totalValidators: UInt16
+        totalValidators: UInt16,
     ) -> UInt16 {
         let c = UInt32(coreIndex)
         let v = UInt32(validatorIndex)
@@ -47,7 +47,7 @@ public actor JAMNPSShardAssignment {
             """
             Shard assignment: validator=\(validatorIndex), core=\(coreIndex), \
             total=\(totalValidators) -> shard=\(shardIndex)
-            """
+            """,
         )
 
         return UInt16(shardIndex)
@@ -63,7 +63,7 @@ public actor JAMNPSShardAssignment {
     public func getAllAssignedShards(
         validatorIndex: UInt16,
         coreCount: UInt16 = 16,
-        totalValidators: UInt16
+        totalValidators: UInt16,
     ) -> [UInt16] {
         var shards: [UInt16] = []
 
@@ -71,7 +71,7 @@ public actor JAMNPSShardAssignment {
             let shardIndex = getShardAssignment(
                 validatorIndex: validatorIndex,
                 coreIndex: coreIndex,
-                totalValidators: totalValidators
+                totalValidators: totalValidators,
             )
             shards.append(shardIndex)
         }
@@ -93,7 +93,7 @@ public actor JAMNPSShardAssignment {
     public func getValidatorsForShard(
         shardIndex: UInt16,
         coreIndex: UInt16,
-        totalValidators: UInt16
+        totalValidators: UInt16,
     ) -> [UInt16] {
         let targetShardIndex = UInt32(shardIndex)
         let c = UInt32(coreIndex)
@@ -127,7 +127,7 @@ public actor JAMNPSShardAssignment {
             """
             Validators for shard=\(shardIndex), core=\(coreIndex), \
             total=\(totalValidators) -> \(validators.count) validators
-            """
+            """,
         )
 
         return validators
@@ -146,7 +146,7 @@ public actor JAMNPSShardAssignment {
     public func getValidatorsForMissingShards(
         missingShardIndices: [UInt16],
         coreIndex: UInt16,
-        totalValidators: UInt16
+        totalValidators: UInt16,
     ) -> [UInt16: [UInt16]] {
         var validatorToShards: [UInt16: [UInt16]] = [:]
 
@@ -176,7 +176,7 @@ public actor JAMNPSShardAssignment {
             """
             Mapped \(missingShardIndices.count) missing shards to \
             \(validatorToShards.count) validators
-            """
+            """,
         )
 
         return validatorToShards

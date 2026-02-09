@@ -2,7 +2,7 @@ import Foundation
 @testable import RocksDBSwift
 import Testing
 
-// First, let's create a simple coder for testing
+/// First, let's create a simple coder for testing
 struct JSONCoder<K: Codable & Encodable, V: Codable>: StoreCoder {
     typealias Key = K
     typealias Value = V
@@ -23,7 +23,7 @@ struct JSONCoder<K: Codable & Encodable, V: Codable>: StoreCoder {
     }
 }
 
-// Test model structures
+/// Test model structures
 struct TestKey: Codable, Hashable {
     let id: String
 }
@@ -48,7 +48,7 @@ final class StoreTests {
         store = Store(
             db: rocksDB,
             column: .col1,
-            coder: JSONCoder()
+            coder: JSONCoder(),
         )
     }
 
@@ -58,7 +58,7 @@ final class StoreTests {
     }
 
     @Test
-    func testBasicOperations() throws {
+    func basicOperations() throws {
         let key = TestKey(id: "test1")
         let value = TestValue(name: "John", age: 30, data: ["a", "b", "c"])
 
@@ -77,7 +77,7 @@ final class StoreTests {
     }
 
     @Test
-    func testBatchOperations() throws {
+    func batchOperations() throws {
         let key1 = TestKey(id: "batch1")
         let key2 = TestKey(id: "batch2")
         let value1 = TestValue(name: "Alice", age: 25, data: ["x"])
@@ -102,7 +102,7 @@ final class StoreTests {
     }
 
     @Test
-    func testErrorHandling() throws {
+    func errorHandling() throws {
         // Test getting non-existent key
         let nonExistentKey = TestKey(id: "nothere")
         #expect(try store.get(key: nonExistentKey) == nil)
@@ -120,7 +120,7 @@ final class StoreTests {
     }
 
     @Test
-    func testLargeData() throws {
+    func largeData() throws {
         let key = TestKey(id: "large")
         let largeArray = (0 ..< 1000).map { String($0) }
         let value = TestValue(name: "Large", age: 99, data: largeArray)
@@ -131,12 +131,12 @@ final class StoreTests {
     }
 
     @Test
-    func testMultipleStores() throws {
+    func multipleStores() throws {
         // Create a second store with different types
         let store2: Store<Columns, JSONCoder<String, Int>> = Store(
             db: rocksDB,
             column: .col2,
-            coder: JSONCoder()
+            coder: JSONCoder(),
         )
 
         // Test operations on both stores

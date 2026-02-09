@@ -1,9 +1,8 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import TracingUtils
 import Utils
-
-@testable import Blockchain
 
 /// Unit tests for DataAvailabilityService that focus on individual components
 /// without requiring full integration setup
@@ -22,14 +21,14 @@ struct DataAvailabilityServiceTests {
         case .segmentNotFound:
             break // Expected
         default:
-            #expect(Bool(false), "Expected segmentNotFound")
+            #expect(Bool(false))
         }
 
         switch error3 {
         case .retrievalError:
             break // Expected
         default:
-            #expect(Bool(false), "Expected retrievalError")
+            #expect(Bool(false))
         }
     }
 
@@ -37,7 +36,7 @@ struct DataAvailabilityServiceTests {
     func insufficientShardsError() {
         // DISABLED: insufficientShards error case doesn't exist in DataAvailabilityError
         // TODO: Update test to use actual error cases or add the error case
-        #expect(Bool(true), "Test disabled - insufficientShards case not implemented")
+        #expect(Bool(true))
     }
 
     // MARK: - Reconstruction Edge Cases
@@ -46,14 +45,14 @@ struct DataAvailabilityServiceTests {
     func reconstructWithMinimumShards() {
         // Test boundary condition: exactly 342 shards (minimum)
         let requiredShards = 342
-        #expect(requiredShards >= 342, "Should meet minimum threshold")
+        #expect(requiredShards >= 342)
     }
 
     @Test
     func reconstructWithMaximumShards() {
         // Test boundary condition: all 1023 shards
         let totalShards = 1023
-        #expect(totalShards >= 342, "Should exceed minimum threshold")
+        #expect(totalShards >= 342)
     }
 
     // MARK: - Validation Tests
@@ -64,8 +63,8 @@ struct DataAvailabilityServiceTests {
         let validBundle = Data(count: 10_000_000)
         let invalidBundle = Data(count: 15_000_000)
 
-        #expect(validBundle.count <= maxBundleSize, "Valid bundle should be within size limit")
-        #expect(invalidBundle.count > maxBundleSize, "Invalid bundle should exceed size limit")
+        #expect(validBundle.count <= maxBundleSize)
+        #expect(invalidBundle.count > maxBundleSize)
     }
 
     @Test
@@ -74,8 +73,8 @@ struct DataAvailabilityServiceTests {
         let validCount = 1000
         let invalidCount = 3100
 
-        #expect(validCount <= maxSegments, "Valid count should be within limit")
-        #expect(invalidCount > maxSegments, "Invalid count should exceed limit")
+        #expect(validCount <= maxSegments)
+        #expect(invalidCount > maxSegments)
     }
 
     // MARK: - Retention Policy Tests
@@ -87,7 +86,7 @@ struct DataAvailabilityServiceTests {
 
         let currentTimestamp = Date()
         let cutoffDate = currentTimestamp.addingTimeInterval(
-            -TimeInterval(retentionEpochs) * epochDuration
+            -TimeInterval(retentionEpochs) * epochDuration,
         )
 
         // Verify cutoff is in the past
@@ -106,7 +105,7 @@ struct DataAvailabilityServiceTests {
 
         let currentTimestamp = Date()
         let cutoffDate = currentTimestamp.addingTimeInterval(
-            -TimeInterval(retentionEpochs) * epochDuration
+            -TimeInterval(retentionEpochs) * epochDuration,
         )
 
         // Verify cutoff is in the past
@@ -125,14 +124,14 @@ struct DataAvailabilityServiceTests {
         let pageSize = 64
 
         // Test exact pages
-        #expect((64 + pageSize - 1) / pageSize == 1, "64 segments = 1 page")
-        #expect((128 + pageSize - 1) / pageSize == 2, "128 segments = 2 pages")
+        #expect((64 + pageSize - 1) / pageSize == 1)
+        #expect((128 + pageSize - 1) / pageSize == 2)
 
         // Test partial pages
-        #expect((65 + pageSize - 1) / pageSize == 2, "65 segments = 2 pages")
-        #expect((1 + pageSize - 1) / pageSize == 1, "1 segment = 1 page")
-        #expect((100 + pageSize - 1) / pageSize == 2, "100 segments = 2 pages")
-        #expect((3000 + pageSize - 1) / pageSize == 47, "3000 segments = 47 pages")
+        #expect((65 + pageSize - 1) / pageSize == 2)
+        #expect((1 + pageSize - 1) / pageSize == 1)
+        #expect((100 + pageSize - 1) / pageSize == 2)
+        #expect((3000 + pageSize - 1) / pageSize == 47)
     }
 
     // MARK: - Merkle Proof Validation Tests
@@ -159,7 +158,7 @@ struct DataAvailabilityServiceTests {
         let segmentSize = 4104
         let validSegment = Data(count: segmentSize)
 
-        #expect(validSegment.count == segmentSize, "Segment should be exactly 4104 bytes")
+        #expect(validSegment.count == segmentSize)
     }
 
     @Test
@@ -167,8 +166,8 @@ struct DataAvailabilityServiceTests {
         let expectedShards = 1023
         let minimumShards = 342
 
-        #expect(expectedShards >= minimumShards, "Total shards should exceed minimum")
-        #expect(Double(minimumShards) / Double(expectedShards) >= 1.0 / 3.0, "Should be at least 1/3")
+        #expect(expectedShards >= minimumShards)
+        #expect(Double(minimumShards) / Double(expectedShards) >= 1.0 / 3.0)
     }
 
     // MARK: - Statistics Tests
@@ -179,7 +178,7 @@ struct DataAvailabilityServiceTests {
         let stats = (
             auditCount: 10,
             d3lCount: 5,
-            totalSegments: 1000
+            totalSegments: 1000,
         )
 
         #expect(stats.auditCount == 10)

@@ -12,7 +12,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "Codec",
-            targets: ["Codec"]
+            targets: ["Codec"],
         ),
     ],
     dependencies: [
@@ -23,14 +23,14 @@ let package = Package(
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "Codec",
-            dependencies: []
+            dependencies: [],
         ),
         .testTarget(
             name: "CodecTests",
             dependencies: [
                 "Codec",
                 .product(name: "Testing", package: "swift-testing"),
-            ]
+            ],
         ),
-    ]
+    ],
 )

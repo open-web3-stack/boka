@@ -45,14 +45,14 @@ public actor ErasureCodingService {
         guard totalPieces * pieceSize == totalData.count else {
             throw ErasureCodingError.invalidDataLength(
                 expected: pieceSize,
-                actual: totalData.count % pieceSize
+                actual: totalData.count % pieceSize,
             )
         }
 
         let shards = try ErasureCoding.chunk(
             data: totalData,
             basicSize: pieceSize,
-            recoveryCount: totalShardCount
+            recoveryCount: totalShardCount,
         )
 
         logger.debug("Generated \(shards.count) shards from \(segments.count) segments")
@@ -69,7 +69,7 @@ public actor ErasureCodingService {
         guard data.count % pieceSize == 0 else {
             throw ErasureCodingError.invalidDataLength(
                 expected: pieceSize,
-                actual: data.count % pieceSize
+                actual: data.count % pieceSize,
             )
         }
 
@@ -78,7 +78,7 @@ public actor ErasureCodingService {
         let shards = try ErasureCoding.chunk(
             data: data,
             basicSize: pieceSize,
-            recoveryCount: totalShardCount
+            recoveryCount: totalShardCount,
         )
 
         logger.debug("Generated \(shards.count) shards")
@@ -93,7 +93,7 @@ public actor ErasureCodingService {
         guard shards.count >= originalShardCount else {
             throw ErasureCodingError.insufficientShards(
                 required: originalShardCount,
-                provided: shards.count
+                provided: shards.count,
             )
         }
 
@@ -115,7 +115,7 @@ public actor ErasureCodingService {
                 basicSize: pieceSize,
                 originalCount: originalShardCount,
                 recoveryCount: totalShardCount,
-                originalLength: originalLength
+                originalLength: originalLength,
             )
 
             logger.debug("Successfully reconstructed \(reconstructed.count) bytes")
@@ -130,13 +130,13 @@ public actor ErasureCodingService {
     /// Reconstruct segments from shards
     public func reconstructSegments(
         shards: [(index: UInt16, data: Data)],
-        segmentCount: Int
+        segmentCount: Int,
     ) throws -> [Data4104] {
         let totalDataSize = segmentCount * 4104
 
         let reconstructedData = try reconstruct(
             shards: shards,
-            originalLength: totalDataSize
+            originalLength: totalDataSize,
         )
 
         var segments: [Data4104] = []
@@ -155,7 +155,7 @@ public actor ErasureCodingService {
             guard let segment = Data4104(paddedSegment) else {
                 throw ErasureCodingError.invalidSegmentLength(
                     expected: 4104,
-                    actual: paddedSegment.count
+                    actual: paddedSegment.count,
                 )
             }
 
@@ -174,7 +174,7 @@ public actor ErasureCodingService {
         guard shards.count == totalShardCount else {
             throw ErasureCodingError.invalidShardCount(
                 expected: totalShardCount,
-                provided: shards.count
+                provided: shards.count,
             )
         }
 
@@ -220,7 +220,7 @@ extension ErasureCodingService {
     public func generateMerkleProof(
         shardIndex: UInt16,
         segmentsRoot: Data32,
-        shards: [Data]
+        shards: [Data],
     ) throws -> [Either<Data, Data32>] {
         guard shardIndex < UInt16(shards.count) else {
             throw ErasureCodingError.invalidShardIndex
@@ -241,7 +241,7 @@ extension ErasureCodingService {
         let proof = Merklization.trace(
             nodes,
             index: Int(shardIndex),
-            hasher: Blake2b256.self
+            hasher: Blake2b256.self,
         )
 
         logger.debug("Generated Merkle proof for shard \(shardIndex) with \(proof.count) steps")
@@ -255,7 +255,7 @@ extension ErasureCodingService {
         shardIndex: UInt16,
         proof: [Either<Data, Data32>],
         erasureRoot: Data32,
-        segmentsRoot: Data32
+        segmentsRoot: Data32,
     ) -> Bool {
         do {
             // Reconstruct the leaf node
@@ -333,7 +333,7 @@ extension ErasureCodingService {
     public func generateJustification(
         shardIndex: UInt16,
         segmentsRoot: Data32,
-        shards: [Data]
+        shards: [Data],
     ) throws -> [AvailabilityJustification.AvailabilityJustificationStep] {
         guard shardIndex < UInt16(shards.count) else {
             throw ErasureCodingError.invalidShardIndex
@@ -342,7 +342,7 @@ extension ErasureCodingService {
         guard shards.count == totalShardCount else {
             throw ErasureCodingError.invalidShardCount(
                 expected: totalShardCount,
-                provided: shards.count
+                provided: shards.count,
             )
         }
 
@@ -360,7 +360,7 @@ extension ErasureCodingService {
         let copath = Merklization.trace(
             nodes,
             index: Int(shardIndex),
-            hasher: Blake2b256.self
+            hasher: Blake2b256.self,
         )
 
         var steps: [AvailabilityJustification.AvailabilityJustificationStep] = []
@@ -402,7 +402,7 @@ extension ErasureCodingService {
         shardIndex: UInt16,
         segmentsRoot _: Data32,
         shards: [Data],
-        baseJustification: [AvailabilityJustification.AvailabilityJustificationStep]
+        baseJustification: [AvailabilityJustification.AvailabilityJustificationStep],
     ) throws -> [AvailabilityJustification.AvailabilityJustificationStep] {
         guard Int(shardIndex) < shards.count else {
             throw ErasureCodingError.invalidShardIndex
@@ -423,7 +423,7 @@ extension ErasureCodingService {
         let segmentCopath = Merklization.trace(
             segmentShards,
             index: Int(shardIndex),
-            hasher: Blake2b256.self
+            hasher: Blake2b256.self,
         )
 
         var fullJustification = baseJustification

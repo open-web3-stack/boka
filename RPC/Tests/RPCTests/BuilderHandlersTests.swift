@@ -12,7 +12,7 @@ actor DummyBuildDataSource {
 }
 
 extension DummyBuildDataSource: BuilderDataSource {
-    public func submitWorkPackage(coreIndex: CoreIndex, workPackage: Data, extrinsics: [Data]) async throws {
+    func submitWorkPackage(coreIndex: CoreIndex, workPackage: Data, extrinsics: [Data]) async throws {
         workPackageCalls.append((coreIndex, workPackage, extrinsics))
     }
 }

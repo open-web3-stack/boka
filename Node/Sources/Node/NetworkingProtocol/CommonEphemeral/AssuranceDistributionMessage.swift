@@ -24,11 +24,10 @@ extension AssuranceDistributionMessage: CEMessage {
         guard let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "unexpected data"
+                debugDescription: "unexpected data",
             ))
         }
 
-        let message = try JamDecoder.decode(Self.self, from: data, withConfig: config)
-        return message
+        return try JamDecoder.decode(Self.self, from: data, withConfig: config)
     }
 }

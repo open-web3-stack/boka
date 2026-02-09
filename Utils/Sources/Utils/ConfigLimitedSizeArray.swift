@@ -25,7 +25,7 @@ public struct ConfigLimitedSizeArray<T, TMinLength: ReadInt, TMaxLength: ReadInt
         try self.init(Array(repeating: defaultValue, count: minLength), minLength: minLength, maxLength: maxLength)
     }
 
-    // require minLength to be zero
+    /// require minLength to be zero
     public init(config: TMinLength.TConfig) throws(ConfigLimitedSizeArrayError) {
         let minLength = TMinLength.read(config: config)
         let maxLength = TMaxLength.read(config: config)
@@ -167,7 +167,7 @@ extension ConfigLimitedSizeArray {
         try validateThrowing()
     }
 
-    // append element and pop the first element if needed
+    /// append element and pop the first element if needed
     public mutating func safeAppend(_ newElement: T) {
         if array.count == maxLength {
             array.removeFirst()

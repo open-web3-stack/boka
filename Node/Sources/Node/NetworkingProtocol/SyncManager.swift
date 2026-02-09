@@ -14,12 +14,12 @@ enum SyncStatus {
     case syncing
 }
 
-// TODO:
-// - pick best peer
-// - remove slow one
-// - sync peer rotation
-// - fast sync mode (no verification)
-// - re-enter to bulk sync mode if new peer with better head is discovered
+/// TODO:
+/// - pick best peer
+/// - remove slow one
+/// - sync peer rotation
+/// - fast sync mode (no verification)
+/// - re-enter to bulk sync mode if new peer with better head is discovered
 public actor SyncManager {
     private let blockchain: Blockchain
     private let network: NetworkProtocol
@@ -73,7 +73,7 @@ public actor SyncManager {
                 "best": "\(String(describing: info.best))",
                 "finalized": "\(info.finalized)",
                 "newBlockHeader": "\(String(describing: newBlockHeader))",
-            ]
+            ],
         )
         if let networkBest {
             if let peerBest = info.best, peerBest.timeslot > networkBest.timeslot {
@@ -120,7 +120,7 @@ public actor SyncManager {
                 let request = BlockRequest(
                     hash: currentHead.hash,
                     direction: .ascendingExcludsive,
-                    maxBlocks: min(BLOCK_REQUEST_BLOCK_COUNT, peerBest.timeslot - currentHead.timeslot)
+                    maxBlocks: min(BLOCK_REQUEST_BLOCK_COUNT, peerBest.timeslot - currentHead.timeslot),
                 )
                 currentRequest = (info.id, request)
                 logger.debug("bulk syncing", metadata: ["peer": "\(info.id)", "request": "\(request)"])
@@ -168,7 +168,7 @@ public actor SyncManager {
                     let resp = try await network.send(to: peer, message: .blockRequest(BlockRequest(
                         hash: newHeader.hash,
                         direction: .descendingInclusive,
-                        maxBlocks: max(1, newHeader.value.timeslot - currentTimeslot)
+                        maxBlocks: max(1, newHeader.value.timeslot - currentTimeslot),
                     )))
                     let blocks = try CERequest.decodeResponseForBlockRequest(data: resp, config: blockchain.config)
                     // reverse to import old block first

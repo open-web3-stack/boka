@@ -48,7 +48,7 @@ public struct ShardRequest: Codable, Sendable {
         guard data.count >= 34 else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: 34,
-                actual: data.count
+                actual: data.count,
             )
         }
 
@@ -65,7 +65,7 @@ public struct ShardRequest: Codable, Sendable {
             guard data.count >= 38 else {
                 throw AvailabilityNetworkingError.invalidMessageLength(
                     expected: 38,
-                    actual: data.count
+                    actual: data.count,
                 )
             }
 
@@ -75,7 +75,7 @@ public struct ShardRequest: Codable, Sendable {
             guard data.count >= offset + Int(count) * 2 else {
                 throw AvailabilityNetworkingError.invalidMessageLength(
                     expected: offset + Int(count) * 2,
-                    actual: data.count
+                    actual: data.count,
                 )
             }
 
@@ -94,7 +94,7 @@ public struct ShardRequest: Codable, Sendable {
         return ShardRequest(
             erasureRoot: erasureRoot,
             shardIndex: shardIndex,
-            segmentIndices: segmentIndices
+            segmentIndices: segmentIndices,
         )
     }
 }
@@ -147,7 +147,7 @@ public struct ShardResponse: Codable, Sendable {
         guard data.count >= 4 else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: 4,
-                actual: data.count
+                actual: data.count,
             )
         }
 
@@ -160,7 +160,7 @@ public struct ShardResponse: Codable, Sendable {
         guard data.count >= offset + Int(bundleLength) else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: offset + Int(bundleLength),
-                actual: data.count
+                actual: data.count,
             )
         }
 
@@ -171,7 +171,7 @@ public struct ShardResponse: Codable, Sendable {
         guard data.count >= offset + 4 else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: offset + 4,
-                actual: data.count
+                actual: data.count,
             )
         }
 
@@ -185,7 +185,7 @@ public struct ShardResponse: Codable, Sendable {
             guard data.count >= offset + 4 else {
                 throw AvailabilityNetworkingError.invalidMessageLength(
                     expected: offset + 4,
-                    actual: data.count
+                    actual: data.count,
                 )
             }
 
@@ -195,7 +195,7 @@ public struct ShardResponse: Codable, Sendable {
             guard data.count >= offset + Int(shardLength) else {
                 throw AvailabilityNetworkingError.invalidMessageLength(
                     expected: offset + Int(shardLength),
-                    actual: data.count
+                    actual: data.count,
                 )
             }
 
@@ -210,7 +210,7 @@ public struct ShardResponse: Codable, Sendable {
         return ShardResponse(
             bundleShard: bundleShard,
             segmentShards: segmentShards,
-            justification: justification
+            justification: justification,
         )
     }
 }
@@ -364,7 +364,7 @@ public struct BundleRequest: Codable, Sendable {
         guard data.count == 32 else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: 32,
-                actual: data.count
+                actual: data.count,
             )
         }
         guard let erasureRoot = Data32(data) else {
@@ -394,7 +394,7 @@ public struct BundleResponse: Codable, Sendable {
         guard data.count >= 4 else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: 4,
-                actual: data.count
+                actual: data.count,
             )
         }
 
@@ -402,7 +402,7 @@ public struct BundleResponse: Codable, Sendable {
         guard data.count >= 4 + Int(length) else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: 4 + Int(length),
-                actual: data.count
+                actual: data.count,
             )
         }
 
@@ -441,7 +441,7 @@ public struct SegmentRequest: Codable, Sendable {
         guard data.count >= 36 else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: 36,
-                actual: data.count
+                actual: data.count,
             )
         }
 
@@ -454,7 +454,7 @@ public struct SegmentRequest: Codable, Sendable {
         guard data.count >= expectedLength else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: expectedLength,
-                actual: data.count
+                actual: data.count,
             )
         }
 
@@ -513,7 +513,7 @@ public struct SegmentResponse: Codable, Sendable {
         guard data.count >= 4 else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: 4,
-                actual: data.count
+                actual: data.count,
             )
         }
 
@@ -527,7 +527,7 @@ public struct SegmentResponse: Codable, Sendable {
         guard data.count >= expectedSegmentsLength else {
             throw AvailabilityNetworkingError.invalidMessageLength(
                 expected: expectedSegmentsLength,
-                actual: data.count
+                actual: data.count,
             )
         }
 
@@ -557,7 +557,7 @@ public struct SegmentResponse: Codable, Sendable {
             guard data.count >= expectedProofLength else {
                 throw AvailabilityNetworkingError.invalidMessageLength(
                     expected: expectedProofLength,
-                    actual: data.count
+                    actual: data.count,
                 )
             }
 

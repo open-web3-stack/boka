@@ -1,9 +1,8 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import TracingUtils
 import Utils
-
-@testable import Blockchain
 
 struct SafroleTicketPoolServiceTests {
     let config: ProtocolConfigRef
@@ -29,7 +28,7 @@ struct SafroleTicketPoolServiceTests {
         let logMiddleware = LogMiddleware(logger: logger, propagateError: true)
         eventBus = EventBus(
             eventMiddleware: .serial(Middleware(storeMiddleware), Middleware(logMiddleware)),
-            handlerMiddleware: Middleware(logMiddleware)
+            handlerMiddleware: Middleware(logMiddleware),
         )
 
         keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
@@ -42,13 +41,15 @@ struct SafroleTicketPoolServiceTests {
     }
 
     @Test
-    func testAddAndRetrieveTickets() async throws {
+    func addAndRetrieveTickets() async throws {
         let state = try await dataProvider.getBestState()
 
         var allTickets = SortedUniqueArray<TicketItemAndOutput>()
 
         for (i, validatorKey) in state.value.nextValidators.enumerated() {
-            let secretKey = try await keystore.get(Bandersnatch.self, publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch))!
+            let publicKey = try Bandersnatch.PublicKey(data: validatorKey.bandersnatch)
+            let keySecret = await keystore.get(Bandersnatch.self, publicKey: publicKey)
+            let secretKey = try #require(keySecret)
 
             let tickets = try SafroleService.generateTickets(
                 count: TicketIndex(config.value.ticketEntriesPerValidator),
@@ -56,7 +57,7 @@ struct SafroleTicketPoolServiceTests {
                 entropy: state.value.entropyPool.t3,
                 ringContext: ringContext,
                 secret: secretKey,
-                idx: UInt32(i)
+                idx: UInt32(i),
             )
 
             allTickets.append(contentsOf: tickets)
@@ -64,7 +65,7 @@ struct SafroleTicketPoolServiceTests {
             let event = RuntimeEvents.SafroleTicketsGenerated(
                 epochIndex: state.value.timeslot.timeslotToEpochIndex(config: config),
                 items: tickets,
-                publicKey: secretKey.publicKey
+                publicKey: secretKey.publicKey,
             )
             await eventBus.publish(event)
 
@@ -78,13 +79,15 @@ struct SafroleTicketPoolServiceTests {
     }
 
     @Test
-    func testAddAndInvalidTickets() async throws {
+    func addAndInvalidTickets() async throws {
         let state = try await dataProvider.getBestState()
 
         var allTickets = SortedUniqueArray<TicketItemAndOutput>()
 
         let validatorKey = state.value.currentValidators[0]
-        let secretKey = try await keystore.get(Bandersnatch.self, publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch))!
+        let publicKey = try Bandersnatch.PublicKey(data: validatorKey.bandersnatch)
+        let keySecret = await keystore.get(Bandersnatch.self, publicKey: publicKey)
+        let secretKey = try #require(keySecret)
 
         var tickets = try SafroleService.generateTickets(
             count: TicketIndex(config.value.ticketEntriesPerValidator) + 2,
@@ -92,7 +95,7 @@ struct SafroleTicketPoolServiceTests {
             entropy: state.value.entropyPool.t3,
             ringContext: ringContext,
             secret: secretKey,
-            idx: 0
+            idx: 0,
         )
 
         tickets.append(tickets[0]) // duplicate
@@ -100,9 +103,9 @@ struct SafroleTicketPoolServiceTests {
         let invalidTicket = TicketItemAndOutput(
             ticket: ExtrinsicTickets.TicketItem(
                 attempt: 0,
-                signature: Data784()
+                signature: Data784(),
             ),
-            output: Data32()
+            output: Data32(),
         )
         tickets.append(invalidTicket)
 
@@ -120,11 +123,13 @@ struct SafroleTicketPoolServiceTests {
     }
 
     @Test
-    func testRemoveTicketsOnBlockFinalization() async throws {
+    func removeTicketsOnBlockFinalization() async throws {
         // Add some tickets to the pool
         let state: StateRef = try await dataProvider.getBestState()
         let validatorKey = state.value.currentValidators[0]
-        let secretKey = try await keystore.get(Bandersnatch.self, publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch))!
+        let publicKey = try Bandersnatch.PublicKey(data: validatorKey.bandersnatch)
+        let keySecret = await keystore.get(Bandersnatch.self, publicKey: publicKey)
+        let secretKey = try #require(keySecret)
 
         let tickets = try SafroleService.generateTickets(
             count: 4,
@@ -132,13 +137,13 @@ struct SafroleTicketPoolServiceTests {
             entropy: state.value.entropyPool.t3,
             ringContext: ringContext,
             secret: secretKey,
-            idx: 0
+            idx: 0,
         )
 
         let addEvent = RuntimeEvents.SafroleTicketsGenerated(
             epochIndex: state.value.timeslot.timeslotToEpochIndex(config: config),
             items: tickets,
-            publicKey: secretKey.publicKey
+            publicKey: secretKey.publicKey,
         )
         await eventBus.publish(addEvent)
 
@@ -148,11 +153,13 @@ struct SafroleTicketPoolServiceTests {
         // Create a block with some of these tickets
         let blockTickets = Array(tickets[0 ..< 2])
         let extrinsic = try Extrinsic(
-            tickets: ExtrinsicTickets(tickets: ConfigLimitedSizeArray(config: config, array: blockTickets.map(\.ticket))),
+            tickets: ExtrinsicTickets(
+                tickets: ConfigLimitedSizeArray(config: config, array: blockTickets.map(\.ticket)),
+            ),
             disputes: ExtrinsicDisputes.dummy(config: config),
             preimages: ExtrinsicPreimages.dummy(config: config),
             availability: ExtrinsicAvailability.dummy(config: config),
-            reports: ExtrinsicGuarantees.dummy(config: config)
+            reports: ExtrinsicGuarantees.dummy(config: config),
         )
         let block = BlockRef(Block(header: Header.dummy(config: config), extrinsic: extrinsic)).mutate {
             $0.header.unsigned.parentHash = state.value.lastBlockHash
@@ -174,11 +181,13 @@ struct SafroleTicketPoolServiceTests {
     }
 
     @Test
-    func testUpdateStateOnEpochChange() async throws {
+    func updateStateOnEpochChange() async throws {
         // Insert some valid tickets
         let state = try await dataProvider.getBestState()
         let validatorKey = state.value.currentValidators[0]
-        let secretKey = try await keystore.get(Bandersnatch.self, publicKey: Bandersnatch.PublicKey(data: validatorKey.bandersnatch))!
+        let publicKey = try Bandersnatch.PublicKey(data: validatorKey.bandersnatch)
+        let keySecret = await keystore.get(Bandersnatch.self, publicKey: publicKey)
+        let secretKey = try #require(keySecret)
 
         let oldTickets = try SafroleService.generateTickets(
             count: 4,
@@ -186,13 +195,13 @@ struct SafroleTicketPoolServiceTests {
             entropy: state.value.entropyPool.t3,
             ringContext: ringContext,
             secret: secretKey,
-            idx: 0
+            idx: 0,
         )
 
         let addEvent = RuntimeEvents.SafroleTicketsGenerated(
             epochIndex: state.value.timeslot.timeslotToEpochIndex(config: config),
             items: oldTickets,
-            publicKey: secretKey.publicKey
+            publicKey: secretKey.publicKey,
         )
         await eventBus.publish(addEvent)
         await storeMiddleware.wait()
@@ -220,7 +229,7 @@ struct SafroleTicketPoolServiceTests {
                 headerHash: newBlock.hash,
                 superPeak: Data32(),
                 stateRoot: Data32(),
-                lookup: .init()
+                lookup: .init(),
             ))
         }
 
@@ -233,14 +242,14 @@ struct SafroleTicketPoolServiceTests {
             entropy: newState.value.entropyPool.t3,
             ringContext: ringContext,
             secret: secretKey,
-            idx: 0
+            idx: 0,
         )
 
         // Ensure new tickets are accepted
         let newAddEvent = RuntimeEvents.SafroleTicketsGenerated(
             epochIndex: newState.value.timeslot.timeslotToEpochIndex(config: config),
             items: newTickets,
-            publicKey: secretKey.publicKey
+            publicKey: secretKey.publicKey,
         )
         await eventBus.publish(newAddEvent)
         await storeMiddleware.wait()

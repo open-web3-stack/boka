@@ -8,7 +8,7 @@ public struct ExtrinsicTickets: Sendable, Equatable, Codable {
 
         public init(
             attempt: TicketIndex,
-            signature: BandersnatchRingVRFProof
+            signature: BandersnatchRingVRFProof,
         ) {
             self.attempt = attempt
             self.signature = signature
@@ -18,15 +18,15 @@ public struct ExtrinsicTickets: Sendable, Equatable, Codable {
     public var tickets: ConfigLimitedSizeArray<
         TicketItem,
         ProtocolConfig.Int0,
-        ProtocolConfig.MaxTicketsPerExtrinsic
+        ProtocolConfig.MaxTicketsPerExtrinsic,
     >
 
     public init(
         tickets: ConfigLimitedSizeArray<
             TicketItem,
             ProtocolConfig.Int0,
-            ProtocolConfig.MaxTicketsPerExtrinsic
-        >
+            ProtocolConfig.MaxTicketsPerExtrinsic,
+        >,
     ) {
         self.tickets = tickets
     }

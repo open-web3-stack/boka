@@ -26,7 +26,7 @@ public protocol StateBackendProtocol: Sendable {
     func createIterator(prefix: Data, startKey: Data?) async throws -> StateBackendIterator
     func batchUpdate(_ ops: [StateBackendOperation]) async throws
 
-    // hash is the blake2b256 hash of the value
+    /// hash is the blake2b256 hash of the value
     func readValue(hash: Data32) async throws -> Data?
 
     /// Read multiple nodes in a single batch operation

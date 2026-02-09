@@ -17,8 +17,8 @@ extension ActivityStatistics {
         availableReports: [WorkReport],
         accumulateStats: AccumulationStats,
         activeValidators: ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators
-        >? = nil
+            ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
+        >? = nil,
     ) throws -> Statistics {
         let epochLength = UInt32(config.value.epochLength)
         let currentEpoch = timeslot / epochLength
@@ -28,7 +28,7 @@ extension ActivityStatistics {
         var acc = try isEpochChange
             ? ConfigFixedSizeArray<_, ProtocolConfig.TotalNumberOfValidators>(
                 config: config,
-                defaultValue: Statistics.Validator.dummy(config: config)
+                defaultValue: Statistics.Validator.dummy(config: config),
             ) : activityStatistics.accumulator
 
         let prev = isEpochChange ? activityStatistics.accumulator : activityStatistics.previous
@@ -59,7 +59,7 @@ extension ActivityStatistics {
         // core and service statistics
         var coreStats = try ConfigFixedSizeArray<Statistics.Core, ProtocolConfig.TotalNumberOfCores>(
             config: config,
-            defaultValue: .dummy(config: config)
+            defaultValue: .dummy(config: config),
         )
         var serviceStats = [UInt32: Statistics.Service]()
         for index in indices {
@@ -111,7 +111,7 @@ extension ActivityStatistics {
             accumulator: acc,
             previous: prev,
             core: coreStats,
-            service: serviceStats
+            service: serviceStats,
         )
     }
 }

@@ -1,10 +1,9 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct ReportedWorkPackage: Codable {
     var hash: Data32
@@ -35,15 +34,15 @@ struct RecentHistoryTests {
 
         var state = testcase.preState
         state.updatePartial(
-            parentStateRoot: testcase.input.parentStateRoot
+            parentStateRoot: testcase.input.parentStateRoot,
         )
         state.update(
             headerHash: testcase.input.headerHash,
             accumulateRoot: testcase.input.accumulateRoot,
             lookup: Dictionary(uniqueKeysWithValues: testcase.input.workPackages.map { (
                 $0.hash,
-                $0.exportsRoot
-            ) })
+                $0.exportsRoot,
+            ) }),
         )
 
         #expect(state == testcase.postState)

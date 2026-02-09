@@ -177,7 +177,7 @@ public struct FallbackTimeoutConfig: Sendable {
         ce138Timeout: TimeInterval = 5.0,
         ce139Timeout: TimeInterval = 3.0,
         ce140Timeout: TimeInterval = 10.0,
-        ce148Timeout: TimeInterval = 5.0
+        ce148Timeout: TimeInterval = 5.0,
     ) {
         self.localTimeout = localTimeout
         self.ce147Timeout = ce147Timeout

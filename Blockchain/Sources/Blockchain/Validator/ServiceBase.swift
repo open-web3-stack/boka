@@ -23,7 +23,7 @@ public class ServiceBase: @unchecked Sendable {
 
     @discardableResult
     func subscribe<T: Event>(
-        _ eventType: T.Type, id _: UniqueId, handler: @escaping @Sendable (T) async throws -> Void
+        _ eventType: T.Type, id _: UniqueId, handler: @escaping @Sendable (T) async throws -> Void,
     ) async -> EventBus.SubscriptionToken {
         await subscriptions.subscribe(eventType, id: id, handler: handler)
     }
@@ -39,7 +39,7 @@ public class ServiceBase: @unchecked Sendable {
     func waitFor<T: Event>(
         eventType: T.Type,
         check: @escaping @Sendable (T) -> Bool = { _ in true },
-        timeout: TimeInterval = 10
+        timeout: TimeInterval = 10,
     ) async throws -> T {
         try await subscriptions.waitFor(eventType, check: check, timeout: timeout)
     }

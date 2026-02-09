@@ -1,12 +1,13 @@
 // swiftlint:disable force_try
 // swiftformat:disable hoistTry
 import Foundation
+@testable import RocksDBSwift
 import Testing
 
-@testable import RocksDBSwift
-
 extension String {
-    var data: Data { Data(utf8) }
+    var data: Data {
+        Data(utf8)
+    }
 }
 
 enum Columns: UInt8, Sendable, ColumnFamilyKey {
@@ -50,7 +51,7 @@ final class RocksDBTests {
         #expect(try rocksDB.get(column: .col1, key: "234".data) == "asdfg".data)
     }
 
-    @Test func testBatchOperations() throws {
+    @Test func batchOperations() throws {
         try rocksDB.put(column: .col1, key: "123".data, value: "qwe".data)
 
         try rocksDB.batch(operations: [
@@ -66,7 +67,7 @@ final class RocksDBTests {
         #expect(try rocksDB.get(column: .col1, key: "345".data) == "ertert".data)
     }
 
-    @Test func testMultipleColumnFamilies() throws {
+    @Test func multipleColumnFamilies() throws {
         // Test operations across different column families
         try rocksDB.put(column: .col1, key: "key1".data, value: "value1".data)
         try rocksDB.put(column: .col2, key: "key1".data, value: "value2".data)
@@ -77,7 +78,7 @@ final class RocksDBTests {
         #expect(try rocksDB.get(column: .col3, key: "key1".data) == "value3".data)
     }
 
-    @Test func testLargeValues() throws {
+    @Test func largeValues() throws {
         // Test handling of large values
         let largeValue = Data((0 ..< 1_000_000).map { UInt8($0 % 256) })
         try rocksDB.put(column: .col1, key: "large".data, value: largeValue)
@@ -86,7 +87,7 @@ final class RocksDBTests {
         #expect(retrieved == largeValue)
     }
 
-    @Test func testBatchOperationsAcrossColumns() throws {
+    @Test func batchOperationsAcrossColumns() throws {
         // Test batch operations across different column families
         try rocksDB.batch(operations: [
             .put(column: Columns.col1.rawValue, key: "batch1".data, value: "value1".data),
@@ -99,7 +100,7 @@ final class RocksDBTests {
         #expect(try rocksDB.get(column: .col3, key: "batch3".data) == "value3".data)
     }
 
-    @Test func testEmptyValues() throws {
+    @Test func emptyValues() throws {
         // Test handling of empty values
         try rocksDB.put(column: .col1, key: "empty".data, value: Data())
 
@@ -129,8 +130,8 @@ final class RocksDBTests {
         iterator.seek(to: "key1".data)
         var count = 0
         while let pair = iterator.read() {
-            let key = String(data: pair.key, encoding: .utf8)!
-            let value = String(data: pair.value, encoding: .utf8)!
+            let key = try #require(String(data: pair.key, encoding: .utf8))
+            let value = try #require(String(data: pair.value, encoding: .utf8))
             #expect(key == testData[count].0)
             #expect(value == testData[count].1)
             count += 1
@@ -156,12 +157,12 @@ final class RocksDBTests {
         let iterator = rocksDB.createIterator(column: .col1, readOptions: readOptions)
         iterator.seek(to: "key1".data)
         if let pair = iterator.read() {
-            let value = String(data: pair.value, encoding: .utf8)!
+            let value = try #require(String(data: pair.value, encoding: .utf8))
             #expect(value == "value1")
         }
 
         // Regular read should see modified value
         let currentValue = try rocksDB.get(column: .col1, key: "key1".data)
-        #expect(String(data: currentValue!, encoding: .utf8) == "modified")
+        #expect(String(data: try #require(currentValue), encoding: .utf8) == "modified")
     }
 }

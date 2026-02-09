@@ -19,7 +19,7 @@ public actor WorkReportProcessor {
     public init(
         dataStore: DataStore,
         erasureCodingDataStore: ErasureCodingDataStore?,
-        config: ProtocolConfigRef
+        config: ProtocolConfigRef,
     ) {
         self.dataStore = dataStore
         self.erasureCodingDataStore = erasureCodingDataStore
@@ -32,7 +32,7 @@ public actor WorkReportProcessor {
     /// Fetch segments from data store
     public func fetchSegment(
         segments: [WorkItem.ImportedDataSegment],
-        segmentsRootMappings: SegmentsRootMappings? = nil
+        segmentsRootMappings: SegmentsRootMappings? = nil,
     ) async throws -> [Data4104] {
         // Delegate segment fetching to the data store.
         // The dataStore handles resolving segment roots and retrieving from the appropriate underlying storage.
@@ -57,7 +57,7 @@ public actor WorkReportProcessor {
             let storedErasureRoot = try await ecStore.storeExportedSegments(
                 segments: data,
                 workPackageHash: workPackageHash,
-                segmentsRoot: segmentRoot
+                segmentsRoot: segmentRoot,
             )
 
             logger.info("Stored exported segments: erasureRoot=\(storedErasureRoot.toHexString()), count=\(data.count)")
@@ -78,7 +78,7 @@ public actor WorkReportProcessor {
             try await dataStore.set(
                 data: segmentData,
                 erasureRoot: erasureRoot,
-                index: UInt16(index)
+                index: UInt16(index),
             )
         }
 
@@ -148,7 +148,7 @@ public actor WorkReportProcessor {
             let erasureRoot = try await ecStore.storeAuditBundle(
                 bundle: serializedData,
                 workPackageHash: workPackageHash,
-                segmentsRoot: segmentsRoot
+                segmentsRoot: segmentsRoot,
             )
 
             logger.info("Stored audit bundle: erasureRoot=\(erasureRoot.toHexString()), length=\(serializedData.count)")
@@ -225,7 +225,7 @@ public actor WorkReportProcessor {
     /// - Throws: DataAvailabilityError if reconstruction fails
     public func reconstructData(
         shards: [(index: UInt16, data: Data)],
-        originalLength: Int
+        originalLength: Int,
     ) async throws -> Data {
         // GP section 10: Erasure Coding
         // We need at least minimumValidatorResponses shards to reconstruct the original data
@@ -249,15 +249,13 @@ public actor WorkReportProcessor {
 
         do {
             // Use ErasureCoding.reconstruct to recover the original data
-            let reconstructed = try ErasureCoding.reconstruct(
+            return try ErasureCoding.reconstruct(
                 shards: erasureShards,
                 basicSize: basicSize,
                 originalCount: originalCount,
                 recoveryCount: totalValidators,
-                originalLength: originalLength
+                originalLength: originalLength,
             )
-
-            return reconstructed
         } catch {
             logger.error("Failed to reconstruct data from shards: \(error)")
             throw DataAvailabilityError.erasureCodingError
@@ -272,7 +270,7 @@ public actor WorkReportProcessor {
     /// - Throws: DataAvailabilityError if reconstruction fails
     public func reconstructSegments(
         shards: [(index: UInt16, data: Data)],
-        segmentCount: Int
+        segmentCount: Int,
     ) async throws -> [Data4104] {
         // Determine the total data size
         let totalDataSize = segmentCount * 4104
@@ -280,7 +278,7 @@ public actor WorkReportProcessor {
         // Reconstruct the full data
         let reconstructedData = try await reconstructData(
             shards: shards,
-            originalLength: totalDataSize
+            originalLength: totalDataSize,
         )
 
         // Split into segments
@@ -315,7 +313,7 @@ public actor WorkReportProcessor {
         // Try to get from local storage first
         let segment = WorkItem.ImportedDataSegment(
             root: .workPackageHash(workPackageHash),
-            index: 0
+            index: 0,
         )
 
         do {
@@ -323,8 +321,7 @@ public actor WorkReportProcessor {
 
             if !segments.isEmpty {
                 let segmentData = segments[0].data
-                let workPackage = try JamDecoder.decode(WorkPackage.self, from: segmentData)
-                return workPackage
+                return try JamDecoder.decode(WorkPackage.self, from: segmentData)
             }
         } catch {
             logger.debug("Work package not in local storage: \(error)")
@@ -342,7 +339,7 @@ public actor WorkReportProcessor {
     /// Batch reconstruction with network fallback
     public func batchReconstructWithFallback(
         erasureRoots: [Data32],
-        originalLengths: [Data32: Int]
+        originalLengths: [Data32: Int],
     ) async throws -> [Data32: Data] {
         guard let ecStore = erasureCodingDataStore else {
             throw DataAvailabilityError.segmentNotFound
@@ -353,7 +350,7 @@ public actor WorkReportProcessor {
             originalLengths: originalLengths,
             validators: nil,
             coreIndex: 0,
-            totalValidators: 1023
+            totalValidators: 1023,
         )
     }
 
@@ -361,7 +358,7 @@ public actor WorkReportProcessor {
     public func fetchSegmentsWithFallback(
         erasureRoot: Data32,
         indices: [Int],
-        validators: [UInt16: NetAddr]? = nil
+        validators: [UInt16: NetAddr]? = nil,
     ) async throws -> [Data4104] {
         guard let ecStore = erasureCodingDataStore else {
             throw DataAvailabilityError.segmentNotFound
@@ -370,7 +367,7 @@ public actor WorkReportProcessor {
         return try await ecStore.getSegmentsWithNetworkFallback(
             erasureRoot: erasureRoot,
             indices: indices,
-            validators: validators
+            validators: validators,
         )
     }
 }

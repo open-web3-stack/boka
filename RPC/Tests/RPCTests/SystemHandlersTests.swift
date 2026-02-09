@@ -1,11 +1,10 @@
 import Blockchain
+@testable import RPC
 import Testing
 import TracingUtils
+@testable import Utils
 import Vapor
 import XCTVapor
-
-@testable import RPC
-@testable import Utils
 
 struct DummySource: SystemDataSource {
     func getProperties() async throws -> JSON {
@@ -34,84 +33,91 @@ struct DummySource: SystemDataSource {
 }
 
 final class SystemHandlersTests {
-    var app: Application
+    var app: Application!
 
-    init() throws {
-        app = Application(.testing)
-
+    func setUp() async throws {
+        app = try await Application.make(.testing)
         let rpcController = JSONRPCController(
-            handlers: SystemHandlers.getHandlers(source: DummySource())
+            handlers: SystemHandlers.getHandlers(source: DummySource()),
         )
         try app.register(collection: rpcController)
     }
 
-    deinit {
-        app.shutdown()
-    }
-
-    @Test func health() throws {
+    @Test func health() async throws {
+        try await setUp()
         let req = JSONRequest(jsonrpc: "2.0", method: "system_health", params: nil, id: 1)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
-            let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).bool == true)
         }
+        try await app.asyncShutdown()
     }
 
-    @Test func implementation() throws {
+    @Test func implementation() async throws {
+        try await setUp()
         let req = JSONRequest(jsonrpc: "2.0", method: "system_implementation", params: nil, id: 2)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
-            let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).string == "Boka")
         }
+        try await app.asyncShutdown()
     }
 
-    @Test func version() throws {
+    @Test func version() async throws {
+        try await setUp()
         let req = JSONRequest(jsonrpc: "2.0", method: "system_version", params: nil, id: 3)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
-            let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).string == "0.0.1")
         }
+        try await app.asyncShutdown()
     }
 
-    @Test func properties() throws {
+    @Test func properties() async throws {
+        try await setUp()
         let req = JSONRequest(jsonrpc: "2.0", method: "system_properties", params: nil, id: 4)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
-            let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect(resp.result?.value != nil)
         }
+        try await app.asyncShutdown()
     }
 
-    @Test func nodeRoles() throws {
+    @Test func nodeRoles() async throws {
+        try await setUp()
         let req = JSONRequest(jsonrpc: "2.0", method: "system_nodeRoles", params: nil, id: 5)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
-            let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).array == [])
         }
+        try await app.asyncShutdown()
     }
 
-    @Test func chain() throws {
+    @Test func chain() async throws {
+        try await setUp()
         let req = JSONRequest(jsonrpc: "2.0", method: "system_chain", params: nil, id: 6)
         var buffer = ByteBuffer()
         try buffer.writeJSONEncodable(req)
-        try app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res in
+        try await app.testable().test(.POST, "/", headers: ["Content-Type": "application/json"], body: buffer) { res async in
             #expect(res.status == .ok)
-            let resp = try res.content.decode(JSONResponse.self, using: JSONDecoder())
+            let resp = try! res.content.decode(JSONResponse.self, using: JSONDecoder())
             #expect((resp.result!.value as! Utils.JSON).string == "dev")
         }
+        try await app.asyncShutdown()
     }
 }

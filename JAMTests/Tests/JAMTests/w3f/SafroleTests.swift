@@ -1,10 +1,9 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
-
-@testable import JAMTests
 
 struct SafroleInput: Codable {
     var slot: UInt32
@@ -16,55 +15,55 @@ struct OutputMarks: Codable {
     var epochMark: EpochMarker?
     var ticketsMark: ConfigFixedSizeArray<
         Ticket,
-        ProtocolConfig.EpochLength
+        ProtocolConfig.EpochLength,
     >?
 }
 
 struct SafroleState: Equatable, Safrole, Codable {
-    // tau
+    /// tau
     var timeslot: UInt32
-    // eta
+    /// eta
     var entropyPool: EntropyPool
-    // lambda
+    /// lambda
     var previousValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     >
-    // kappa
+    /// kappa
     var currentValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     >
-    // gammaK
+    /// gammaK
     var nextValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     >
-    // iota
+    /// iota
     var validatorQueue: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators
+        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     >
-    // gammaA
+    /// gammaA
     var ticketsAccumulator: ConfigLimitedSizeArray<
         Ticket,
         ProtocolConfig.Int0,
-        ProtocolConfig.EpochLength
+        ProtocolConfig.EpochLength,
     >
-    // gammaS
+    /// gammaS
     var ticketsOrKeys: Either<
         ConfigFixedSizeArray<
             Ticket,
-            ProtocolConfig.EpochLength
+            ProtocolConfig.EpochLength,
         >,
         ConfigFixedSizeArray<
             BandersnatchPublicKey,
-            ProtocolConfig.EpochLength
-        >
+            ProtocolConfig.EpochLength,
+        >,
     >
-    // gammaZ
+    /// gammaZ
     var ticketsVerifier: BandersnatchRingVRFRoot
 
-    // ψo
+    /// ψo
     var offenders: [Ed25519PublicKey]
 
-    public mutating func mergeWith(postState: SafrolePostState) {
+    mutating func mergeWith(postState: SafrolePostState) {
         timeslot = postState.timeslot
         entropyPool = postState.entropyPool
         previousValidators = postState.previousValidators
@@ -98,14 +97,14 @@ struct SafroleTests {
             try testcase.preState.validateTickets(
                 config: config,
                 slot: testcase.input.slot,
-                extrinsics: testcase.input.extrinsics
+                extrinsics: testcase.input.extrinsics,
             )
             return try testcase.preState.updateSafrole(
                 config: config,
                 slot: testcase.input.slot,
                 entropy: testcase.input.entropy,
                 offenders: Set(testcase.preState.offenders),
-                extrinsics: testcase.input.extrinsics
+                extrinsics: testcase.input.extrinsics,
             )
         }
         switch result {

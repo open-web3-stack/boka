@@ -6,9 +6,6 @@
 #include <cstdint>
 #include <cstddef>
 
-// Compiles PolkaVM bytecode to AArch64 machine code
-// 
-// Error codes:
 // - 0: Success
 // - 1: Invalid input (null buffer or zero size)
 // - 2: Invalid output parameter
@@ -32,9 +29,25 @@
 // - x9-x15: Temporary registers for computation
 // - x0-x7: Parameter passing for function calls
 // - x0: Return value register
-int32_t compilePolkaVMCode_a64(
+
+// Label-based compilation with direct jumps for maximum performance
+// Uses single-pass compilation with lazy label creation
+// Same interface as compilePolkaVMCode_a64 but uses labels for control flow
+//
+// NEW: skipTable provides instruction sizes from Swift's ProgramCode.skip(pc)
+// This is required for variable-length encoded instructions (LoadImmJump, BranchImm, etc.)
+// skipTable[pc] = number of additional bytes after opcode (instruction size = skip + 1)
+// NEW: bitmask provides instruction boundary markers for branch validation
+// bitmask[pc/8] has bit 0 set if pc is an instruction boundary (per spec pvm.tex)
+extern "C" int32_t compilePolkaVMCode_a64_labeled(
+    void* _Nonnull context,      // NEW: Swift-owned runtime context
     const uint8_t* _Nonnull codeBuffer,
     size_t codeSize,
     uint32_t initialPC,
     uint32_t jitMemorySize,
+    const uint32_t* _Nullable skipTable,   // instruction skip values
+    size_t skipTableSize,                   // skip table size
+    const uint8_t* _Nullable bitmask,      // bitmask for instruction boundaries
+    size_t bitmaskSize,                    // bitmask size
     void* _Nullable * _Nonnull funcOut);
+

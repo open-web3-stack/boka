@@ -22,7 +22,7 @@ extension AuditShardRequestMessage: CEMessage {
         guard let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "unexpected data"
+                debugDescription: "unexpected data",
             ))
         }
         return try JamDecoder.decode(AuditShardRequestMessage.self, from: data, withConfig: config)

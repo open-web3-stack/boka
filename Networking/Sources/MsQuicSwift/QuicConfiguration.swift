@@ -21,13 +21,13 @@ public final class QuicConfiguration: Sendable {
             for (i, alpnPtr) in alpnPtrs.enumerated() {
                 buffer[i].Length = UInt32(alpnPtr.count)
                 buffer[i].Buffer = UnsafeMutablePointer(
-                    mutating: alpnPtr.bindMemory(to: UInt8.self).baseAddress!
+                    mutating: alpnPtr.bindMemory(to: UInt8.self).baseAddress!,
                 )
             }
 
             try registration.api.call("ConfigurationOpen") { api in
                 api.pointee.ConfigurationOpen(
-                    registration.ptr, &buffer, UInt32(alpnPtrs.count), &settings, UInt32(MemoryLayout.size(ofValue: settings)), nil, &ptr
+                    registration.ptr, &buffer, UInt32(alpnPtrs.count), &settings, UInt32(MemoryLayout.size(ofValue: settings)), nil, &ptr,
                 )
             }
         }
@@ -55,13 +55,13 @@ public final class QuicConfiguration: Sendable {
                     Type: QUIC_CREDENTIAL_TYPE_CERTIFICATE_PKCS12,
                     Flags: QUIC_CREDENTIAL_FLAGS(flags),
                     QUIC_CREDENTIAL_CONFIG.__Unnamed_union___Anonymous_field2(
-                        CertificatePkcs12: certPtr
+                        CertificatePkcs12: certPtr,
                     ),
                     Principal: nil,
                     Reserved: nil,
                     AsyncHandler: nil,
                     AllowedCipherSuites: QUIC_ALLOWED_CIPHER_SUITE_NONE,
-                    CaCertificateFile: nil
+                    CaCertificateFile: nil,
                 )
 
                 try registration.api.call("ConfigurationLoadCredential") { api in

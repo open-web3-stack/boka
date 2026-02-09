@@ -26,7 +26,7 @@ public enum CE148Handler {
         network: any AvailabilityNetworkProtocol,
         segmentsRoot: Data32,
         segmentIndices: [UInt16],
-        from guarantorAddress: NetAddr
+        from guarantorAddress: NetAddr,
     ) async throws -> ([Data4104], [[Data32]]) {
         let request = SegmentRequest(segmentsRoot: segmentsRoot, segmentIndices: segmentIndices)
         let requestData = try request.encode()
@@ -34,14 +34,14 @@ public enum CE148Handler {
         logger.debug(
             """
             Fetching \(segmentIndices.count) segments from \(guarantorAddress) using CE 148
-            """
+            """,
         )
 
         do {
             let responseData = try await sendSegmentRequest(
                 network: network,
                 to: guarantorAddress,
-                data: requestData
+                data: requestData,
             )
 
             let response = try SegmentResponse.decode(responseData)
@@ -49,7 +49,7 @@ public enum CE148Handler {
             logger.info(
                 """
                 Successfully fetched \(response.segments.count) segments from \(guarantorAddress)
-                """
+                """,
             )
 
             return (response.segments, response.importProofs)
@@ -57,7 +57,7 @@ public enum CE148Handler {
             logger.warning(
                 """
                 Failed to fetch segments via CE 148, would need to fallback to CE 139/140: \(error)
-                """
+                """,
             )
             throw error
         }
@@ -74,7 +74,7 @@ public enum CE148Handler {
     private static func sendSegmentRequest(
         network: any AvailabilityNetworkProtocol,
         to address: NetAddr,
-        data: Data
+        data: Data,
     ) async throws -> Data {
         logger.debug("Sending CE 148 segment request to \(address)")
 

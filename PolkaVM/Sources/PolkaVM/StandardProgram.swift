@@ -1,3 +1,4 @@
+import Codec
 import Foundation
 
 /// Standard Program defined in GP.
@@ -20,6 +21,7 @@ public class StandardProgram {
     public let initialRegisters: Registers
 
     public init(blob: Data, argumentData: Data?) throws {
+        // Data is already thread-safe (value semantic, copy-on-write)
         var slice = Slice(base: blob, bounds: blob.startIndex ..< blob.endIndex)
 
         guard let readOnlyLen: UInt32 = slice.decode(length: 3) else { throw Error.invalidReadOnlyLength }
@@ -55,7 +57,12 @@ public class StandardProgram {
         guard totalSize <= 0x1_0000_0000 else {
             throw Error.invalidTotalMemorySize
         }
-        code = try ProgramCode(blob[slice.startIndex ..< slice.startIndex + Int(codeLength)])
+        // CRITICAL: Create a new Data object with indices starting from 0
+        // ProgramCode expects blob.startIndex to be 0, not an offset into the original blob
+        // Using Array to ensure we get a copy with zero-based indices
+        let programCodeBytes = Array(blob[slice.startIndex ..< slice.startIndex + Int(codeLength)])
+        let programCodeData = Data(programCodeBytes)
+        code = try ProgramCode(programCodeData)
 
         initialRegisters = Registers(config: config, argumentData: argumentData)
 
@@ -64,7 +71,7 @@ public class StandardProgram {
             readWriteData: readWriteData,
             argumentData: argumentData ?? Data(),
             heapEmptyPagesSize: UInt32(heapEmptyPagesSize),
-            stackSize: UInt32(stackSize)
+            stackSize: UInt32(stackSize),
         )
     }
 

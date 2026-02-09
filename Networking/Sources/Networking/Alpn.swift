@@ -7,7 +7,7 @@ public struct Alpn: Sendable {
     init(protocolName: String = "jamnp-s", version: String = "0", genesisHeader: Data32, builder: Bool) {
         let header: String.SubSequence = genesisHeader.toHexString().prefix(Alpn.headerPrefixLength)
         data = Data(
-            "\(protocolName)/\(version)/\(header)\(builder ? "/builder" : "")".utf8
+            "\(protocolName)/\(version)/\(header)\(builder ? "/builder" : "")".utf8,
         )
     }
 }

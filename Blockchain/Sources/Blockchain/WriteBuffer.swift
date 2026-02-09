@@ -6,7 +6,7 @@ import Utils
 /// NOTE: This is a non-actor class because it's owned exclusively by StateTrie (which is an actor)
 /// Making it a class avoids suspension overhead and maintains atomicity of batch operations
 public final class WriteBuffer {
-    // Count of buffered updates (we don't store the actual data since StateTrie maintains it)
+    /// Count of buffered updates (we don't store the actual data since StateTrie maintains it)
     private var count: Int = 0
 
     // Configuration
@@ -101,7 +101,7 @@ public final class WriteBuffer {
             totalFlushes: totalFlushes,
             autoFlushes: autoFlushes,
             manualFlushes: manualFlushes,
-            utilization: utilization
+            utilization: utilization,
         )
     }
 

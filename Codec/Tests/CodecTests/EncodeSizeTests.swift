@@ -1,7 +1,6 @@
+@testable import Codec
 import Foundation
 import Testing
-
-@testable import Codec
 
 extension Int: EncodedSize, @retroactive Error {
     public var encodedSize: Int {
@@ -15,7 +14,7 @@ extension Int: EncodedSize, @retroactive Error {
 
 struct EncodeSizeTests {
     @Test
-    func encodeFixedWidthInteger() throws {
+    func encodeFixedWidthInteger() {
         #expect(Int(42).encodedSize == MemoryLayout<Int>.size)
         #expect(Int8(-5).encodedSize == MemoryLayout<Int8>.size)
         #expect(UInt32(123_456).encodedSize == MemoryLayout<UInt32>.size)
@@ -25,14 +24,14 @@ struct EncodeSizeTests {
     }
 
     @Test
-    func encodeBool() throws {
+    func encodeBool() {
         #expect(true.encodedSize == 1)
         #expect(false.encodedSize == 1)
         #expect(Bool.encodeedSizeHint == 1)
     }
 
     @Test
-    func encodeStringAndData() throws {
+    func encodeStringAndData() {
         #expect("test".encodedSize == 4)
         #expect("".encodedSize == 0)
         #expect(Data([0x01, 0x02, 0x03]).encodedSize == 4)
@@ -42,7 +41,7 @@ struct EncodeSizeTests {
     }
 
     @Test
-    func encodeArrayAndSet() throws {
+    func encodeArrayAndSet() {
         let intArray = [1, 2, 3]
         let emptyArray: [Int] = []
         let intSet: Set<Int> = [4, 5, 6]
@@ -57,7 +56,7 @@ struct EncodeSizeTests {
     }
 
     @Test
-    func encodeDictionary() throws {
+    func encodeDictionary() {
         let dict: [Int: String] = [1: "one", 2: "two"]
         let emptyDict: [Int: String] = [:]
 
@@ -71,7 +70,7 @@ struct EncodeSizeTests {
     }
 
     @Test
-    func encodeOptional() throws {
+    func encodeOptional() {
         let someValue: Int? = 42
         let noneValue: Int? = nil
 
@@ -81,7 +80,7 @@ struct EncodeSizeTests {
     }
 
     @Test
-    func encodeResult() throws {
+    func encodeResult() {
         let successResult: Result<String, Int> = .success("OK")
         let failureResult: Result<String, Int> = .failure(404)
 

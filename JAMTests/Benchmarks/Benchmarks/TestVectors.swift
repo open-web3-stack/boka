@@ -12,7 +12,7 @@ func testVectorsBenchmarks() {
     let erasureCases = (try? TestLoader.getTestcases(path: "erasure/full", extension: "bin")) ?? []
     if erasureCases.isEmpty {
         print(
-            "⚠️  Warning: Erasure coding test vectors not found at 'erasure/full'. Skipping w3f.erasure.full.encode+reconstruct benchmark."
+            "⚠️  Warning: Erasure coding test vectors not found at 'erasure/full'. Skipping w3f.erasure.full.encode+reconstruct benchmark.",
         )
     }
     if !erasureCases.isEmpty {
@@ -34,7 +34,7 @@ func testVectorsBenchmarks() {
                         shards: Array(typed.prefix(originalCount)),
                         basicSize: basicSize,
                         originalCount: originalCount,
-                        recoveryCount: recoveryCount
+                        recoveryCount: recoveryCount,
                     )
                 }
             }
@@ -77,7 +77,7 @@ func testVectorsBenchmarks() {
     for (path, iterations) in tracePaths {
         guard let traces = try? JamTestnet.loadTests(path: path, src: .w3f) else {
             print(
-                "⚠️  Warning: Trace files not found at '\(path)'. Skipping w3f.traces.\(path.components(separatedBy: "/").last!) benchmark."
+                "⚠️  Warning: Trace files not found at '\(path)'. Skipping w3f.traces.\(path.components(separatedBy: "/").last!) benchmark.",
             )
             continue
         }

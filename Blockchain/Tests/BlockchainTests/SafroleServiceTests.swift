@@ -1,9 +1,8 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import TracingUtils
 import Utils
-
-@testable import Blockchain
 
 struct SafroleServiceTests {
     let config: ProtocolConfigRef
@@ -28,7 +27,7 @@ struct SafroleServiceTests {
         let logMiddleware = LogMiddleware(logger: logger, propagateError: true)
         eventBus = EventBus(
             eventMiddleware: .serial(Middleware(storeMiddleware), Middleware(logMiddleware)),
-            handlerMiddleware: Middleware(logMiddleware)
+            handlerMiddleware: Middleware(logMiddleware),
         )
         keystore = try await DevKeyStore(devKeysCount: 2)
 
@@ -42,7 +41,7 @@ struct SafroleServiceTests {
     }
 
     @Test
-    func testGenerateTicketsOnGenesis() async throws {
+    func generateTicketsOnGenesis() async throws {
         await safroleService.on(genesis: genesisState)
 
         let events = await storeMiddleware.wait()
@@ -50,13 +49,13 @@ struct SafroleServiceTests {
 
         for event in events {
             #expect(event is RuntimeEvents.SafroleTicketsGenerated)
-            let ticketEvent = event as! RuntimeEvents.SafroleTicketsGenerated
+            let ticketEvent = try #require(event as? RuntimeEvents.SafroleTicketsGenerated)
             #expect(ticketEvent.items.count == config.value.ticketEntriesPerValidator)
         }
     }
 
     @Test
-    func testGenerateTicketsOnEpochChange() async throws {
+    func generateTicketsOnEpochChange() async throws {
         // Simulate an epoch change
         let newBlock = BlockRef.dummy(config: config).mutate {
             $0.header.unsigned.timeslot += TimeslotIndex(config.value.epochLength)
@@ -68,7 +67,7 @@ struct SafroleServiceTests {
                 headerHash: newBlock.hash,
                 superPeak: Data32(),
                 stateRoot: Data32(),
-                lookup: .init()
+                lookup: .init(),
             ))
         }
 
@@ -79,13 +78,13 @@ struct SafroleServiceTests {
 
         for event in events[1...] {
             #expect(event is RuntimeEvents.SafroleTicketsGenerated)
-            let ticketEvent = event as! RuntimeEvents.SafroleTicketsGenerated
+            let ticketEvent = try #require(event as? RuntimeEvents.SafroleTicketsGenerated)
             #expect(ticketEvent.items.count == config.value.ticketEntriesPerValidator)
         }
     }
 
     @Test
-    func testNoTicketGenerationMidEpoch() async throws {
+    func noTicketGenerationMidEpoch() async throws {
         // Simulate a mid-epoch block
         let newBlock = BlockRef.dummy(config: config).mutate {
             $0.header.unsigned.timeslot += 1
@@ -97,7 +96,7 @@ struct SafroleServiceTests {
                 headerHash: newBlock.hash,
                 superPeak: Data32(),
                 stateRoot: Data32(),
-                lookup: .init()
+                lookup: .init(),
             ))
         }
 

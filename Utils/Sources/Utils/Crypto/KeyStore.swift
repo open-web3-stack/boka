@@ -3,7 +3,7 @@ import Foundation
 public protocol KeyStore: Sendable {
     func generate<K: KeyType>(_ type: K.Type) async throws -> K.SecretKey
     func add<K: KeyType>(_ type: K.Type, seed: Data32) async throws -> K.SecretKey
-    func contains<PK: PublicKeyProtocol>(publicKey: PK) async -> Bool
+    func contains(publicKey: some PublicKeyProtocol) async -> Bool
     func get<K: KeyType>(_ type: K.Type, publicKey: K.SecretKey.PublicKey) async -> K.SecretKey?
     func getAll<K: KeyType>(_ type: K.Type) async -> [K.SecretKey]
 }
@@ -72,7 +72,7 @@ public actor FilesystemKeyStore: KeyStore {
             try FileManager.default.createDirectory(
                 at: self.storageDirectory,
                 withIntermediateDirectories: true,
-                attributes: nil
+                attributes: nil,
             )
         }
     }

@@ -62,7 +62,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
         benchmark.stopMeasurement()
 
@@ -81,7 +81,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         let block = BlockRef.dummy(config: config, parent: genesisBlock)
@@ -101,7 +101,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         var blocks: [BlockRef] = []
@@ -129,7 +129,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         benchmark.startMeasurement()
@@ -147,7 +147,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         // Create dummy states (just for benchmarking I/O)
@@ -175,7 +175,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         benchmark.startMeasurement()
@@ -194,7 +194,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         // Add some blocks
@@ -227,7 +227,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         benchmark.startMeasurement()
@@ -246,7 +246,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         // Add some states
@@ -276,7 +276,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         benchmark.startMeasurement()
@@ -296,7 +296,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         benchmark.startMeasurement()
@@ -317,7 +317,7 @@ func rocksdbBenchmarks() {
             path: tempDir.url,
             config: config,
             genesisBlock: genesisBlock,
-            genesisStateData: stateData
+            genesisStateData: stateData,
         )
 
         benchmark.startMeasurement()

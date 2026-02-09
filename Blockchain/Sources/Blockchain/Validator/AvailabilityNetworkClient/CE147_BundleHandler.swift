@@ -23,18 +23,18 @@ public enum CE147Handler {
     public static func fetchBundle(
         erasureRoot: Data32,
         from guarantorAddress: NetAddr,
-        network: any AvailabilityNetworkProtocol
+        network: any AvailabilityNetworkProtocol,
     ) async throws -> Data {
         logger.debug(
             """
             Fetching bundle \(erasureRoot) from \(guarantorAddress) using CE 147
-            """
+            """,
         )
 
         let responseData = try await sendBundleRequest(
             to: guarantorAddress,
             erasureRoot: erasureRoot,
-            network: network
+            network: network,
         )
 
         let response = try BundleResponse.decode(responseData)
@@ -42,7 +42,7 @@ public enum CE147Handler {
         logger.info(
             """
             Successfully fetched bundle (\(response.bundle.count) bytes) from \(guarantorAddress)
-            """
+            """,
         )
 
         return response.bundle
@@ -59,7 +59,7 @@ public enum CE147Handler {
     private static func sendBundleRequest(
         to address: NetAddr,
         erasureRoot: Data32,
-        network: any AvailabilityNetworkProtocol
+        network: any AvailabilityNetworkProtocol,
     ) async throws -> Data {
         let requestData = BundleRequest(erasureRoot: erasureRoot).encode()
 

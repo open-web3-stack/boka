@@ -4,16 +4,16 @@ import Utils
 
 private let logger = Logger(label: "RecentHistory")
 
-// β
+/// β
 public struct RecentHistory: Sendable, Equatable, Codable {
     public struct HistoryItem: Sendable, Equatable, Codable {
-        // h
+        /// h
         public var headerHash: Data32
 
-        // b
+        /// b
         public var superPeak: Data32
 
-        // s
+        /// s
         public var stateRoot: Data32
 
         // p: work package hash -> segment root lookup
@@ -23,7 +23,7 @@ public struct RecentHistory: Sendable, Equatable, Codable {
             headerHash: Data32,
             superPeak: Data32,
             stateRoot: Data32,
-            lookup: [Data32: Data32]
+            lookup: [Data32: Data32],
         ) {
             self.headerHash = headerHash
             self.superPeak = superPeak
@@ -32,7 +32,7 @@ public struct RecentHistory: Sendable, Equatable, Codable {
         }
     }
 
-    // H
+    /// H
     public var items: ConfigLimitedSizeArray<HistoryItem, ProtocolConfig.Int0, ProtocolConfig.RecentHistorySize>
 
     // B: Accumulation Output Log
@@ -49,10 +49,10 @@ extension RecentHistory: Dummy {
                     headerHash: Data32(),
                     superPeak: Data32(),
                     stateRoot: Data32(),
-                    lookup: [Data32: Data32]()
-                )]
+                    lookup: [Data32: Data32](),
+                )],
             ),
-            mmr: MMR([])
+            mmr: MMR([]),
         )
     }
 }
@@ -70,7 +70,7 @@ extension RecentHistory {
     public mutating func update(
         headerHash: Data32,
         accumulateRoot: Data32,
-        lookup: [Data32: Data32]
+        lookup: [Data32: Data32],
     ) {
         mmr.append(accumulateRoot, hasher: Keccak.self)
 
@@ -80,7 +80,7 @@ extension RecentHistory {
             headerHash: headerHash,
             superPeak: mmr.superPeak(),
             stateRoot: Data32(), // empty and will be updated upon next block
-            lookup: lookup
+            lookup: lookup,
         )
 
         items.safeAppend(newItem)

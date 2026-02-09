@@ -1,7 +1,6 @@
+@testable import Codec
 import Foundation
 import Testing
-
-@testable import Codec
 
 struct SortedSetTests {
     @Test func encode() throws {

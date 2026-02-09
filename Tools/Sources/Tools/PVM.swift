@@ -13,7 +13,7 @@ struct PVM: AsyncParsableCommand {
         abstract: "PVM tools",
         subcommands: [
             Invoke.self,
-        ]
+        ],
     )
 
     struct Invoke: AsyncParsableCommand {

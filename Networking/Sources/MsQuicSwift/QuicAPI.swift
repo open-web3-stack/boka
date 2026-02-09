@@ -9,7 +9,7 @@ public final class QuicAPI: Sendable {
         try MsQuicOpenVersion(2, &ptr).requireSucceeded("MsQuicOpenVersion")
 
         api = ptr!.assumingMemoryBound(
-            to: QUIC_API_TABLE.self
+            to: QUIC_API_TABLE.self,
         ).asSendable
     }
 
@@ -19,13 +19,13 @@ public final class QuicAPI: Sendable {
 
     func call(
         _ message: String,
-        fn: (UnsafePointer<QUIC_API_TABLE>) throws(QuicError) -> UInt32
+        fn: (UnsafePointer<QUIC_API_TABLE>) throws(QuicError) -> UInt32,
     ) throws(QuicError) {
         try fn(api.value).requireSucceeded(message)
     }
 
     func call(
-        fn: (UnsafePointer<QUIC_API_TABLE>) -> Void
+        fn: (UnsafePointer<QUIC_API_TABLE>) -> Void,
     ) {
         fn(api.value)
     }

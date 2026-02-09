@@ -15,7 +15,7 @@ public struct ValidatorKey: Sendable, Equatable, Codable, Hashable {
         bandersnatch: BandersnatchPublicKey,
         ed25519: Ed25519PublicKey,
         bls: BLSKey,
-        metadata: Data128
+        metadata: Data128,
     ) {
         self.bandersnatch = bandersnatch
         self.ed25519 = ed25519

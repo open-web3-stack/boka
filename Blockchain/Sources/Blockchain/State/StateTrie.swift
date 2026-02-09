@@ -18,7 +18,7 @@ private struct TrieNode {
     let isNew: Bool
     let rawValue: Data?
 
-    // Constructor for loading from storage (65-byte format: [type][left-32][right-32])
+    /// Constructor for loading from storage (65-byte format: [type][left-32][right-32])
     init(hash: Data32, data: Data, isNew: Bool = false) {
         self.hash = hash
         self.isNew = isNew
@@ -31,7 +31,7 @@ private struct TrieNode {
         right = Data32(data[relative: 33 ..< 65])! // bytes 33-64
     }
 
-    // Constructor for pure trie operations
+    /// Constructor for pure trie operations
     private init(left: Data32, right: Data32, type: TrieNodeType, isNew: Bool, rawValue: Data?) {
         hash = Self.calculateHash(left: left, right: right, type: type)
         self.left = left // Store original data
@@ -41,7 +41,7 @@ private struct TrieNode {
         self.rawValue = rawValue
     }
 
-    // JAM spec compliant hash calculation
+    /// JAM spec compliant hash calculation
     private static func calculateHash(left: Data32, right: Data32, type: TrieNodeType) -> Data32 {
         switch type {
         case .branch:
@@ -60,7 +60,7 @@ private struct TrieNode {
         }
     }
 
-    // New 65-byte storage format: [type:1][left:32][right:32]
+    /// New 65-byte storage format: [type:1][left:32][right:32]
     var storageData: Data {
         var data = Data(capacity: 65)
         data.append(type.rawValue)
@@ -89,9 +89,15 @@ private struct TrieNode {
             return nil
         }
         // For embedded leaves: length is stored in first byte
-        let len = Int(left.data[relative: 0])
-        let safeLen = min(len, 32)
-        return right.data[relative: 0 ..< safeLen]
+        let len = left.data[relative: 0]
+
+        // Validate len to prevent crash on corrupted data
+        // Embedded leaves can only store up to 32 bytes (see leaf() constructor)
+        guard len <= 32 else {
+            return nil // Corrupted data, treat as missing value
+        }
+
+        return right.data[relative: 0 ..< Int(len)]
     }
 
     static func leaf(key: Data31, value: Data) -> TrieNode {
@@ -143,7 +149,7 @@ public actor StateTrie {
         cacheSize: Int = 1000,
         enableWriteBuffer: Bool = true,
         writeBufferSize: Int = 1000,
-        writeBufferFlushInterval: TimeInterval = 1.0
+        writeBufferFlushInterval: TimeInterval = 1.0,
     ) {
         self.rootHash = rootHash
         self.backend = backend
@@ -153,7 +159,7 @@ public actor StateTrie {
         self.enableWriteBuffer = enableWriteBuffer
         writeBuffer = enableWriteBuffer ? WriteBuffer(
             maxBufferSize: writeBufferSize,
-            flushInterval: writeBufferFlushInterval
+            flushInterval: writeBufferFlushInterval,
         ) : nil
     }
 
@@ -372,8 +378,6 @@ public actor StateTrie {
             }
         }
 
-        // Don't save loaded nodes to nodes map - they're already persisted
-        // and don't need ref count updates (only new nodes do)
         return node
     }
 
@@ -425,23 +429,57 @@ public actor StateTrie {
 
         // Decrement reference count of old root hash if it changed
         if lastSavedRootHash != rootHash {
-            refChanges[lastSavedRootHash.data.suffix(31), default: 0] -= 1
+            let key = lastSavedRootHash.data.suffix(31)
+            refChanges[key, default: 0] -= 1
         }
 
         // process deleted nodes
         for id in deleted {
             guard let node = nodes[id] else {
+                // Node not in nodes map - might be a persisted node that was never added
+                // Try to load it from cache or backend to get its children for ref counting
+                if let cache = nodeCache, let cachedNode = cache.get(id) {
+                    if cachedNode.isBranch {
+                        let leftKey = cachedNode.left.data.suffix(31)
+                        let rightKey = cachedNode.right.data.suffix(31)
+                        refChanges[leftKey, default: 0] -= 1
+                        refChanges[rightKey, default: 0] -= 1
+                    }
+                    cache.remove(id)
+                } else {
+                    // Try to load from backend to get node data for ref counting
+                    // Accept any data size >= 65 bytes to handle potential future encoding changes
+                    if let nodeData = try? await backend.read(key: id), nodeData.count >= 65 {
+                        // Reconstruct a temporary hash for parsing (TrieNode doesn't validate hash)
+                        // The actual hash value doesn't matter here since we only need node.type and children
+                        // Safety: id is guaranteed to be 31 bytes (from deleted set keys which are suffix(31))
+                        // Prefixing with 1 zero byte gives us exactly 32 bytes for Data32
+                        var hashBytes = Data(repeating: 0, count: 1)
+                        hashBytes.append(id)
+                        let node = TrieNode(hash: Data32(hashBytes)!, data: nodeData)
+                        if node.isBranch {
+                            let leftKey = node.left.data.suffix(31)
+                            let rightKey = node.right.data.suffix(31)
+                            refChanges[leftKey, default: 0] -= 1
+                            refChanges[rightKey, default: 0] -= 1
+                        }
+                    } else {
+                        logger.warning("StateTrie.save(): deleted node \(id.toHexString()) not found in nodes map, cache, or backend")
+                    }
+                }
                 continue
             }
             if node.isBranch {
                 // Decrement reference counts for children of deleted branch nodes
-                // Note: We don't decrement the node's own ref count here - that's
-                // handled by its parent when the parent is processed (or when the
-                // root changes). We only decrement the children that this node
-                // was referencing.
+                // Note: We don't decrement the node's own ref count here - ref counts
+                // track how many parents reference a node, not whether the node exists.
+                // The node's own ref count is managed by its parent when the parent
+                // is deleted or replaced.
                 // Use -= to properly accumulate if multiple deleted nodes share children
-                refChanges[node.left.data.suffix(31), default: 0] -= 1
-                refChanges[node.right.data.suffix(31), default: 0] -= 1
+                let leftKey = node.left.data.suffix(31)
+                let rightKey = node.right.data.suffix(31)
+                refChanges[leftKey, default: 0] -= 1
+                refChanges[rightKey, default: 0] -= 1
             }
             nodes.removeValue(forKey: id)
 
@@ -546,7 +584,7 @@ public actor StateTrie {
     }
 
     private func insert(
-        hash: Data32, key: Data31, value: Data, depth: UInt8
+        hash: Data32, key: Data31, value: Data, depth: UInt8,
     ) async throws -> Data32 {
         guard let parent = try await get(hash: hash) else {
             let node = TrieNode.leaf(key: key, value: value)
@@ -589,7 +627,7 @@ public actor StateTrie {
         if existingKeyBit == newKeyBit {
             // need to go deeper
             let childNodeHash = try await insertLeafNode(
-                existing: existing, newKey: newKey, newValue: newValue, depth: depth + 1
+                existing: existing, newKey: newKey, newValue: newValue, depth: depth + 1,
             )
             let newBranch = if existingKeyBit {
                 TrieNode.branch(left: Data32(), right: childNodeHash)
@@ -675,22 +713,39 @@ public actor StateTrie {
 
     private func removeNode(node: TrieNode) {
         let id = node.hash.data.suffix(31)
-        deleted.insert(id)
 
         // Only remove from nodes map if it's a new node (never persisted)
         // For persisted nodes, we need to keep them in memory until save() processes
         // their reference counts (decrementing children's ref counts)
         if node.isNew {
+            // New nodes were never persisted, so we don't need to track them for deletion
+            // Just remove from in-memory nodes map
             nodes.removeValue(forKey: id)
         } else {
+            // For persisted nodes, add them to deleted set and nodes map so save() can process them
+            deleted.insert(id)
             nodes[id] = node
         }
     }
 
     private func saveNode(node: TrieNode) {
         let id = node.hash.data.suffix(31)
+
+        // If this node was previously persisted and then deleted in the same batch,
+        // we need to keep the old persisted version (isNew=false) instead of overwriting
+        // with the new version (isNew=true). This prevents reference count leaks:
+        // - removeNode added it to deleted set (will decrement children ref counts)
+        // - If we overwrite with isNew=true, save() will increment children ref counts
+        // - Result: Net increment (leak) instead of canceling out
+        if deleted.contains(id) {
+            // Cancel the deletion by removing from deleted set
+            // Keep the existing isNew=false node that's already in nodes map
+            deleted.remove(id)
+            return
+        }
+
+        // Normal case: save the new node
         nodes[id] = node
-        deleted.remove(id)
     }
 
     public func debugPrint() async throws {

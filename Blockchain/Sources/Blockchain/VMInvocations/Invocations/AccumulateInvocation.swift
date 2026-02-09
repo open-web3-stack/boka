@@ -12,7 +12,7 @@ public func accumulate(
     serviceIndex: ServiceIndex,
     gas: Gas,
     arguments: [AccumulationInput],
-    timeslot: TimeslotIndex
+    timeslot: TimeslotIndex,
 ) async throws -> AccumulationResult {
     logger.debug("accumulating service index: \(serviceIndex), gas: \(gas)")
 
@@ -31,7 +31,7 @@ public func accumulate(
 
     guard let preimage = try await state.accounts.value.get(
         serviceAccount: serviceIndex,
-        preimageHash: accumulatingAccountDetails.codeHash
+        preimageHash: accumulatingAccountDetails.codeHash,
     ) else {
         logger.error("code preimage not found for service index: \(serviceIndex)")
         return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), provide: [])
@@ -49,23 +49,25 @@ public func accumulate(
     let nextAccountIndex = try await AccumulateContext.check(
         i: (initialIndex % modValue) + S,
         accounts: state.accounts.toRef(),
-        config: config
+        config: config,
     )
 
     let contextContent = AccumulateContext.ContextType(
         x: AccumulateResultContext(
             serviceIndex: serviceIndex,
             state: state,
-            nextAccountIndex: nextAccountIndex
+            nextAccountIndex: nextAccountIndex,
         ),
         y: AccumulateResultContext(
             serviceIndex: serviceIndex,
             state: state.copy(),
-            nextAccountIndex: nextAccountIndex
-        )
+            nextAccountIndex: nextAccountIndex,
+        ),
     )
     let ctx = AccumulateContext(context: contextContent, config: config, timeslot: timeslot, inputs: arguments)
     let argumentData = try JamEncoder.encode(UInt(timeslot), UInt(serviceIndex), UInt(arguments.count))
+
+    logger.debug("=== Service \(serviceIndex): about to invokePVM with codeBlob size: \(codeBlob.count), gas: \(gas) ===")
 
     let (exitReason, gas, output) = await invokePVM(
         config: config,
@@ -73,19 +75,21 @@ public func accumulate(
         pc: 5,
         gas: gas,
         argumentData: argumentData,
-        ctx: ctx
+        ctx: ctx,
     )
 
-    logger.debug("accumulate exit reason: \(exitReason)")
-    logger.debug("accumulate output: \(output?.toDebugHexString() ?? "nil")")
+    let outputHex = output?.toDebugHexString() ?? "nil"
+    logger.debug(
+        "=== Service \(serviceIndex): exit reason: \(exitReason), remaining gas: \(gas), output: \(outputHex) ===",
+    )
 
     return try collapse(exitReason: exitReason, output: output, context: ctx.context, gas: gas)
 }
 
-// collapse function C selects one of the two dimensions of context depending on whether the virtual
-// machine’s halt was regular or exceptional
+/// collapse function C selects one of the two dimensions of context depending on whether the virtual
+/// machine’s halt was regular or exceptional
 private func collapse(
-    exitReason: ExitReason, output: Data?, context: AccumulateContext.ContextType, gas: Gas
+    exitReason: ExitReason, output: Data?, context: AccumulateContext.ContextType, gas: Gas,
 ) throws -> AccumulationResult {
     switch exitReason {
     case .panic, .outOfGas:
@@ -94,7 +98,7 @@ private func collapse(
             transfers: context.y.transfers,
             commitment: context.y.yield,
             gasUsed: gas,
-            provide: context.y.provide
+            provide: context.y.provide,
         )
     default:
         if let output, let o = Data32(output) {
@@ -103,7 +107,7 @@ private func collapse(
                 transfers: context.x.transfers,
                 commitment: o,
                 gasUsed: gas,
-                provide: context.x.provide
+                provide: context.x.provide,
             )
 
         } else {
@@ -112,7 +116,7 @@ private func collapse(
                 transfers: context.x.transfers,
                 commitment: context.x.yield,
                 gasUsed: gas,
-                provide: context.x.provide
+                provide: context.x.provide,
             )
         }
     }

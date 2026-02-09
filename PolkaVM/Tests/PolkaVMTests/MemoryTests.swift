@@ -1,8 +1,7 @@
 import Foundation
+@testable import PolkaVM
 import Testing
 import Utils
-
-@testable import PolkaVM
 
 enum MemoryTests {
     @Suite struct PageMapTests {
@@ -166,7 +165,7 @@ enum MemoryTests {
                     (address: 0, length: UInt32(config.pvmMemoryPageSize), access: .readOnly),
                     (address: UInt32(config.pvmMemoryPageSize), length: UInt32(config.pvmMemoryPageSize), access: .readOnly),
                 ],
-                config: config
+                config: config,
             )
 
             #expect(pageMap.isReadable(pageStart: 0, pages: 1).result == true)
@@ -242,12 +241,12 @@ enum MemoryTests {
             #expect(throws: MemoryError.invalidZone(0)) { try MemoryZone(
                 startAddress: 0,
                 endAddress: 0,
-                chunks: [MemoryChunk(startAddress: 0, data: Data([0]))]
+                chunks: [MemoryChunk(startAddress: 0, data: Data([0]))],
             ) }
             #expect(throws: MemoryError.invalidZone(0)) { try MemoryZone(
                 startAddress: 0,
                 endAddress: 1,
-                chunks: [MemoryChunk(startAddress: 0, data: Data([0, 0]))]
+                chunks: [MemoryChunk(startAddress: 0, data: Data([0, 0]))],
             ) }
         }
 
@@ -337,7 +336,7 @@ enum MemoryTests {
                 readWriteData: readWriteData,
                 argumentData: argumentData,
                 heapEmptyPagesSize: 100 * UInt32(config.pvmMemoryPageSize),
-                stackSize: 1024
+                stackSize: 1024,
             )
             readOnlyStart = UInt32(config.pvmProgramInitZoneSize)
             readOnlyEnd = UInt32(config.pvmProgramInitZoneSize) + UInt32(config.pvmMemoryPageSize)
@@ -361,7 +360,7 @@ enum MemoryTests {
             #expect(try memory.read(address: readOnlyStart, length: 4) == Data([1, 2, 3, 0]))
             #expect(throws: MemoryError.notReadable(readOnlyEnd)) { try memory.read(
                 address: readOnlyEnd,
-                length: Int(heapStart - readOnlyEnd)
+                length: Int(heapStart - readOnlyEnd),
             ) }
 
             // heap
@@ -388,7 +387,7 @@ enum MemoryTests {
             #expect(throws: MemoryError.notWritable(0)) { try memory.write(address: 0, value: 0) }
             #expect(throws: MemoryError.notWritable(readOnlyStart - UInt32(config.pvmMemoryPageSize))) { try memory.write(
                 address: readOnlyStart - 1,
-                value: 0
+                value: 0,
             ) }
             #expect(memory.isWritable(address: 0, length: config.pvmProgramInitZoneSize) == false)
 
@@ -461,11 +460,11 @@ enum MemoryTests {
                     (address: 4, data: Data([5, 6, 7])),
                     (address: 2048, data: Data([1, 2, 3])),
                     (address: UInt32(config.pvmMemoryPageSize), data: Data([1, 2, 3])),
-                ]
+                ],
             )
         }
 
-        @Test func pageMap() throws {
+        @Test func pageMap() {
             #expect(memory.isReadable(pageStart: 0, pages: 1) == true)
             #expect(memory.isReadable(pageStart: 1, pages: 1) == true)
             #expect(memory.isReadable(pageStart: 2, pages: 1) == false)

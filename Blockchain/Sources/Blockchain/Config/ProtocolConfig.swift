@@ -173,7 +173,7 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         pvmDynamicAddressAlignmentFactor: Int,
         pvmProgramInitInputDataSize: Int,
         pvmProgramInitZoneSize: Int,
-        pvmMemoryPageSize: Int
+        pvmMemoryPageSize: Int,
     ) {
         self.auditTranchePeriod = auditTranchePeriod
         self.additionalMinBalancePerStateItem = additionalMinBalancePerStateItem
@@ -225,10 +225,21 @@ public typealias ProtocolConfigRef = Ref<ProtocolConfig>
 extension ProtocolConfig: PvmConfig {}
 /// silence the warning about cross module conformances as we owns all the code
 extension Ref: @retroactive PvmConfig where T == ProtocolConfig {
-    public var pvmDynamicAddressAlignmentFactor: Int { value.pvmDynamicAddressAlignmentFactor }
-    public var pvmProgramInitInputDataSize: Int { value.pvmProgramInitInputDataSize }
-    public var pvmProgramInitZoneSize: Int { value.pvmProgramInitZoneSize }
-    public var pvmMemoryPageSize: Int { value.pvmMemoryPageSize }
+    public var pvmDynamicAddressAlignmentFactor: Int {
+        value.pvmDynamicAddressAlignmentFactor
+    }
+
+    public var pvmProgramInitInputDataSize: Int {
+        value.pvmProgramInitInputDataSize
+    }
+
+    public var pvmProgramInitZoneSize: Int {
+        value.pvmProgramInitZoneSize
+    }
+
+    public var pvmMemoryPageSize: Int {
+        value.pvmMemoryPageSize
+    }
 }
 
 extension ProtocolConfig {
@@ -313,7 +324,7 @@ extension ProtocolConfig {
             pvmProgramInitZoneSize: other.pvmProgramInitZoneSize != 0
                 ? other.pvmProgramInitZoneSize : pvmProgramInitZoneSize,
             pvmMemoryPageSize: other.pvmMemoryPageSize != 0
-                ? other.pvmMemoryPageSize : pvmMemoryPageSize
+                ? other.pvmMemoryPageSize : pvmMemoryPageSize,
         )
     }
 
@@ -330,10 +341,10 @@ extension ProtocolConfig {
 
         auditTranchePeriod = try decode(.auditTranchePeriod, defaultValue: 0, required: required)
         additionalMinBalancePerStateItem = try decode(
-            .additionalMinBalancePerStateItem, defaultValue: 0, required: required
+            .additionalMinBalancePerStateItem, defaultValue: 0, required: required,
         )
         additionalMinBalancePerStateByte = try decode(
-            .additionalMinBalancePerStateByte, defaultValue: 0, required: required
+            .additionalMinBalancePerStateByte, defaultValue: 0, required: required,
         )
         serviceMinBalance = try decode(.serviceMinBalance, defaultValue: 0, required: required)
         totalNumberOfCores = try decode(.totalNumberOfCores, defaultValue: 0, required: required)
@@ -341,84 +352,84 @@ extension ProtocolConfig {
         epochLength = try decode(.epochLength, defaultValue: 0, required: required)
         auditBiasFactor = try decode(.auditBiasFactor, defaultValue: 0, required: required)
         workReportAccumulationGas = try decode(
-            .workReportAccumulationGas, defaultValue: Gas(0), required: required
+            .workReportAccumulationGas, defaultValue: Gas(0), required: required,
         )
         workPackageIsAuthorizedGas = try decode(
-            .workPackageIsAuthorizedGas, defaultValue: Gas(0), required: required
+            .workPackageIsAuthorizedGas, defaultValue: Gas(0), required: required,
         )
         workPackageRefineGas = try decode(
-            .workPackageRefineGas, defaultValue: Gas(0), required: required
+            .workPackageRefineGas, defaultValue: Gas(0), required: required,
         )
         totalAccumulationGas = try decode(
-            .totalAccumulationGas, defaultValue: Gas(0), required: required
+            .totalAccumulationGas, defaultValue: Gas(0), required: required,
         )
         recentHistorySize = try decode(.recentHistorySize, defaultValue: 0, required: required)
         maxWorkItems = try decode(.maxWorkItems, defaultValue: 0, required: required)
         maxDepsInWorkReport = try decode(.maxDepsInWorkReport, defaultValue: 0, required: required)
         maxTicketsPerExtrinsic = try decode(
-            .maxTicketsPerExtrinsic, defaultValue: 0, required: required
+            .maxTicketsPerExtrinsic, defaultValue: 0, required: required,
         )
         maxLookupAnchorAge = try decode(.maxLookupAnchorAge, defaultValue: 0, required: required)
         transferMemoSize = try decode(.transferMemoSize, defaultValue: 0, required: required)
         ticketEntriesPerValidator = try decode(
-            .ticketEntriesPerValidator, defaultValue: 0, required: required
+            .ticketEntriesPerValidator, defaultValue: 0, required: required,
         )
         maxAuthorizationsPoolItems = try decode(
-            .maxAuthorizationsPoolItems, defaultValue: 0, required: required
+            .maxAuthorizationsPoolItems, defaultValue: 0, required: required,
         )
         slotPeriodSeconds = try decode(.slotPeriodSeconds, defaultValue: 0, required: required)
         maxAuthorizationsQueueItems = try decode(
-            .maxAuthorizationsQueueItems, defaultValue: 0, required: required
+            .maxAuthorizationsQueueItems, defaultValue: 0, required: required,
         )
         coreAssignmentRotationPeriod = try decode(
-            .coreAssignmentRotationPeriod, defaultValue: 0, required: required
+            .coreAssignmentRotationPeriod, defaultValue: 0, required: required,
         )
         minPublicServiceIndex = try decode(
-            .minPublicServiceIndex, defaultValue: 0, required: required
+            .minPublicServiceIndex, defaultValue: 0, required: required,
         )
         maxWorkPackageExtrinsics = try decode(
-            .maxWorkPackageExtrinsics, defaultValue: 0, required: required
+            .maxWorkPackageExtrinsics, defaultValue: 0, required: required,
         )
         maxIsAuthorizedCodeSize = try decode(.maxIsAuthorizedCodeSize, defaultValue: 0, required: required)
         maxServiceCodeSize = try decode(.maxServiceCodeSize, defaultValue: 0, required: required)
         preimageReplacementPeriod = try decode(
-            .preimageReplacementPeriod, defaultValue: 0, required: required
+            .preimageReplacementPeriod, defaultValue: 0, required: required,
         )
         totalNumberOfValidators = try decode(
-            .totalNumberOfValidators, defaultValue: 0, required: required
+            .totalNumberOfValidators, defaultValue: 0, required: required,
         )
         erasureCodedPieceSize = try decode(.erasureCodedPieceSize, defaultValue: 0, required: required)
         maxWorkPackageImports = try decode(
-            .maxWorkPackageImports, defaultValue: 0, required: required
+            .maxWorkPackageImports, defaultValue: 0, required: required,
         )
         maxWorkPackageExports = try decode(
-            .maxWorkPackageExports, defaultValue: 0, required: required
+            .maxWorkPackageExports, defaultValue: 0, required: required,
         )
         maxEncodedWorkPackageSize = try decode(
-            .maxEncodedWorkPackageSize, defaultValue: 0, required: required
+            .maxEncodedWorkPackageSize, defaultValue: 0, required: required,
         )
         segmentSize = try decode(.segmentSize, defaultValue: 0, required: required)
         segmentFootprint = try decode(.segmentFootprint, defaultValue: 0, required: required)
         maxWorkReportBlobSize = try decode(
-            .maxWorkReportBlobSize, defaultValue: 0, required: required
+            .maxWorkReportBlobSize, defaultValue: 0, required: required,
         )
         erasureCodedSegmentSize = try decode(
-            .erasureCodedSegmentSize, defaultValue: 0, required: required
+            .erasureCodedSegmentSize, defaultValue: 0, required: required,
         )
         ticketSubmissionEndSlot = try decode(
-            .ticketSubmissionEndSlot, defaultValue: 0, required: required
+            .ticketSubmissionEndSlot, defaultValue: 0, required: required,
         )
         pvmDynamicAddressAlignmentFactor = try decode(
-            .pvmDynamicAddressAlignmentFactor, defaultValue: 0, required: required
+            .pvmDynamicAddressAlignmentFactor, defaultValue: 0, required: required,
         )
         pvmProgramInitInputDataSize = try decode(
-            .pvmProgramInitInputDataSize, defaultValue: 0, required: required
+            .pvmProgramInitInputDataSize, defaultValue: 0, required: required,
         )
         pvmProgramInitZoneSize = try decode(
-            .pvmProgramInitZoneSize, defaultValue: 0, required: required
+            .pvmProgramInitZoneSize, defaultValue: 0, required: required,
         )
         pvmMemoryPageSize = try decode(
-            .pvmMemoryPageSize, defaultValue: 0, required: required
+            .pvmMemoryPageSize, defaultValue: 0, required: required,
         )
     }
 }
@@ -802,7 +813,7 @@ extension ProtocolConfig {
         let maxWorkPackageExports = try decoder.decode(UInt32.self)
         let ticketSubmissionEndSlot = try decoder.decode(UInt32.self)
 
-        let protocolConfig = ProtocolConfig(
+        return ProtocolConfig(
             auditTranchePeriod: 8, // A = 8
             additionalMinBalancePerStateItem: Int(additionalMinBalancePerStateItem),
             additionalMinBalancePerStateByte: Int(additionalMinBalancePerStateByte),
@@ -844,9 +855,7 @@ extension ProtocolConfig {
             pvmDynamicAddressAlignmentFactor: 2, // ZA = 2
             pvmProgramInitInputDataSize: 1 << 24, // ZI = 2^24
             pvmProgramInitZoneSize: 1 << 16, // ZZ = 2^16
-            pvmMemoryPageSize: 1 << 12 // ZP = 2^12
+            pvmMemoryPageSize: 1 << 12, // ZP = 2^12
         )
-
-        return protocolConfig
     }
 }

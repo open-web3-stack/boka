@@ -23,7 +23,7 @@ public actor D3LSegmentStore {
         dataStore: any DataStoreProtocol,
         filesystemStore: FilesystemDataStore,
         erasureCoding: ErasureCodingService,
-        pagedProofsGenerator: PagedProofsGenerator
+        pagedProofsGenerator: PagedProofsGenerator,
     ) {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
@@ -41,7 +41,7 @@ public actor D3LSegmentStore {
     public func storeSegments(
         segments: [Data4104],
         workPackageHash: Data32,
-        segmentsRoot: Data32
+        segmentsRoot: Data32,
     ) async throws -> Data32 {
         guard !segments.isEmpty else {
             throw ErasureCodingStoreError.noSegmentsToStore
@@ -59,7 +59,7 @@ public actor D3LSegmentStore {
         guard calculatedSegmentsRoot == segmentsRoot else {
             throw ErasureCodingStoreError.segmentsRootMismatch(
                 calculated: calculatedSegmentsRoot,
-                expected: segmentsRoot
+                expected: segmentsRoot,
             )
         }
 
@@ -72,7 +72,7 @@ public actor D3LSegmentStore {
         // Calculate erasure root
         let erasureRoot = try await erasureCoding.calculateErasureRoot(
             segmentsRoot: segmentsRoot,
-            shards: shards
+            shards: shards,
         )
 
         // Store each shard's individual data in parallel using TaskGroup
@@ -86,7 +86,7 @@ public actor D3LSegmentStore {
                     try await filesystemStore.storeD3LShard(
                         erasureRoot: erasureRoot,
                         shardIndex: UInt16(index),
-                        data: shard
+                        data: shard,
                     )
                 }
             }
@@ -102,7 +102,7 @@ public actor D3LSegmentStore {
             segmentsRoot: segmentsRoot,
             erasureRoot: erasureRoot,
             segmentCount: UInt32(segments.count),
-            timestamp: Date()
+            timestamp: Date(),
         )
         try await dataStore.set(segmentRoot: segmentsRoot, forWorkPackageHash: workPackageHash)
         // Use separate D³L mapping to avoid collision with audit erasure root mapping
@@ -133,14 +133,14 @@ public actor D3LSegmentStore {
         guard availableShardIndices.count >= cEcOriginalCount else {
             throw ErasureCodingStoreError.insufficientShards(
                 available: availableShardIndices.count,
-                required: cEcOriginalCount
+                required: cEcOriginalCount,
             )
         }
 
         // Get shards for reconstruction
         let shardTuples = try await dataStore.getShards(
             erasureRoot: erasureRoot,
-            shardIndices: Array(availableShardIndices.prefix(cEcOriginalCount))
+            shardIndices: Array(availableShardIndices.prefix(cEcOriginalCount)),
         )
 
         // Get segment count from metadata
@@ -154,7 +154,7 @@ public actor D3LSegmentStore {
         // Reconstruct segments
         let reconstructedData = try await erasureCoding.reconstruct(
             shards: shardTuples,
-            originalLength: originalLength
+            originalLength: originalLength,
         )
 
         // Split into individual segments

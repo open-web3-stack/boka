@@ -49,7 +49,9 @@ public struct ConfigSizeBitString<TBitLength: ReadInt>: Equatable, Sendable, Cod
         (0 ..< length).map { at(unchecked: $0) ? "1" : "0" }.joined()
     }
 
-    public var description: String { binaryString }
+    public var description: String {
+        binaryString
+    }
 
     public func at(_ index: Int) throws(ConfigSizeBitStringError) -> Bool {
         guard index < length else {
@@ -122,7 +124,9 @@ extension ConfigSizeBitString: RandomAccessCollection {
 }
 
 extension ConfigSizeBitString: FixedLengthData {
-    public var data: Data { bytes }
+    public var data: Data {
+        bytes
+    }
 
     public static func length(decoder: Decoder) throws -> Int {
         guard let config = decoder.getConfig(TBitLength.TConfig.self) else {
@@ -151,7 +155,7 @@ extension ConfigSizeBitString: EncodedSize {
 
 extension ConfigSizeBitString: DataPtrRepresentable {
     public func withPtr<R>(
-        cb: (UnsafeRawBufferPointer) throws -> R
+        cb: (UnsafeRawBufferPointer) throws -> R,
     ) rethrows -> R {
         try data.withUnsafeBytes(cb)
     }

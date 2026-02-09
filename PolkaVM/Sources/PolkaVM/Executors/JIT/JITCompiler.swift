@@ -10,28 +10,61 @@ import Utils
 final class JITCompiler {
     private let logger = Logger(label: "JITCompiler")
 
-    // Errors that can occur during JIT compilation
-    enum CompilationError: Error {
+    /// Runtime context wrapper for type-safe C++ interop
+    /// Each JITCompiler instance has its own isolated RuntimeContext
+    /// This makes C++ completely thread-agnostic - no global state, no locks needed
+    private let runtimeContext: JITRuntimeContext
+
+    init() {
+        runtimeContext = JITRuntimeContext()
+    }
+
+    /// Errors that can occur during JIT compilation
+    enum CompilationError: Error, Equatable {
         case invalidBlob
         case compilationFailed(Int32)
         case unsupportedArchitecture
         case allocationFailed
+        case exportFailed(Int32)
+        case metadataStorageFailed(Int32)
+
+        /// Equatable conformance
+        static func == (lhs: CompilationError, rhs: CompilationError) -> Bool {
+            switch (lhs, rhs) {
+            case (.invalidBlob, .invalidBlob),
+                 (.unsupportedArchitecture, .unsupportedArchitecture),
+                 (.allocationFailed, .allocationFailed):
+                true
+            case let (.compilationFailed(lhsCode), .compilationFailed(rhsCode)):
+                lhsCode == rhsCode
+            case let (.exportFailed(lhsCode), .exportFailed(rhsCode)):
+                lhsCode == rhsCode
+            case let (.metadataStorageFailed(lhsCode), .metadataStorageFailed(rhsCode)):
+                lhsCode == rhsCode
+            default:
+                false
+            }
+        }
     }
 
     /// Compile VM code into executable machine code
     /// - Parameters:
     ///   - blob: The program code blob
     ///   - initialPC: The initial program counter
-    ///   - config: The VM configuration
+    ///   - config _: The VM configuration
     ///   - targetArchitecture: The target architecture
     ///   - jitMemorySize: The total memory size for JIT operations
+    ///   - skipTable: Instruction skip values from ProgramCode.skip(pc) for variable-length encoding
+    ///   - bitmask: Instruction boundary bitmask from ProgramCode.bitmask
     /// - Returns: Pointer to the compiled function
     func compile(
         blob: Data,
         initialPC: UInt32,
         config _: PvmConfig,
         targetArchitecture: JITPlatform,
-        jitMemorySize: UInt32
+        jitMemorySize: UInt32,
+        skipTable: [UInt32], // NEW: skip table for variable-length instructions
+        bitmask: Data, // NEW: bitmask for instruction boundary validation
     ) throws -> UnsafeMutableRawPointer {
         logger.debug("Starting JIT compilation. Blob size: \(blob.count), Initial PC: \(initialPC), Target: \(targetArchitecture)")
 
@@ -57,27 +90,57 @@ final class JITCompiler {
             throw CompilationError.invalidBlob
         }
 
+        // Validate skip table consistency
+        for (pc, skip) in skipTable.enumerated() {
+            let maxSkip = blob.count - pc - 1
+            if skip > UInt32(maxSkip) {
+                logger.error("Invalid skip value \(skip) at PC \(pc) (max: \(maxSkip))")
+                throw CompilationError.invalidBlob
+            }
+        }
+
         // Compile based on architecture
+        // Using label-based compilation for maximum performance
+        // This enables proper control flow (branches, loops) with direct jumps
+        // No locks needed - each compiler instance has its own RuntimeContext
         switch targetArchitecture {
         case .x86_64:
-            logger.debug("Compiling for x86_64 architecture")
-            resultCode = compilePolkaVMCode_x64(
-                basePointer,
-                blob.count,
-                initialPC,
-                jitMemorySize,
-                &compiledFuncPtr
-            )
+            logger.debug("Compiling for x86_64 architecture (labeled compilation)")
+            try bitmask.withUnsafeBytes { bitmaskPtr in
+                guard let bitmaskBytes = bitmaskPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                    throw CompilationError.invalidBlob
+                }
+                resultCode = compilePolkaVMCode_x64_labeled(
+                    runtimeContext.contextPointer,
+                    basePointer,
+                    blob.count,
+                    initialPC,
+                    jitMemorySize,
+                    skipTable,
+                    skipTable.count,
+                    bitmaskBytes, bitmask.count,
+                    &compiledFuncPtr,
+                )
+            }
 
         case .arm64:
-            logger.debug("Compiling for Arm64 architecture")
-            resultCode = compilePolkaVMCode_a64(
-                basePointer,
-                blob.count,
-                initialPC,
-                jitMemorySize,
-                &compiledFuncPtr
-            )
+            logger.debug("Compiling for Arm64 architecture (labeled compilation)")
+            try bitmask.withUnsafeBytes { bitmaskPtr in
+                guard let bitmaskBytes = bitmaskPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                    throw CompilationError.invalidBlob
+                }
+                resultCode = compilePolkaVMCode_a64_labeled(
+                    runtimeContext.contextPointer,
+                    basePointer,
+                    blob.count,
+                    initialPC,
+                    jitMemorySize,
+                    skipTable,
+                    skipTable.count,
+                    bitmaskBytes, bitmask.count,
+                    &compiledFuncPtr,
+                )
+            }
         }
 
         // Check compilation result
@@ -100,31 +163,102 @@ final class JITCompiler {
         return funcPtr
     }
 
-    /// Compile each instruction in the program - this is a placeholder that will be
-    /// replaced by the C++ implementation that handles instruction-by-instruction compilation
-    /// - Parameters:
-    ///   - blob: The program code blob
-    ///   - initialPC: The initial program counter
-    ///   - compilerPtr: The compiler pointer
-    ///   - targetArchitecture: The target architecture
-    /// - Returns: True if compilation was successful
-    private func compileInstructions(
-        blob: Data,
-        initialPC: UInt32,
-        compilerPtr _: UnsafeMutableRawPointer,
-        targetArchitecture: JITPlatform
-    ) throws -> Bool {
-        // This would typically implement instruction-by-instruction compilation
-        // but we're delegating this to the C++ layer directly.
-        // This method is kept for future refinements and direct Swift-based compilation.
-
-        // TODO: Implement a fast dispatch table for instruction compilation
-        // TODO: Add support for chunk-based decoding (16-byte chunks)
-        // TODO: Implement register allocation and mapping
-        // TODO: Add gas metering instructions
-        // TODO: Add memory access sandboxing
-
-        logger.debug("Swift compilation step for blob size: \(blob.count), PC: \(initialPC), Target: \(targetArchitecture)")
-        return true
+    /// Get the runtime context wrapper for this compiler
+    /// Used by ExecutorBackendJIT to retrieve dispatcher tables
+    func getRuntimeContext() -> JITRuntimeContext {
+        runtimeContext
     }
+}
+
+// MARK: - Export/Import API for Persistent Caching
+
+extension JITCompiler {
+    /// Compiled code information for export
+    struct CompiledCodeInfo {
+        let functionPtr: UnsafeRawPointer
+        let dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+        let dispatcherTableSize: Int
+        let hasDispatcherTable: Bool
+
+        init(
+            functionPtr: UnsafeRawPointer,
+            dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?,
+            dispatcherTableSize: Int,
+            hasDispatcherTable: Bool,
+        ) {
+            self.functionPtr = functionPtr
+            self.dispatcherTable = dispatcherTable
+            self.dispatcherTableSize = dispatcherTableSize
+            self.hasDispatcherTable = hasDispatcherTable
+        }
+    }
+
+    /// Get compiled code information
+    /// Retrieves metadata about compiled code needed for caching
+    ///
+    /// - Parameter context: Runtime context wrapper from JITCompiler
+    /// - Parameter functionPtr: Compiled function pointer
+    /// - Returns: CompiledCodeInfo containing metadata
+    /// - Throws: CompilationError if info cannot be retrieved
+    static func getCompiledCodeInfo(
+        context: JITRuntimeContext,
+        functionPtr: UnsafeRawPointer,
+    ) throws -> CompiledCodeInfo {
+        var dispatcherTable: UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+        var dispatcherTableSize: size_t = 0
+        var hasDispatcherTable: Int32 = 0
+
+        let result = CppHelper.getCompiledCodeInfo(
+            context.contextPointer,
+            UnsafeMutableRawPointer(mutating: functionPtr),
+            &dispatcherTable,
+            &dispatcherTableSize,
+            &hasDispatcherTable,
+        )
+
+        guard result == 0 else {
+            throw CompilationError.exportFailed(result)
+        }
+
+        return CompiledCodeInfo(
+            functionPtr: functionPtr,
+            dispatcherTable: dispatcherTable,
+            dispatcherTableSize: Int(dispatcherTableSize),
+            hasDispatcherTable: hasDispatcherTable != 0,
+        )
+    }
+
+    /// Store compiled code metadata
+    /// Associates bytecode hash with compiled function for cache lookup
+    ///
+    /// - Parameters:
+    ///   - bytecodeHash: Hash of the bytecode (for cache key)
+    ///   - functionPtr: Compiled function pointer
+    ///   - codeSize: Size of compiled code
+    /// - Throws: CompilationError if metadata cannot be stored
+    static func setCompiledCodeMetadata(
+        bytecodeHash: UInt64,
+        functionPtr: UnsafeRawPointer,
+        codeSize: Int,
+    ) throws {
+        let result = CppHelper.setCompiledCodeMetadata(
+            bytecodeHash,
+            UnsafeMutableRawPointer(mutating: functionPtr),
+            size_t(codeSize),
+        )
+
+        guard result == 0 else {
+            throw CompilationError.metadataStorageFailed(result)
+        }
+    }
+
+    // NOTE: Full export/import of compiled machine code requires deeper AsmJit integration
+    // This is a placeholder for future implementation
+    // For now, users can:
+    // 1. Store bytecode hash -> function pointer mapping
+    // 2. Serialize bytecode to disk
+    // 3. Load bytecode and recompile on next run
+    //
+    // This provides most of the caching benefit (avoiding recompilation)
+    // while avoiding the complexity of serializing machine code
 }

@@ -85,7 +85,7 @@ public class FuzzingClient {
 
         let message = FuzzingMessage.peerInfo(.init(
             name: "boka-fuzzing-fuzzer",
-            fuzzFeatures: 0
+            fuzzFeatures: 0,
         ))
         try connection.sendMessage(message)
 
@@ -132,7 +132,7 @@ public class FuzzingClient {
             let blockRef = try await fuzzGenerator.generateBlock(
                 timeslot: timeslot,
                 currentStateRef: currentStateRef!,
-                config: config
+                config: config,
             )
 
             // TODO: Implement fork feature
@@ -161,7 +161,7 @@ public class FuzzingClient {
                 try await generateMismatchReport(
                     blockIndex: blockIndex + 1,
                     targetState: targetState,
-                    expectedState: expectedPostState
+                    expectedState: expectedPostState,
                 )
 
                 break
@@ -227,7 +227,7 @@ public class FuzzingClient {
     private func generateMismatchReport(
         blockIndex: Int,
         targetState: [FuzzKeyValue],
-        expectedState: [FuzzKeyValue]
+        expectedState: [FuzzKeyValue],
     ) async throws {
         logger.info("📊 Generating mismatch report for block \(blockIndex) (target vs expected)")
 

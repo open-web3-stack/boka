@@ -11,7 +11,7 @@ public protocol RPCHandler: Sendable {
     func handle(request: Request) async throws -> Response?
     func handle(jsonRequest: JSONRequest) async throws -> JSONResponse
 
-    // for OpenRPC spec generation
+    /// for OpenRPC spec generation
     static var summary: String? { get }
 
     static var requestType: any RequestParameter.Type { get }
@@ -25,7 +25,7 @@ extension RPCHandler {
         let res = try await handle(request: req)
         return JSONResponse(
             id: jsonRequest.id,
-            result: res
+            result: res,
         )
     }
 

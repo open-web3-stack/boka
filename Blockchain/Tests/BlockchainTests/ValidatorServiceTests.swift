@@ -1,22 +1,21 @@
+@testable import Blockchain
 import Foundation
 import Testing
 import TracingUtils
 import Utils
 
-@testable import Blockchain
-
 struct ValidatorServiceTests {
     func setup(
         config: ProtocolConfigRef = .dev,
         time: TimeInterval = 988,
-        keysCount: Int = 12
+        keysCount: Int = 12,
     ) async throws -> (BlockchainServices, ValidatorService) {
         // setupTestLogger()
 
         let services = await BlockchainServices(
             config: config,
             timeProvider: MockTimeProvider(time: time),
-            keysCount: keysCount
+            keysCount: keysCount,
         )
         let validatorService = await ValidatorService(
             blockchain: services.blockchain,
@@ -24,7 +23,7 @@ struct ValidatorServiceTests {
             eventBus: services.eventBus,
             scheduler: services.scheduler,
             dataProvider: services.dataProvider,
-            dataStore: services.dataStore
+            dataStore: services.dataStore,
         )
         await validatorService.onSyncCompleted()
         return (services, validatorService)
@@ -72,7 +71,7 @@ struct ValidatorServiceTests {
         let blockAuthoredEvent = events.last { $0 is RuntimeEvents.BlockAuthored }
         #expect(blockAuthoredEvent != nil)
 
-        let blockEvent = blockAuthoredEvent as! RuntimeEvents.BlockAuthored
+        let blockEvent = try #require(blockAuthoredEvent as? RuntimeEvents.BlockAuthored)
         // Verify the produced block
         let block = blockEvent.block
         // we produce block before the timeslot starts
@@ -96,7 +95,7 @@ struct ValidatorServiceTests {
         #expect(try await dataProvider.getHeads().contains(block.hash))
     }
 
-    // try different genesis time offset to ensure edge cases are covered
+    /// try different genesis time offset to ensure edge cases are covered
     @Test(arguments: [988, 1000, 1003, 1021])
     func makeManyBlocksWithAllKeys(time: Int) async throws {
         let (services, validatorService) = try await setup(time: TimeInterval(time))
@@ -125,7 +124,7 @@ struct ValidatorServiceTests {
     func makeManyBlocksWithSingleKey() async throws {
         let (services, validatorService) = try await setup(
             config: .minimal,
-            keysCount: 0
+            keysCount: 0,
         )
         let genesisState = services.genesisState
         let storeMiddleware = services.storeMiddleware

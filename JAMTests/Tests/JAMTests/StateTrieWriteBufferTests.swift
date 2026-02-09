@@ -13,14 +13,14 @@ private func makeKey(_ byte: UInt8) -> Data31 {
 /// Integration tests for StateTrie with write buffering
 struct StateTrieWriteBufferIntegrationTests {
     @Test("State trie with write buffering enabled")
-    func testStateTrieWithWriteBuffer() async throws {
+    func stateTrieWithWriteBuffer() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 10,
-            writeBufferFlushInterval: 1.0
+            writeBufferFlushInterval: 1.0,
         )
 
         // Perform updates
@@ -41,14 +41,14 @@ struct StateTrieWriteBufferIntegrationTests {
     }
 
     @Test("State trie auto-flushes when buffer is full")
-    func testAutoFlushBySize() async throws {
+    func autoFlushBySize() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 5,
-            writeBufferFlushInterval: 10.0
+            writeBufferFlushInterval: 10.0,
         )
 
         // Add 6 items (buffer size is 5, so should auto-flush)
@@ -62,18 +62,18 @@ struct StateTrieWriteBufferIntegrationTests {
         // Check buffer stats
         let stats = await trie.getWriteBufferStats()
         #expect(stats != nil)
-        #expect(stats!.totalFlushes >= 1) // Should have auto-flushed
+        #expect(try #require(stats?.totalFlushes) >= 1) // Should have auto-flushed
     }
 
     @Test("State trie flushes before read for consistency")
-    func testReadConsistency() async throws {
+    func readConsistency() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 100,
-            writeBufferFlushInterval: 10.0
+            writeBufferFlushInterval: 10.0,
         )
 
         // Add an item without manual flush
@@ -87,14 +87,14 @@ struct StateTrieWriteBufferIntegrationTests {
     }
 
     @Test("State trie write buffer statistics")
-    func testWriteBufferStatistics() async throws {
+    func writeBufferStatistics() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 50,
-            writeBufferFlushInterval: 1.0
+            writeBufferFlushInterval: 1.0,
         )
 
         // Perform some updates
@@ -108,19 +108,19 @@ struct StateTrieWriteBufferIntegrationTests {
         // Check statistics
         let stats = await trie.getWriteBufferStats()
         #expect(stats != nil)
-        #expect(stats!.currentSize == 10)
-        #expect(stats!.totalUpdates == 10)
+        #expect(stats?.currentSize == 10)
+        #expect(stats?.totalUpdates == 10)
     }
 
     @Test("State trie manual flush works correctly")
-    func testManualFlush() async throws {
+    func manualFlush() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 100,
-            writeBufferFlushInterval: 10.0
+            writeBufferFlushInterval: 10.0,
         )
 
         // Add items
@@ -136,16 +136,16 @@ struct StateTrieWriteBufferIntegrationTests {
 
         // Buffer should be empty after flush
         let stats = await trie.getWriteBufferStats()
-        #expect(stats!.currentSize == 0)
+        #expect(stats?.currentSize == 0)
     }
 
     @Test("State trie with write buffering disabled")
-    func testWriteBufferDisabled() async throws {
+    func writeBufferDisabled() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
-            enableWriteBuffer: false // Disabled
+            enableWriteBuffer: false, // Disabled
         )
 
         // Perform updates
@@ -161,14 +161,14 @@ struct StateTrieWriteBufferIntegrationTests {
     }
 
     @Test("State trie handles deletes in write buffer")
-    func testWriteBufferWithDeletes() async throws {
+    func writeBufferWithDeletes() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 10,
-            writeBufferFlushInterval: 1.0
+            writeBufferFlushInterval: 1.0,
         )
 
         let key = makeKey(1)
@@ -198,7 +198,7 @@ struct StateTrieWriteBufferIntegrationTests {
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 100,
-            writeBufferFlushInterval: 1.0
+            writeBufferFlushInterval: 1.0,
         )
 
         // Add items to buffer
@@ -214,18 +214,18 @@ struct StateTrieWriteBufferIntegrationTests {
 
         // Buffer should be empty
         let stats = await trie.getWriteBufferStats()
-        #expect(stats!.currentSize == 0)
+        #expect(stats?.currentSize == 0)
     }
 
     @Test("State trie maintains consistency with mixed operations")
-    func testMixedOperationsConsistency() async throws {
+    func mixedOperationsConsistency() async throws {
         let backend = InMemoryBackend()
         let trie = StateTrie(
             rootHash: Data32(),
             backend: backend,
             enableWriteBuffer: true,
             writeBufferSize: 10,
-            writeBufferFlushInterval: 1.0
+            writeBufferFlushInterval: 1.0,
         )
 
         let key1 = makeKey(1)

@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-
 @testable import Utils
 
 @Suite struct BandersnatchTests {
@@ -10,7 +9,7 @@ import Testing
 
         for i in 0 ..< 10 {
             seed[0] = UInt8(i)
-            let secret = try Bandersnatch.SecretKey(from: Data32(seed)!)
+            let secret = try Bandersnatch.SecretKey(from: #require(Data32(seed)))
             keys.append(secret)
         }
 
@@ -21,7 +20,7 @@ import Testing
 
         for (i, key) in keys.enumerated() {
             let prover = Bandersnatch.Prover(
-                sercret: key, ring: keys.map(\.publicKey), proverIdx: UInt(i), ctx: ctx
+                sercret: key, ring: keys.map(\.publicKey), proverIdx: UInt(i), ctx: ctx,
             )
             let vrfInputData = Data(repeating: UInt8(i), count: 32)
             let sig = try prover.ringVRFSign(vrfInputData: vrfInputData)
@@ -31,14 +30,14 @@ import Testing
         }
     }
 
-    @Test func testInitialization() throws {
+    @Test func initialization() throws {
         let secret = try Bandersnatch.SecretKey(from: Data32.random())
 
         let publicKey = try Bandersnatch.PublicKey(data: secret.publicKey.data)
         #expect(publicKey.data == secret.publicKey.data)
     }
 
-    @Test func testEncodingAndDecoding() throws {
+    @Test func encodingAndDecoding() throws {
         let secret = try Bandersnatch.SecretKey(from: Data32.random())
 
         let publicKey = try Bandersnatch.PublicKey(data: secret.publicKey.data)

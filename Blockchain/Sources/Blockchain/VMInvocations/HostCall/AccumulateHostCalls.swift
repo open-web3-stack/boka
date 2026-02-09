@@ -10,7 +10,9 @@ private let logger = Logger(label: "HostCalls.Accumulate")
 
 /// Set privileged services details
 public class Bless: HostCall {
-    public static var identifier: UInt8 { 14 }
+    public static var identifier: UInt8 {
+        14
+    }
 
     public let x: AccumulateResultContext
 
@@ -26,7 +28,7 @@ public class Bless: HostCall {
             assigners = try JamDecoder.decode(
                 ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>.self,
                 from: state.readMemory(address: regs[1], length: 4 * config.value.totalNumberOfCores),
-                withConfig: config
+                withConfig: config,
             )
         }
 
@@ -65,7 +67,9 @@ public class Bless: HostCall {
 
 /// Assign the authorization queue for a core
 public class Assign: HostCall {
-    public static var identifier: UInt8 { 15 }
+    public static var identifier: UInt8 {
+        15
+    }
 
     public let x: AccumulateResultContext
 
@@ -110,7 +114,9 @@ public class Assign: HostCall {
 
 /// Designate the new validator queue
 public class Designate: HostCall {
-    public static var identifier: UInt8 { 16 }
+    public static var identifier: UInt8 {
+        16
+    }
 
     public let x: AccumulateResultContext
 
@@ -145,7 +151,9 @@ public class Designate: HostCall {
 
 /// Save a checkpoint
 public class Checkpoint: HostCall {
-    public static var identifier: UInt8 { 17 }
+    public static var identifier: UInt8 {
+        17
+    }
 
     public let x: AccumulateResultContext
     public let y: AccumulateResultContext
@@ -169,7 +177,9 @@ public class Checkpoint: HostCall {
 
 /// Create a new service account
 public class New: HostCall {
-    public static var identifier: UInt8 { 18 }
+    public static var identifier: UInt8 {
+        18
+    }
 
     public let x: AccumulateResultContext
     public let timeslot: TimeslotIndex
@@ -250,7 +260,7 @@ public class New: HostCall {
             x.nextAccountIndex = try await AccumulateContext.check(
                 i: S + (left % right),
                 accounts: x.state.accounts.toRef(),
-                config: config
+                config: config,
             )
         }
     }
@@ -258,7 +268,9 @@ public class New: HostCall {
 
 /// Upgrade a service account
 public class Upgrade: HostCall {
-    public static var identifier: UInt8 { 19 }
+    public static var identifier: UInt8 {
+        19
+    }
 
     public let x: AccumulateResultContext
 
@@ -287,7 +299,9 @@ public class Upgrade: HostCall {
 
 /// Make a transfer
 public class Transfer: HostCall {
-    public static var identifier: UInt8 { 20 }
+    public static var identifier: UInt8 {
+        20
+    }
 
     public let x: AccumulateResultContext
 
@@ -295,8 +309,8 @@ public class Transfer: HostCall {
         self.x = x
     }
 
-    // GP v0.7.2: g = 10 + t, where t = gasLimit when OK, 0 otherwise
-    // We override call() to implement conditional gas charging
+    /// GP v0.7.2: g = 10 + t, where t = gasLimit when OK, 0 otherwise
+    /// We override call() to implement conditional gas charging
     public func call(config: ProtocolConfigRef, state: VMState) async -> ExecOutcome {
         logger.debug("===== host call: \(Self.self) =====")
 
@@ -349,7 +363,7 @@ public class Transfer: HostCall {
                 destination: dest,
                 amount: amount,
                 memo: Data128(memo!)!,
-                gasLimit: gasLimit
+                gasLimit: gasLimit,
             ))
             srcAccount.balance -= amount
             x.state.accounts.set(serviceAccount: x.serviceIndex, account: srcAccount)
@@ -365,7 +379,9 @@ public class Transfer: HostCall {
 
 /// Eject (remove) a service account
 public class Eject: HostCall {
-    public static var identifier: UInt8 { 21 }
+    public static var identifier: UInt8 {
+        21
+    }
 
     public let x: AccumulateResultContext
     public let timeslot: TimeslotIndex
@@ -397,7 +413,7 @@ public class Eject: HostCall {
         let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: ejectIndex,
             preimageHash: Data32(preimageHash!)!,
-            length: max(81, UInt32(ejectAccount!.totalByteLength)) - 81
+            length: max(81, UInt32(ejectAccount!.totalByteLength)) - 81,
         )
 
         let minHoldSlot = max(0, Int(timeslot) - Int(minHoldPeriod))
@@ -422,7 +438,9 @@ public class Eject: HostCall {
 
 /// Query preimage info
 public class Query: HostCall {
-    public static var identifier: UInt8 { 22 }
+    public static var identifier: UInt8 {
+        22
+    }
 
     public let x: AccumulateResultContext
 
@@ -440,7 +458,7 @@ public class Query: HostCall {
         let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: Data32(preimageHash)!,
-            length: length
+            length: length,
         )
         guard let preimageInfo else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
@@ -466,7 +484,9 @@ public class Query: HostCall {
 
 /// Solicit data to be made available in-core (through preimage lookups)
 public class Solicit: HostCall {
-    public static var identifier: UInt8 { 23 }
+    public static var identifier: UInt8 {
+        23
+    }
 
     public let x: AccumulateResultContext
     public let timeslot: TimeslotIndex
@@ -490,7 +510,7 @@ public class Solicit: HostCall {
         let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: hash,
-            length: length
+            length: length,
         )
         logger.debug("previous info: \(String(describing: preimageInfo))")
 
@@ -531,7 +551,7 @@ public class Solicit: HostCall {
                     serviceAccount: x.serviceIndex,
                     preimageHash: hash,
                     length: length,
-                    value: preimageInfo
+                    value: preimageInfo,
                 )
             }
         }
@@ -540,7 +560,9 @@ public class Solicit: HostCall {
 
 /// Forget data made available in-core (through preimage lookups)
 public class Forget: HostCall {
-    public static var identifier: UInt8 { 24 }
+    public static var identifier: UInt8 {
+        24
+    }
 
     public let x: AccumulateResultContext
     public let timeslot: TimeslotIndex
@@ -562,7 +584,7 @@ public class Forget: HostCall {
         let preimageInfo = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: hash,
-            length: length
+            length: length,
         )
         let historyCount = preimageInfo?.count
         let minHoldSlot = max(0, Int(timeslot) - config.value.preimagePurgePeriod)
@@ -586,7 +608,7 @@ public class Forget: HostCall {
                     serviceAccount: x.serviceIndex,
                     preimageHash: hash,
                     length: length,
-                    value: preimageInfo
+                    value: preimageInfo,
                 )
             } else if isAvailable3, var preimageInfo {
                 preimageInfo = [preimageInfo[2], timeslot]
@@ -594,7 +616,7 @@ public class Forget: HostCall {
                     serviceAccount: x.serviceIndex,
                     preimageHash: hash,
                     length: length,
-                    value: preimageInfo
+                    value: preimageInfo,
                 )
             }
         }
@@ -603,7 +625,9 @@ public class Forget: HostCall {
 
 /// Yield accumulation hash
 public class Yield: HostCall {
-    public static var identifier: UInt8 { 25 }
+    public static var identifier: UInt8 {
+        25
+    }
 
     public let x: AccumulateResultContext
 
@@ -625,7 +649,9 @@ public class Yield: HostCall {
 
 /// Provide some preimages (will be made available after invocation)
 public class Provide: HostCall {
-    public static var identifier: UInt8 { 26 }
+    public static var identifier: UInt8 {
+        26
+    }
 
     public let x: AccumulateResultContext
 
@@ -647,7 +673,7 @@ public class Provide: HostCall {
             let lookup = try await x.state.accounts.value.get(
                 serviceAccount: serviceIndex,
                 preimageHash: Blake2b256.hash(preimage),
-                length: length
+                length: length,
             )
             if let lookup, lookup.isEmpty {
                 preimageLookupOk = true

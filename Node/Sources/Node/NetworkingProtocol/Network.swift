@@ -12,7 +12,7 @@ public protocol NetworkProtocolHandler: Sendable {
     func handle(
         connection: some ConnectionInfoProtocol,
         stream: some StreamProtocol<UPMessage>,
-        kind: UniquePresistentStreamKind
+        kind: UniquePresistentStreamKind,
     ) async throws
 }
 
@@ -27,7 +27,7 @@ public final class Network: NetworkProtocol {
             role: PeerRole,
             listenAddress: NetAddr,
             key: Ed25519.SecretKey,
-            peerSettings: PeerSettings = .defaultSettings
+            peerSettings: PeerSettings = .defaultSettings,
         ) {
             self.role = role
             self.listenAddress = listenAddress
@@ -43,14 +43,14 @@ public final class Network: NetworkProtocol {
         config: Config,
         protocolConfig: ProtocolConfigRef,
         genesisHeader: Data32,
-        handler: NetworkProtocolHandler
+        handler: NetworkProtocolHandler,
     ) throws {
         let logger = Logger(label: "Network".uniqueId)
 
         impl = NetworkImpl(
             logger: logger,
             config: protocolConfig,
-            handler: handler
+            handler: handler,
         )
 
         let option = PeerOptions<HandlerDef>(
@@ -61,7 +61,7 @@ public final class Network: NetworkProtocol {
             persistentStreamHandler: PresistentStreamHandlerImpl(impl: impl),
             ephemeralStreamHandler: EphemeralStreamHandlerImpl(impl: impl),
             serverSettings: .defaultSettings,
-            clientSettings: .defaultSettings
+            clientSettings: .defaultSettings,
         )
 
         peer = try Peer(options: option)

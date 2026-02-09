@@ -1,7 +1,6 @@
 import Codec
 import Foundation
 import Testing
-
 @testable import Utils
 
 struct LimitedSizeArrayTests {
@@ -17,14 +16,14 @@ struct LimitedSizeArrayTests {
         static let value = 0
     }
 
-    @Test func initWithDefaultValue() throws {
+    @Test func initWithDefaultValue() {
         let defaultValue = 1
         let array = LimitedSizeArray<Int, ConstInt5, ConstInt10>(defaultValue: defaultValue)
         #expect(array.array == [1, 1, 1, 1, 1])
         #expect(array.count == 5)
     }
 
-    @Test func expressibleByArrayLiteral() throws {
+    @Test func expressibleByArrayLiteral() {
         let array: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
         #expect(array.array == [1, 2, 3, 4, 5])
     }
@@ -51,7 +50,7 @@ struct LimitedSizeArrayTests {
         #expect(array.count == 5)
     }
 
-    @Test func equatable() throws {
+    @Test func equatable() {
         let array1: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
         let array2: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
         let array3: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [5, 4, 3, 2, 1]
@@ -68,26 +67,31 @@ struct LimitedSizeArrayTests {
         #expect(decoded == array)
     }
 
-    @Test func encodedSize() throws {
+    @Test func encodedSize() {
         struct FixedEncodedSizeType: EncodedSize {
-            var encodedSize: Int { 4 }
-            static var encodeedSizeHint: Int? { 4 }
+            var encodedSize: Int {
+                4
+            }
+
+            static var encodeedSizeHint: Int? {
+                4
+            }
         }
 
         let array: LimitedSizeArray<FixedEncodedSizeType, ConstInt5, ConstInt5> = .init(
-            Array(repeating: FixedEncodedSizeType(), count: 5)
+            Array(repeating: FixedEncodedSizeType(), count: 5),
         )
 
         #expect(array.encodedSize == 20) // 5 elements * 4 bytes each
         let array1: LimitedSizeArray<FixedEncodedSizeType, ConstInt5, ConstInt10> = .init(
-            Array(repeating: FixedEncodedSizeType(), count: 10)
+            Array(repeating: FixedEncodedSizeType(), count: 10),
         )
         #expect(array1.encodedSize == 41)
         #expect(LimitedSizeArray<FixedEncodedSizeType, ConstInt5, ConstInt5>.encodeedSizeHint == 20)
         #expect(LimitedSizeArray<FixedEncodedSizeType, ConstInt5, ConstInt10>.encodeedSizeHint == nil)
     }
 
-    @Test func randomAccessCollection() throws {
+    @Test func randomAccessCollection() {
         var array: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
 
         #expect(array.startIndex == 0)
@@ -106,7 +110,7 @@ struct LimitedSizeArrayTests {
         #expect(array.index(from: iteratorIndex) == 0)
     }
 
-    @Test func randomAccessCollectionIndexOutOfBounds() throws {
+    @Test func randomAccessCollectionIndexOutOfBounds() {
         let array: LimitedSizeArray<Int, ConstInt5, ConstInt10> = [1, 2, 3, 4, 5]
 
         // Ensure accessing out of bounds throws as expected

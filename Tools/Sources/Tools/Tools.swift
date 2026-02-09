@@ -12,7 +12,7 @@ struct Tools: AsyncParsableCommand {
             OpenRPC.self,
             PVM.self,
             POC.self,
-        ]
+        ],
     )
 
     mutating func run() async throws {}

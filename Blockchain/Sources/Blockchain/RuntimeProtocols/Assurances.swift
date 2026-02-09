@@ -10,14 +10,14 @@ public protocol Assurances {
     var reports:
         ConfigFixedSizeArray<
             ReportItem?,
-            ProtocolConfig.TotalNumberOfCores
+            ProtocolConfig.TotalNumberOfCores,
         >
     { get }
 
     var currentValidators:
         ConfigFixedSizeArray<
             ValidatorKey,
-            ProtocolConfig.TotalNumberOfValidators
+            ProtocolConfig.TotalNumberOfValidators,
         >
     { get }
 }
@@ -25,7 +25,7 @@ public protocol Assurances {
 extension Assurances {
     public func validateAssurances(
         extrinsics: ExtrinsicAvailability,
-        parentHash: Data32
+        parentHash: Data32,
     ) throws {
         for assurance in extrinsics.assurances {
             guard assurance.parentHash == parentHash else {
@@ -49,9 +49,9 @@ extension Assurances {
     ) throws -> (
         newReports: ConfigFixedSizeArray<
             ReportItem?,
-            ProtocolConfig.TotalNumberOfCores
+            ProtocolConfig.TotalNumberOfCores,
         >,
-        availableReports: [WorkReport]
+        availableReports: [WorkReport],
     ) {
         var newReports = reports
 
@@ -85,7 +85,7 @@ extension Assurances {
 
         return (
             newReports: newReports,
-            availableReports: availableReports
+            availableReports: availableReports,
         )
     }
 }

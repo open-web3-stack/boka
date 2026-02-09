@@ -1,12 +1,11 @@
 import Blockchain
 import Codec
 import Foundation
+@testable import JAMTests
 import Testing
 import Utils
 
-@testable import JAMTests
-
-// NOTE: the statistics tests only test the validator stats
+/// NOTE: the statistics tests only test the validator stats
 struct TestStatsState: Equatable, Codable {
     var current: ConfigFixedSizeArray<Statistics.Validator, ProtocolConfig.TotalNumberOfValidators>
     var previous: ConfigFixedSizeArray<Statistics.Validator, ProtocolConfig.TotalNumberOfValidators>
@@ -49,7 +48,7 @@ struct StatisticsTests {
                 guarantee.credential.map { credential in
                     testStatsState.currentValidators[Int(credential.index)].ed25519
                 }
-            }
+            },
         )
         var activityStatistics = Statistics.dummy(config: config)
         activityStatistics.accumulator = testStatsState.current
@@ -57,7 +56,7 @@ struct StatisticsTests {
         let fullStatsState = StatsState(
             activityStatistics: activityStatistics,
             timeslot: testStatsState.timeslot,
-            currentValidators: testStatsState.currentValidators
+            currentValidators: testStatsState.currentValidators,
         )
         let result = try fullStatsState.update(
             config: config,
@@ -80,7 +79,7 @@ struct StatisticsTests {
     }
 
     @Test(arguments: try StatisticsTests.loadTests(variant: .full))
-    func fullTests(_ testcase: Testcase) throws {
+    func fullTests(_ testcase: Testcase) {
         withKnownIssue("outdated testcase, missing reporters", isIntermittent: true) {
             try statisticsTests(testcase, variant: .full)
         }

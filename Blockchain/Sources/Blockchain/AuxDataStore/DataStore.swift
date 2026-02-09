@@ -24,7 +24,7 @@ public final class DataStore: Sendable {
     /// - Returns: The retrieved segments
     public func fetchSegment(
         segments: [WorkItem.ImportedDataSegment],
-        segmentsRootMappings: SegmentsRootMappings?
+        segmentsRootMappings: SegmentsRootMappings?,
     ) async throws -> [Data4104] {
         var result: [Data4104] = []
 
@@ -52,7 +52,7 @@ public final class DataStore: Sendable {
     /// Resolves a segment root from either direct root or work package hash
     private func resolveSegmentRoot(
         segment: WorkItem.ImportedDataSegment,
-        segmentsRootMappings: SegmentsRootMappings?
+        segmentsRootMappings: SegmentsRootMappings?,
     ) async throws -> Data32 {
         switch segment.root {
         case let .segmentRoot(root):

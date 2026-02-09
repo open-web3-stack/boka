@@ -1,7 +1,6 @@
+@testable import Codec
 import Foundation
 import Testing
-
-@testable import Codec
 
 struct ResultCodingTests {
     enum ResultError: Error, Codable, Equatable {
@@ -22,7 +21,7 @@ struct ResultCodingTests {
             self = .success(value)
         }
 
-        // Encodable implementation
+        /// Encodable implementation
         func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 

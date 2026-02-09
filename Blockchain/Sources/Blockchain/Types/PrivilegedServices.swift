@@ -2,15 +2,15 @@ import Codec
 import Utils
 
 public struct PrivilegedServices: Sendable, Equatable, Codable {
-    // m
+    /// m
     public var manager: ServiceIndex
-    // a
+    /// a
     public var assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>
-    // v
+    /// v
     public var delegator: ServiceIndex
-    // r
+    /// r
     public var registrar: ServiceIndex
-    // z
+    /// z
     public var alwaysAcc: [ServiceIndex: Gas]
 
     public init(
@@ -18,7 +18,7 @@ public struct PrivilegedServices: Sendable, Equatable, Codable {
         assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>,
         delegator: ServiceIndex,
         registrar: ServiceIndex,
-        alwaysAcc: [ServiceIndex: Gas]
+        alwaysAcc: [ServiceIndex: Gas],
     ) {
         self.manager = manager
         self.assigners = assigners

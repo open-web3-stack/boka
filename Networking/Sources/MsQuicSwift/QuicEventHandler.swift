@@ -15,7 +15,7 @@ public struct ConnectionInfo: Sendable {
     public let serverName: String
 
     public init(
-        localAddress: NetAddr, remoteAddress: NetAddr, negotiatedAlpn: Data, serverName: String
+        localAddress: NetAddr, remoteAddress: NetAddr, negotiatedAlpn: Data, serverName: String,
     ) {
         self.localAddress = localAddress
         self.remoteAddress = remoteAddress
@@ -25,7 +25,7 @@ public struct ConnectionInfo: Sendable {
 }
 
 public protocol QuicEventHandler: Sendable {
-    // listener events
+    /// listener events
     func newConnection(_ listener: QuicListener, connection: QuicConnection, info: ConnectionInfo)
         -> QuicStatus
 
@@ -42,7 +42,7 @@ public protocol QuicEventHandler: Sendable {
     func closed(_ stream: QuicStream, status: QuicStatus, code: QuicErrorCode)
 }
 
-// default implementations
+/// default implementations
 extension QuicEventHandler {
     public func newConnection(_: QuicListener, connection _: QuicConnection, info _: ConnectionInfo)
         -> QuicStatus

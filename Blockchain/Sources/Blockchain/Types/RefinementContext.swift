@@ -1,21 +1,21 @@
 import Codec
 import Utils
 
-// A refinement context, denoted by the set X, describes the context of the chain
-// at the point that the report’s corresponding work-package was evaluated.
+/// A refinement context, denoted by the set X, describes the context of the chain
+/// at the point that the report’s corresponding work-package was evaluated.
 public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
     public struct Anchor: Comparable, Sendable, Equatable, Codable, Hashable {
-        // a
+        /// a
         public var headerHash: Data32
-        // s
+        /// s
         public var stateRoot: Data32
-        // b
+        /// b
         public var beefyRoot: Data32
 
         public init(
             headerHash: Data32,
             stateRoot: Data32,
-            beefyRoot: Data32
+            beefyRoot: Data32,
         ) {
             self.headerHash = headerHash
             self.stateRoot = stateRoot
@@ -34,14 +34,14 @@ public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
     }
 
     public struct LookupAnchor: Comparable, Sendable, Equatable, Codable, Hashable {
-        // l
+        /// l
         public var headerHash: Data32
-        // t
+        /// t
         public var timeslot: TimeslotIndex
 
         public init(
             headerHash: Data32,
-            timeslot: TimeslotIndex
+            timeslot: TimeslotIndex,
         ) {
             self.headerHash = headerHash
             self.timeslot = timeslot
@@ -59,7 +59,7 @@ public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
 
     public var lookupAnchor: LookupAnchor
 
-    // p
+    /// p
     @CodingAs<SortedSet<Data32>> public var prerequisiteWorkPackages: Set<Data32>
 
     public init(anchor: Anchor, lookupAnchor: LookupAnchor, prerequisiteWorkPackages: Set<Data32>) {
@@ -83,13 +83,13 @@ extension RefinementContext: Dummy {
             anchor: Anchor(
                 headerHash: Data32(),
                 stateRoot: Data32(),
-                beefyRoot: Data32()
+                beefyRoot: Data32(),
             ),
             lookupAnchor: LookupAnchor(
                 headerHash: Data32(),
-                timeslot: 0
+                timeslot: 0,
             ),
-            prerequisiteWorkPackages: Set()
+            prerequisiteWorkPackages: Set(),
         )
     }
 }

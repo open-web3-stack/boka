@@ -10,7 +10,9 @@ private let logger = Logger(label: "HostCalls.General")
 
 /// Get gas remaining
 public class GasFn: HostCall {
-    public static var identifier: UInt8 { 0 }
+    public static var identifier: UInt8 {
+        0
+    }
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         state.writeRegister(Registers.Index(raw: 7), UInt64(bitPattern: state.getGas().value))
@@ -19,25 +21,27 @@ public class GasFn: HostCall {
 
 /// Fetch
 public class Fetch: HostCall {
-    public static var identifier: UInt8 { 1 }
+    public static var identifier: UInt8 {
+        1
+    }
 
     public let serviceAccounts: ServiceAccountsRef?
     public let serviceIndex: ServiceIndex?
 
-    // p
+    /// p
     public let workPackage: WorkPackage?
-    // n
+    /// n
     public let entropy: Data32?
-    // r
+    /// r
     public let authorizerTrace: Data?
-    // i
+    /// i
     public let workItemIndex: Int?
-    // overline i
+    /// overline i
     public let importSegments: [[Data4104]]?
-    // overline x (no need pass in)
-    // o
+    /// overline x (no need pass in)
+    /// o
     public let inputs: [AccumulationInput]?
-    // c
+    /// c
     public let coreIndex: CoreIndex?
 
     public init(
@@ -49,7 +53,7 @@ public class Fetch: HostCall {
         workItemIndex: Int? = nil,
         importSegments: [[Data4104]]? = nil,
         inputs: [AccumulationInput]? = nil,
-        coreIndex: CoreIndex? = nil
+        coreIndex: CoreIndex? = nil,
     ) {
         self.serviceAccounts = serviceAccounts
         self.serviceIndex = serviceIndex
@@ -190,7 +194,9 @@ public class Fetch: HostCall {
 
 /// Lookup a preimage from a service account
 public class Lookup: HostCall {
-    public static var identifier: UInt8 { 2 }
+    public static var identifier: UInt8 {
+        2
+    }
 
     public let serviceIndex: ServiceIndex
     public let serviceAccounts: ServiceAccountsRef
@@ -246,7 +252,9 @@ public class Lookup: HostCall {
 
 /// Read a service account storage
 public class Read: HostCall {
-    public static var identifier: UInt8 { 3 }
+    public static var identifier: UInt8 {
+        3
+    }
 
     public let serviceIndex: ServiceIndex
     public let serviceAccounts: ServiceAccountsRef
@@ -313,7 +321,9 @@ public class Read: HostCall {
 
 /// Write to a service account storage
 public class Write: HostCall {
-    public static var identifier: UInt8 { 4 }
+    public static var identifier: UInt8 {
+        4
+    }
 
     public let serviceIndex: ServiceIndex
     public let serviceAccounts: ServiceAccountsMutRef
@@ -379,7 +389,9 @@ public class Write: HostCall {
 
 /// Get information about a service account
 public class Info: HostCall {
-    public static var identifier: UInt8 { 5 }
+    public static var identifier: UInt8 {
+        5
+    }
 
     public let serviceIndex: ServiceIndex
     public let serviceAccounts: ServiceAccountsRef
@@ -414,7 +426,7 @@ public class Info: HostCall {
                 account.gratisStorage,
                 account.createdAt,
                 account.lastAccAt,
-                account.parentService
+                account.parentService,
             )
         } else {
             value = nil
@@ -443,7 +455,9 @@ public class Info: HostCall {
 
 /// Historical lookup
 public class HistoricalLookup: HostCall {
-    public static var identifier: UInt8 { 6 }
+    public static var identifier: UInt8 {
+        6
+    }
 
     public let context: RefineContext.ContextType
     public let serviceIndex: ServiceIndex
@@ -454,7 +468,7 @@ public class HistoricalLookup: HostCall {
         context: RefineContext.ContextType,
         serviceIndex: ServiceIndex,
         serviceAccounts: ServiceAccountsRef,
-        lookupAnchorTimeslot: TimeslotIndex
+        lookupAnchorTimeslot: TimeslotIndex,
     ) {
         self.context = context
         self.lookupAnchorTimeslot = lookupAnchorTimeslot
@@ -486,7 +500,7 @@ public class HistoricalLookup: HostCall {
         let preimage = try await serviceAccounts.value.historicalLookup(
             serviceAccount: service,
             timeslot: lookupAnchorTimeslot,
-            preimageHash: Data32(state.readMemory(address: regs[0], length: 32))!
+            preimageHash: Data32(state.readMemory(address: regs[0], length: 32))!,
         )
 
         let reg10: UInt64 = state.readRegister(Registers.Index(raw: 10))

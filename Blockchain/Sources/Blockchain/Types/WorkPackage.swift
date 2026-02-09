@@ -2,28 +2,28 @@ import Codec
 import Foundation
 import Utils
 
-// P
+/// P
 public struct WorkPackage: Comparable, Sendable, Equatable, Codable, Hashable {
-    // h
+    /// h
     public var authorizationServiceIndex: ServiceIndex
 
-    // u
+    /// u
     public var authorizationCodeHash: Data32
 
-    // c
+    /// c
     public var context: RefinementContext
 
-    // j
+    /// j
     public var authorizationToken: Data
 
-    // f
+    /// f
     public var configurationBlob: Data
 
-    // w
+    /// w
     public var workItems: ConfigLimitedSizeArray<
         WorkItem,
         ProtocolConfig.Int1,
-        ProtocolConfig.MaxWorkItems
+        ProtocolConfig.MaxWorkItems,
     >
 
     public init(
@@ -35,8 +35,8 @@ public struct WorkPackage: Comparable, Sendable, Equatable, Codable, Hashable {
         workItems: ConfigLimitedSizeArray<
             WorkItem,
             ProtocolConfig.Int1,
-            ProtocolConfig.MaxWorkItems
-        >
+            ProtocolConfig.MaxWorkItems,
+        >,
     ) {
         self.authorizationToken = authorizationToken
         self.authorizationServiceIndex = authorizationServiceIndex
@@ -75,7 +75,7 @@ extension WorkPackage: Dummy {
             authorizationCodeHash: Data32(),
             configurationBlob: Data(),
             context: RefinementContext.dummy(config: config),
-            workItems: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkItem.dummy(config: config))
+            workItems: try! ConfigLimitedSizeArray(config: config, defaultValue: WorkItem.dummy(config: config)),
         )
     }
 }
@@ -105,7 +105,7 @@ extension WorkPackage {
         guard let preimage = try await serviceAccounts.historicalLookup(
             serviceAccount: authorizationServiceIndex,
             timeslot: context.lookupAnchor.timeslot,
-            preimageHash: authorizationCodeHash
+            preimageHash: authorizationCodeHash,
         ) else {
             return nil
         }

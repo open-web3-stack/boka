@@ -1,5 +1,4 @@
 import Testing
-
 @testable import Utils
 
 struct CollectionUtilsTests {
@@ -29,7 +28,7 @@ struct CollectionUtilsTests {
         }
     }
 
-    @Test func safeIndexAccess() throws {
+    @Test func safeIndexAccess() {
         let array = [10, 20, 30, 40, 50]
 
         #expect(array[safe: 0] == 10)
@@ -38,7 +37,7 @@ struct CollectionUtilsTests {
         #expect(array[safe: -1] == nil)
     }
 
-    @Test func safeRangeAccess() throws {
+    @Test func safeRangeAccess() {
         let array = [10, 20, 30, 40, 50]
 
         #expect(array[safe: 0 ..< 2] == [10, 20])
@@ -56,12 +55,12 @@ struct CollectionUtilsTests {
         }
     }
 
-    @Test func relativeIndexAccess() throws {
+    @Test func relativeIndexAccess() {
         let array = [10, 20, 30, 40, 50]
         #expect(array[relative: 1] == 20)
     }
 
-    @Test func relativeRangeAccess() throws {
+    @Test func relativeRangeAccess() {
         let array = [10, 20, 30, 40, 50]
 
         #expect(array[relative: 0 ..< 2] == [10, 20])
@@ -70,7 +69,7 @@ struct CollectionUtilsTests {
         #expect(array[relative: ...4] == [10, 20, 30, 40, 50])
     }
 
-    @Test func safeRelativeIndexAccess() throws {
+    @Test func safeRelativeIndexAccess() {
         let array = [10, 20, 30, 40, 50]
 
         #expect(array[safeRelative: 1] == 20)

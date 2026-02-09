@@ -33,7 +33,7 @@ extension BundleRequestMessage: CEMessage {
         guard let data = data.first else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "unexpected data \(data)"
+                debugDescription: "unexpected data \(data)",
             ))
         }
         return try JamDecoder.decode(BundleRequestMessage.self, from: data, withConfig: config)

@@ -82,7 +82,7 @@ public final class SegmentCache: @unchecked Sendable {
                 accessTime: .now,
                 hitCount: 0,
                 previousKey: nil,
-                nextKey: nil
+                nextKey: nil,
             )
 
             if state.storage[key] != nil {
@@ -136,7 +136,7 @@ public final class SegmentCache: @unchecked Sendable {
                 misses: state.misses,
                 evictions: state.evictions,
                 size: state.storage.count,
-                hitRate: hitRate
+                hitRate: hitRate,
             )
         }
     }

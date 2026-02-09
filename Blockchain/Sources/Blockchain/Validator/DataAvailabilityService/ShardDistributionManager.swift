@@ -5,8 +5,8 @@ import Utils
 
 private let logger = Logger(label: "ShardDistributionManager")
 
-// GP spec constants from definitions.tex
-private let cEcRecoveryCount = 1023 /// Recovery shard count
+/// GP spec constants from definitions.tex
+private let cEcRecoveryCount = 1023 // Recovery shard count
 
 /// Manager for shard distribution and CE protocol message handlers
 ///
@@ -22,7 +22,7 @@ public actor ShardDistributionManager {
         dataProvider: BlockchainDataProvider,
         dataStore: DataStore,
         erasureCodingDataStore: ErasureCodingDataStore?,
-        config: ProtocolConfigRef
+        config: ProtocolConfigRef,
     ) {
         self.dataProvider = dataProvider
         self.dataStore = dataStore
@@ -35,7 +35,7 @@ public actor ShardDistributionManager {
     public func workReportDistribution(
         workReport: WorkReport,
         slot: UInt32,
-        signatures: [ValidatorSignature]
+        signatures: [ValidatorSignature],
     ) async throws {
         let hash = workReport.hash()
 
@@ -50,7 +50,7 @@ public actor ShardDistributionManager {
         let report = GuaranteedWorkReport(
             workReport: workReport,
             slot: slot,
-            signatures: signatures
+            signatures: signatures,
         )
         try await dataProvider.add(guaranteedWorkReport: GuaranteedWorkReportRef(report))
     }
@@ -110,7 +110,7 @@ public actor ShardDistributionManager {
     /// - Throws: DataAvailabilityError if validation fails
     public func validateWorkReportSignatures(
         signatures: [ValidatorSignature],
-        workReportHash: Data32
+        workReportHash: Data32,
     ) async throws {
         // Per GP section 15.2, at least 3 validators are required for a work-report
         guard signatures.count >= 3 else {
@@ -155,7 +155,7 @@ public actor ShardDistributionManager {
 
     public func shardDistribution(
         erasureRoot: Data32,
-        shardIndex: UInt16
+        shardIndex: UInt16,
     ) async throws -> (bundleShard: Data, segmentShards: [Data], justification: AvailabilityJustification) {
         // CE 137: Respond with bundle shard and segment shards with justification
 
@@ -167,7 +167,7 @@ public actor ShardDistributionManager {
         // Check if we have this shard
         let hasShard = try await ecStore.hasShard(
             erasureRoot: erasureRoot,
-            shardIndex: shardIndex
+            shardIndex: shardIndex,
         )
 
         guard hasShard else {
@@ -177,7 +177,7 @@ public actor ShardDistributionManager {
         // Get shard data
         guard let shardData = try await ecStore.getShard(
             erasureRoot: erasureRoot,
-            shardIndex: shardIndex
+            shardIndex: shardIndex,
         ) else {
             throw DataAvailabilityError.retrievalError
         }
@@ -216,7 +216,7 @@ public actor ShardDistributionManager {
         let allShardIndices = Array(0 ..< UInt16(cEcRecoveryCount))
         let allShards = try await ecStore.getShards(
             erasureRoot: erasureRoot,
-            shardIndices: allShardIndices
+            shardIndices: allShardIndices,
         )
         let allShardHashes = allShards.map(\.data)
 
@@ -224,7 +224,7 @@ public actor ShardDistributionManager {
         let justificationSteps = try await erasureCodingService.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: d3lMetadata.segmentsRoot,
-            shards: allShardHashes
+            shards: allShardHashes,
         )
         let justification = AvailabilityJustification.copath(justificationSteps)
 
@@ -242,7 +242,7 @@ public actor ShardDistributionManager {
     public func requestAuditShards(
         workPackageHash _: Data32,
         indices _: [UInt16],
-        validators: [ValidatorIndex]
+        validators: [ValidatorIndex],
     ) async throws -> [Data4104] {
         // CE 138: Request audit shards from validators
         // 1. Determine which validators to request from
@@ -264,12 +264,12 @@ public actor ShardDistributionManager {
     /// - Returns: The bundle shard and justification
     public func processAuditShardRequest(
         erasureRoot: Data32,
-        shardIndex: UInt16
+        shardIndex: UInt16,
     ) async throws -> (bundleShard: Data, justification: AvailabilityJustification) {
         // Reuse shardDistribution logic to get the shard and justification
         let (bundleShard, _, justification) = try await shardDistribution(
             erasureRoot: erasureRoot,
-            shardIndex: shardIndex
+            shardIndex: shardIndex,
         )
 
         return (bundleShard, justification)
@@ -284,7 +284,7 @@ public actor ShardDistributionManager {
     public func handleAuditShardRequest(
         workPackageHash _: Data32,
         indices: [UInt16],
-        requester: ValidatorIndex
+        requester: ValidatorIndex,
     ) async throws -> [Data4104] {
         // CE 138: Handle incoming audit shard requests
         // 1. Verify the requester is a validator
@@ -332,7 +332,7 @@ public actor ShardDistributionManager {
     public func requestSegmentShards(
         segmentsRoot _: Data32,
         indices _: [UInt16],
-        validators: [ValidatorIndex]
+        validators: [ValidatorIndex],
     ) async throws -> [Data4104] {
         // CE 139/140: Request segment shards from validators
         // 1. Determine which validators to request from
@@ -356,12 +356,12 @@ public actor ShardDistributionManager {
     public func processSegmentShardRequest(
         erasureRoot: Data32,
         shardIndex: UInt16,
-        segmentIndices: [UInt16]
+        segmentIndices: [UInt16],
     ) async throws -> [SegmentShard] {
         // 1. Get the full shard and base justification
         let (bundleShard, segmentShards, baseJustification) = try await shardDistribution(
             erasureRoot: erasureRoot,
-            shardIndex: shardIndex
+            shardIndex: shardIndex,
         )
 
         // 2. Extract requested segment shards and generate their justifications
@@ -398,7 +398,7 @@ public actor ShardDistributionManager {
                 shardIndex: shardIndex,
                 segmentsRoot: d3lMetadata.segmentsRoot,
                 shards: segmentShards,
-                baseJustification: baseSteps
+                baseJustification: baseSteps,
             )
 
             // Convert steps to JustificationStep
@@ -426,7 +426,7 @@ public actor ShardDistributionManager {
     public func handleSegmentShardRequest(
         segmentsRoot _: Data32,
         indices: [UInt16],
-        requester: ValidatorIndex
+        requester: ValidatorIndex,
     ) async throws -> [Data4104] {
         // CE 139/140: Handle incoming segment shard requests
         // 1. Verify the requester is a validator

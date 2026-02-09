@@ -1,6 +1,6 @@
 #pragma once
 
-#include <asmjit/asmjit.h>
+#include <asmjit/core.h>
 #include <asmjit/a64.h>
 
 // Static register allocation for PolkaVM JIT

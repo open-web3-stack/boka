@@ -1,8 +1,7 @@
 import Foundation
+@testable import PolkaVM
 import Testing
 import Utils
-
-@testable import PolkaVM
 
 struct InstructionTests {
     @Test func decodeImmediate() {

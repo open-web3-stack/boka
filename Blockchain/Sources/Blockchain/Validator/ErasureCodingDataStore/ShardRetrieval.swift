@@ -10,7 +10,7 @@ public actor ShardRetrieval {
     public init(
         dataStore: any DataStoreProtocol,
         filesystemStore: FilesystemDataStore,
-        segmentCache: SegmentCache
+        segmentCache: SegmentCache,
     ) {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore

@@ -107,14 +107,14 @@ public actor InMemoryDataStore: DataStoreProtocol {
         erasureRoot: Data32,
         segmentsRoot: Data32,
         bundleSize: Int,
-        timestamp: Date
+        timestamp: Date,
     ) async throws {
         auditEntries[erasureRoot] = AuditEntry(
             workPackageHash: workPackageHash,
             erasureRoot: erasureRoot,
             segmentsRoot: segmentsRoot,
             bundleSize: bundleSize,
-            timestamp: timestamp
+            timestamp: timestamp,
         )
     }
 
@@ -134,7 +134,7 @@ public actor InMemoryDataStore: DataStoreProtocol {
     public func cleanupAuditEntriesIteratively(
         before: Date,
         batchSize: Int,
-        processor: @Sendable ([AuditEntry]) async throws -> Bool
+        processor: @Sendable ([AuditEntry]) async throws -> Bool,
     ) async throws -> Int {
         var count = 0
         let entries = auditEntries.values.filter { $0.timestamp < before }
@@ -163,7 +163,7 @@ public actor InMemoryDataStore: DataStoreProtocol {
             segmentsRoot: segmentsRoot,
             erasureRoot: erasureRoot,
             segmentCount: segmentCount,
-            timestamp: timestamp
+            timestamp: timestamp,
         )
     }
 
@@ -183,7 +183,7 @@ public actor InMemoryDataStore: DataStoreProtocol {
     public func cleanupD3LEntriesIteratively(
         before: Date,
         batchSize: Int,
-        processor: @Sendable ([D3LEntry]) async throws -> Bool
+        processor: @Sendable ([D3LEntry]) async throws -> Bool,
     ) async throws -> Int {
         var count = 0
         let entries = d3lEntries.values.filter { $0.timestamp < before }

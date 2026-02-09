@@ -36,7 +36,7 @@ public enum ConcurrentFetchHelpers {
         maxConcurrentRequests: Int = 50,
         requestTimeout: TimeInterval = 30.0,
         shardAssignment: JAMNPSShardAssignment,
-        fetchOperation: @Sendable @escaping (_ erasureRoot: Data32, _ shardIndex: UInt16, _ address: NetAddr) async throws -> Data
+        fetchOperation: @Sendable @escaping (_ erasureRoot: Data32, _ shardIndex: UInt16, _ address: NetAddr) async throws -> Data,
     ) async throws -> [UInt16: Data] {
         var collectedShards: [UInt16: Data] = [:]
         let requiredCount = requiredShards
@@ -45,14 +45,14 @@ public enum ConcurrentFetchHelpers {
             """
             Starting concurrent fetch: need \(requiredCount) shards from \(validators.count) validators \
             (max concurrent: \(maxConcurrentRequests))
-            """
+            """,
         )
 
         // Map validators to their assigned shard indices
         let validatorToShards = await shardAssignment.getValidatorsForMissingShards(
             missingShardIndices: shardIndices,
             coreIndex: coreIndex,
-            totalValidators: totalValidators
+            totalValidators: totalValidators,
         )
 
         // Prepare validator/shard pairs to fetch
@@ -108,7 +108,7 @@ public enum ConcurrentFetchHelpers {
                     logger.warning(
                         """
                         Request timeout after \(elapsed)s, collected \(collectedShards.count)/\(requiredCount) shards
-                        """
+                        """,
                     )
                     group.cancelAll()
                     break
@@ -125,7 +125,7 @@ public enum ConcurrentFetchHelpers {
                     """
                     Collected shard \(shardIndex) from validator \(validatorIndex), \
                     total: \(collectedShards.count)/\(requiredCount)
-                    """
+                    """,
                 )
 
                 // Check if we have enough shards
@@ -134,7 +134,7 @@ public enum ConcurrentFetchHelpers {
                         """
                         Collected sufficient shards (\(collectedShards.count)/\(requiredCount)), \
                         cancelling remaining requests
-                        """
+                        """,
                     )
                     group.cancelAll()
                     break
@@ -150,7 +150,7 @@ public enum ConcurrentFetchHelpers {
             logger.error(
                 """
                 Insufficient shards collected: \(collectedShards.count)/\(requiredCount)
-                """
+                """,
             )
             throw AvailabilityNetworkingError.decodingFailed
         }
@@ -158,7 +158,7 @@ public enum ConcurrentFetchHelpers {
         logger.info(
             """
             Successfully collected \(collectedShards.count) shards from \(completedTasks) validators
-            """
+            """,
         )
 
         return collectedShards
@@ -191,7 +191,7 @@ public actor RequestSendingHelpers {
         to address: NetAddr,
         requestType: ShardRequestType,
         data: Data,
-        network: any AvailabilityNetworkProtocol
+        network: any AvailabilityNetworkProtocol,
     ) async throws -> Data {
         // Use the request type and entire data for cache key to avoid collisions
         // Hash the entire data since prefix(64) could collide for segment requests

@@ -16,10 +16,10 @@ public struct PeerInfo: Sendable {
     }
 }
 
-// TODOs:
-// - distinguish between connect peers and offline peers
-// - peer reputation
-// - purge offline peers
+/// TODOs:
+/// - distinguish between connect peers and offline peers
+/// - peer reputation
+/// - purge offline peers
 public actor PeerManager {
     private let eventBus: EventBus
 
@@ -32,7 +32,7 @@ public actor PeerManager {
     func addPeer(id: PeerId, handshake: BlockAnnouncementHandshake) {
         var peer = PeerInfo(
             id: id,
-            finalized: handshake.finalized
+            finalized: handshake.finalized,
         )
         for head in handshake.heads {
             peer.heads.insert(head)
@@ -63,7 +63,7 @@ public actor PeerManager {
                 finalized: message.finalized,
                 heads: [
                     HashAndSlot(hash: message.header.hash, timeslot: message.header.value.timeslot),
-                ]
+                ],
             )
         }
         peers[id.publicKey] = updatedPeer

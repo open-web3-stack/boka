@@ -40,7 +40,7 @@ extension WorkPackageSubmissionMessage: CEMessage {
         guard data.count == 2 else {
             throw DecodingError.dataCorrupted(DecodingError.Context(
                 codingPath: [],
-                debugDescription: "unexpected data"
+                debugDescription: "unexpected data",
             ))
         }
         let decoder = JamDecoder(data: data[0], config: config)

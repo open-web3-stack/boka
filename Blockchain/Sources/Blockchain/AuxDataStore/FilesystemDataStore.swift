@@ -62,7 +62,7 @@ public actor FilesystemDataStore {
                 try fm.createDirectory(
                     at: url,
                     withIntermediateDirectories: true,
-                    attributes: nil
+                    attributes: nil,
                 )
             } catch {
                 // Verify if it was created by another task
@@ -136,7 +136,7 @@ public actor FilesystemDataStore {
 
             let files = try FileManager.default.contentsOfDirectory(
                 at: URL(fileURLWithPath: shardsDirPath),
-                includingPropertiesForKeys: nil
+                includingPropertiesForKeys: nil,
             )
             var indices: [UInt16] = []
             indices.reserveCapacity(files.count)
@@ -177,7 +177,7 @@ public actor FilesystemDataStore {
 
             let prefixDirs = try FileManager.default.contentsOfDirectory(
                 at: URL(fileURLWithPath: auditPathString),
-                includingPropertiesForKeys: nil
+                includingPropertiesForKeys: nil,
             )
 
             for prefixDir in prefixDirs {
@@ -213,7 +213,7 @@ public actor FilesystemDataStore {
 
             let prefixDirs = try FileManager.default.contentsOfDirectory(
                 at: URL(fileURLWithPath: d3lPathString),
-                includingPropertiesForKeys: nil
+                includingPropertiesForKeys: nil,
             )
 
             for prefixDir in prefixDirs {
@@ -259,7 +259,7 @@ extension FilesystemDataStore {
                     try FileManager.default.createDirectory(
                         at: URL(fileURLWithPath: path),
                         withIntermediateDirectories: true,
-                        attributes: nil
+                        attributes: nil,
                     )
                 } catch {
                     // Verify if it was created by another task
@@ -299,26 +299,26 @@ extension FilesystemDataStore {
             if FileManager.default.fileExists(atPath: targetPath) {
                 // Target exists - use replaceItem for atomic replacement
                 #if os(Linux)
-                    try FileManager.default.replaceItem(
-                        at: targetURL,
-                        withItemAt: URL(fileURLWithPath: tempPath),
-                        backupItemName: nil,
-                        options: .usingNewMetadataOnly
-                    )
-                #else
-                    try FileManager.default.replaceItem(
+                    _ = try FileManager.default.replaceItem(
                         at: targetURL,
                         withItemAt: URL(fileURLWithPath: tempPath),
                         backupItemName: nil,
                         options: .usingNewMetadataOnly,
-                        resultingItemURL: nil
+                    )
+                #else
+                    _ = try FileManager.default.replaceItem(
+                        at: targetURL,
+                        withItemAt: URL(fileURLWithPath: tempPath),
+                        backupItemName: nil,
+                        options: .usingNewMetadataOnly,
+                        resultingItemURL: nil,
                     )
                 #endif
             } else {
                 // Target doesn't exist - use moveItem
                 try FileManager.default.moveItem(
                     at: URL(fileURLWithPath: tempPath),
-                    to: targetURL
+                    to: targetURL,
                 )
             }
         }.value
@@ -380,7 +380,7 @@ extension FilesystemDataStore {
             let enumerator = FileManager.default.enumerator(
                 at: URL(fileURLWithPath: path),
                 includingPropertiesForKeys: [.fileSizeKey],
-                options: []
+                options: [],
             )
 
             while let fileURL = enumerator?.nextObject() as? URL {

@@ -121,7 +121,7 @@ struct POC: AsyncParsableCommand {
             SHM_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC,
             MAP_ANON | MAP_PRIVATE | MAP_JIT,
             -1,
-            0
+            0,
         )
         guard codeMap != MAP_FAILED else {
             throw POCError.mmapFailed(errno: errno)
@@ -266,7 +266,7 @@ struct POC: AsyncParsableCommand {
             throw POCError.childProcessFailed(error: NSError(
                 domain: NSPOSIXErrorDomain,
                 code: Int(spawnResult),
-                userInfo: [NSLocalizedDescriptionKey: errMsg]
+                userInfo: [NSLocalizedDescriptionKey: errMsg],
             ))
         }
         print("[Parent] Child process spawned with pid: \(pid)")

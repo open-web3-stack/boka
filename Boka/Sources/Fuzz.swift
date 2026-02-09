@@ -8,7 +8,7 @@ extension Boka {
         static let configuration = CommandConfiguration(
             commandName: "fuzz",
             abstract: "JAM Conformance Protocol",
-            subcommands: [Target.self, Fuzzer.self]
+            subcommands: [Target.self, Fuzzer.self],
         )
     }
 }
@@ -21,7 +21,7 @@ extension Boka.Fuzz {
 
     struct Target: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Run fuzzing target - waits for fuzzer connections"
+            abstract: "Run fuzzing target - waits for fuzzer connections",
         )
 
         @Option(help: "Unix socket path for fuzzing protocol")
@@ -40,7 +40,7 @@ extension Boka.Fuzz {
 
             let fuzzTarget = try FuzzingTarget(
                 socketPath: socketPath,
-                config: config.rawValue
+                config: config.rawValue,
             )
 
             try await fuzzTarget.run()
@@ -49,7 +49,7 @@ extension Boka.Fuzz {
 
     struct Fuzzer: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Run fuzzing fuzzer - connects to targets"
+            abstract: "Run fuzzing fuzzer - connects to targets",
         )
 
         @Option(help: "Unix socket path for fuzzing protocol.")
@@ -80,7 +80,7 @@ extension Boka.Fuzz {
                 config: config.rawValue,
                 seed: seed,
                 blockCount: blocks,
-                tracesDir: tracesDir
+                tracesDir: tracesDir,
             )
             try await fuzzer.run()
         }

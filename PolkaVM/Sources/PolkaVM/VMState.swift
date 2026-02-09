@@ -39,7 +39,7 @@ public protocol VMState {
     func increasePC(_ amount: UInt32)
     func updatePC(_ newPC: UInt32)
 
-    // Execution Control
+    /// Execution Control
     func withExecutingInst<R>(_ block: () throws -> R) rethrows -> R
 }
 
