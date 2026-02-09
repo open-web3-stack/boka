@@ -42,12 +42,18 @@ let package = Package(
                 .interoperabilityMode(.Cxx),
             ],
         ),
+        .target(
+            name: "MacOSSandboxSupport",
+            path: "Sources/MacOSSandboxSupport",
+            publicHeadersPath: "include",
+        ),
         .executableTarget(
             name: "Sandbox",
             dependencies: [
                 "PolkaVM",
                 "Utils",
                 "TracingUtils",
+                "MacOSSandboxSupport",
                 .product(name: "Logging", package: "swift-log"),
             ],
             sources: ["main.swift"],

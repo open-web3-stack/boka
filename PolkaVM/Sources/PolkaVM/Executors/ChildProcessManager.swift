@@ -36,20 +36,11 @@ actor ChildProcessManager {
             /// Create socket pair for IPC
             var sockets: [Int32] = [0, 0]
 
-            // Use the raw values directly
-            #if os(Linux)
-                let domain: Int32 = 1 // AF_UNIX
-                let socketType: Int32 = 1 // SOCK_STREAM
-            #else
-                let domain: Int32 = AF_UNIX
-                let socketType: Int32 = SOCK_STREAM
-            #endif
+            // Use raw constants to avoid Linux/Darwin type signature differences.
+            let domain: Int32 = 1 // AF_UNIX
+            let socketType: Int32 = 1 // SOCK_STREAM
 
-            #if canImport(Glibc)
-                let result = Glibc.socketpair(domain, socketType, 0, &sockets)
-            #elseif canImport(Darwin)
-                let result = Darwin.socketpair(domain, socketType, 0, &sockets)
-            #endif
+            let result = Glibc.socketpair(domain, socketType, 0, &sockets)
 
             guard result == 0 else {
                 let err = errno
@@ -72,66 +63,33 @@ actor ChildProcessManager {
             let execPathCArray = executablePath.utf8CString
 
             // Fork child process
-            #if canImport(Glibc)
-                let pid = Glibc.fork()
-            #elseif canImport(Darwin)
-                let pid = Darwin.fork()
-            #endif
+            let pid = Glibc.fork()
 
             if pid < 0 {
                 // Fork failed
                 let err = errno
-                #if canImport(Glibc)
-                    Glibc.close(parentFD)
-                    Glibc.close(childFD)
-                #elseif canImport(Darwin)
-                    Darwin.close(parentFD)
-                    Darwin.close(childFD)
-                #endif
+                Glibc.close(parentFD)
+                Glibc.close(childFD)
                 logger.error("Failed to fork: \(err)")
                 throw IPCError.writeFailed(Int(err))
             } else if pid == 0 {
                 // Child process - DO NOT use logging, locks, or any async-unsafe functions
-                #if canImport(Glibc)
-                    Glibc.close(parentFD)
-                #elseif canImport(Darwin)
-                    Darwin.close(parentFD)
-                #endif
+                Glibc.close(parentFD)
 
                 // Redirect stdin/stdout to /dev/null, keep stderr for debugging
-                #if canImport(Glibc)
-                    let devNull = Glibc.open("/dev/null", O_RDWR)
-                #elseif canImport(Darwin)
-                    let devNull = Darwin.open("/dev/null", O_RDWR)
-                #endif
+                let devNull = Glibc.open("/dev/null", O_RDWR)
                 if devNull >= 0 {
-                    #if canImport(Glibc)
-                        Glibc.dup2(devNull, STDOUT_FILENO)
-                        // Glibc.dup2(devNull, STDERR_FILENO)  // Keep stderr for debugging
-                        Glibc.close(devNull)
-                    #elseif canImport(Darwin)
-                        Darwin.dup2(devNull, STDOUT_FILENO)
-                        // Darwin.dup2(devNull, STDERR_FILENO)  // Keep stderr for debugging
-                        Darwin.close(devNull)
-                    #endif
+                    Glibc.dup2(devNull, STDOUT_FILENO)
+                    // Glibc.dup2(devNull, STDERR_FILENO)  // Keep stderr for debugging
+                    Glibc.close(devNull)
                 }
 
                 // Set child FD as stdin (for IPC)
-                #if canImport(Glibc)
-                    if Glibc.dup2(childFD, STDIN_FILENO) == -1 {
-                        _exit(1)
-                    }
-                #elseif canImport(Darwin)
-                    if Darwin.dup2(childFD, STDIN_FILENO) == -1 {
-                        _exit(1)
-                    }
-                #endif
+                if Glibc.dup2(childFD, STDIN_FILENO) == -1 {
+                    _exit(1)
+                }
 
-                #if canImport(Glibc)
-                    Glibc.close(childFD)
-                #elseif canImport(Darwin)
-                    Darwin.close(childFD)
-                #endif
+                Glibc.close(childFD)
 
                 // Execute child process
                 // Use pre-allocated C string array (async-signal-safe)
@@ -144,11 +102,7 @@ actor ChildProcessManager {
                         nil,
                     ]
 
-                    #if canImport(Glibc)
-                        let exeResult = Glibc.execvp(execPath, &argv)
-                    #elseif canImport(Darwin)
-                        let exeResult = Darwin.execvp(execPath, &argv)
-                    #endif
+                    let exeResult = Glibc.execvp(execPath, &argv)
 
                     // execvp only returns on failure
                     // Use _exit() instead of exit() to avoid calling atexit() handlers
@@ -163,11 +117,7 @@ actor ChildProcessManager {
             } else {
                 // Parent process
                 logger.debug("Parent: Closing childFD \(childFD)")
-                #if canImport(Glibc)
-                    Glibc.close(childFD)
-                #elseif canImport(Darwin)
-                    Darwin.close(childFD)
-                #endif
+                Glibc.close(childFD)
 
                 // Validate parentFD is still valid after closing childFD
                 let parentFlagsAfterClose = fcntl(parentFD, F_GETFL)
@@ -184,6 +134,100 @@ actor ChildProcessManager {
                 logger.debug("Parent: Returning handle and parentFD \(parentFD) to caller")
                 return (handle, parentFD)
             }
+        #elseif os(macOS)
+            logger.debug("Spawning child process: \(executablePath)")
+
+            /// Create socket pair for IPC
+            var sockets: [Int32] = [0, 0]
+            let domain: Int32 = 1 // AF_UNIX
+            let socketType: Int32 = 1 // SOCK_STREAM
+
+            let socketResult = Darwin.socketpair(domain, socketType, 0, &sockets)
+            guard socketResult == 0 else {
+                let err = errno
+                logger.error("Failed to create socketpair: \(err)")
+                throw IPCError.writeFailed(Int(err))
+            }
+
+            let parentFD = sockets[0]
+            let childFD = sockets[1]
+
+            logger.debug("Created socketpair: parentFD=\(parentFD), childFD=\(childFD)")
+
+            var fileActions: posix_spawn_file_actions_t?
+            let initResult = posix_spawn_file_actions_init(&fileActions)
+            guard initResult == 0 else {
+                Darwin.close(parentFD)
+                Darwin.close(childFD)
+                logger.error("Failed to initialize posix_spawn file actions: \(initResult)")
+                throw IPCError.writeFailed(Int(initResult))
+            }
+
+            defer {
+                _ = posix_spawn_file_actions_destroy(&fileActions)
+            }
+
+            var actionResult = posix_spawn_file_actions_addclose(&fileActions, parentFD)
+            guard actionResult == 0 else {
+                Darwin.close(parentFD)
+                Darwin.close(childFD)
+                logger.error("Failed to add close action for parentFD: \(actionResult)")
+                throw IPCError.writeFailed(Int(actionResult))
+            }
+
+            actionResult = posix_spawn_file_actions_addopen(&fileActions, STDOUT_FILENO, "/dev/null", O_RDWR, 0)
+            guard actionResult == 0 else {
+                Darwin.close(parentFD)
+                Darwin.close(childFD)
+                logger.error("Failed to add stdout redirection action: \(actionResult)")
+                throw IPCError.writeFailed(Int(actionResult))
+            }
+
+            actionResult = posix_spawn_file_actions_adddup2(&fileActions, childFD, STDIN_FILENO)
+            guard actionResult == 0 else {
+                Darwin.close(parentFD)
+                Darwin.close(childFD)
+                logger.error("Failed to add dup2 action for IPC stdin: \(actionResult)")
+                throw IPCError.writeFailed(Int(actionResult))
+            }
+
+            actionResult = posix_spawn_file_actions_addclose(&fileActions, childFD)
+            guard actionResult == 0 else {
+                Darwin.close(parentFD)
+                Darwin.close(childFD)
+                logger.error("Failed to add close action for childFD: \(actionResult)")
+                throw IPCError.writeFailed(Int(actionResult))
+            }
+
+            var pid: pid_t = 0
+            var execPathCArray = executablePath.utf8CString
+            let spawnResult = execPathCArray.withUnsafeMutableBufferPointer { buffer -> Int32 in
+                guard let execPath = buffer.baseAddress else {
+                    return EINVAL
+                }
+
+                var argv: [UnsafeMutablePointer<CChar>?] = [execPath, nil]
+                return posix_spawnp(&pid, execPath, &fileActions, nil, &argv, environ)
+            }
+
+            guard spawnResult == 0 else {
+                Darwin.close(parentFD)
+                Darwin.close(childFD)
+                logger.error("Failed to spawn child process: \(spawnResult)")
+                throw IPCError.writeFailed(Int(spawnResult))
+            }
+
+            Darwin.close(childFD)
+
+            let handle = ProcessHandle(pid: pid, ipcFD: parentFD)
+            activeProcesses[pid] = handle
+
+            logger.debug("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
+
+            // Wait a moment for child to start
+            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+
+            return (handle, parentFD)
         #else
             throw IPCError.childProcessError("Sandboxed execution is not supported on this platform")
         #endif

@@ -16,7 +16,7 @@ public func invokePVM(
 ) async -> (ExitReason, Gas, Data?) {
     do {
         // Use JIT/Executor if requested, otherwise use Engine (interpreter)
-        if executionMode.contains(.jit) {
+        if executionMode.contains(.jit) || executionMode.contains(.sandboxed) {
             let executor = Executor(mode: executionMode, config: config)
             let result = await executor.execute(
                 blob: blob,
