@@ -13,11 +13,11 @@ import Utils
 private let logger = Logger(label: "JITArithmeticTests")
 
 /// JIT Arithmetic Instruction Tests
-@Suite(.disabled("Temporarily disabled: JIT arithmetic results are unstable in current backend"))
+@Suite
 struct JITArithmeticTests {
     // MARK: - Add64/Sub64 Instructions (Opcodes 200-201)
 
-    @Test("JIT: Add64 adds two registers")
+    @Test("JIT: Add64 adds two registers", .disabled("Known issue: arm64 JIT arithmetic backend returns incorrect Add64 result"))
     func jitAdd64() async {
         // LoadImm64 r1, 100
         // LoadImm64 r2, 42
@@ -48,7 +48,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 142)
     }
 
-    @Test("JIT: Add64 with overflow wraps correctly")
+    @Test("JIT: Add64 with overflow wraps correctly", .disabled("Known issue: arm64 JIT arithmetic backend returns incorrect Add64 result"))
     func jitAdd64Overflow() async {
         // LoadImm64 r1, UInt64.max
         // LoadImm64 r2, 1
@@ -79,7 +79,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 0)
     }
 
-    @Test("JIT: Sub64 subtracts two registers")
+    @Test("JIT: Sub64 subtracts two registers", .disabled("Known issue: arm64 JIT arithmetic backend returns incorrect Sub64 result"))
     func jitSub64() async {
         // LoadImm64 r1, 100
         // LoadImm64 r2, 42
@@ -110,7 +110,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 58)
     }
 
-    @Test("JIT: Sub64 with underflow wraps correctly")
+    @Test("JIT: Sub64 with underflow wraps correctly", .disabled("Known issue: arm64 JIT arithmetic backend returns incorrect Sub64 result"))
     func jitSub64Underflow() async {
         // LoadImm64 r1, 42
         // LoadImm64 r2, 100
@@ -142,7 +142,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: expected)
     }
 
-    @Test("JIT vs Interpreter: Add64 parity")
+    @Test("JIT vs Interpreter: Add64 parity", .disabled("Known issue: arm64 JIT arithmetic backend fails Add64 parity"))
     func jitAdd64Parity() async {
         var code = Data()
 
@@ -174,7 +174,7 @@ struct JITArithmeticTests {
 
     // MARK: - AddImm/SubImm Instructions (Opcodes 149-154)
 
-    @Test("JIT: AddImm64 adds immediate to register")
+    @Test("JIT: AddImm64 adds immediate to register", .disabled("Known issue: arm64 JIT compiler fails AddImm64 lowering"))
     func jitAddImm64() async {
         // LoadImm64 r1, 100
         // AddImm64 r1, 42
@@ -200,7 +200,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: 142)
     }
 
-    @Test("JIT vs Interpreter: AddImm64 parity")
+    @Test("JIT vs Interpreter: AddImm64 parity", .disabled("Known issue: arm64 JIT compiler fails AddImm64 lowering"))
     func jitAddImm64Parity() async {
         var code = Data()
 
@@ -228,7 +228,7 @@ struct JITArithmeticTests {
 
     // MARK: - Mul64 Instruction (Opcode 202)
 
-    @Test("JIT: Mul64 multiplies two registers")
+    @Test("JIT: Mul64 multiplies two registers", .disabled("Known issue: arm64 JIT arithmetic backend returns incorrect Mul64 result"))
     func jitMul64() async {
         // LoadImm64 r1, 100
         // LoadImm64 r2, 42
@@ -289,7 +289,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 0)
     }
 
-    @Test("JIT vs Interpreter: Mul64 parity")
+    @Test("JIT vs Interpreter: Mul64 parity", .disabled("Known issue: arm64 JIT arithmetic backend fails Mul64 parity"))
     func jitMul64Parity() async {
         var code = Data()
 
@@ -320,7 +320,7 @@ struct JITArithmeticTests {
 
     // MARK: - Shift Instructions (Opcodes 206-211)
 
-    @Test("JIT: ShloL64 shifts left logical")
+    @Test("JIT: ShloL64 shifts left logical", .disabled("Known issue: arm64 JIT compiler fails shift-op lowering"))
     func jitShloL64() async {
         // LoadImm64 r1, 1
         // LoadImm64 r2, 4
@@ -350,7 +350,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 16)
     }
 
-    @Test("JIT: ShloL64 with large shift wraps")
+    @Test("JIT: ShloL64 with large shift wraps", .disabled("Known issue: arm64 JIT compiler fails shift-op lowering"))
     func jitShloL64LargeShift() async {
         // LoadImm64 r1, 1
         // LoadImm64 r2, 68 (greater than 64)
@@ -380,7 +380,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 16)
     }
 
-    @Test("JIT: ShroR64 shifts right logical")
+    @Test("JIT: ShroR64 shifts right logical", .disabled("Known issue: arm64 JIT compiler fails shift-op lowering"))
     func jitShroR64() async {
         // LoadImm64 r1, 128
         // LoadImm64 r2, 2
@@ -410,7 +410,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 32)
     }
 
-    @Test("JIT: SharR64 shifts right arithmetic")
+    @Test("JIT: SharR64 shifts right arithmetic", .disabled("Known issue: arm64 JIT compiler fails shift-op lowering"))
     func jitSharR64() async {
         // LoadImm64 r1, -128 (as signed)
         // LoadImm64 r2, 2
@@ -442,7 +442,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: expected)
     }
 
-    @Test("JIT vs Interpreter: ShloL64 parity")
+    @Test("JIT vs Interpreter: ShloL64 parity", .disabled("Known issue: arm64 JIT compiler fails shift-op lowering"))
     func jitShloL64Parity() async {
         var code = Data()
 
@@ -473,7 +473,7 @@ struct JITArithmeticTests {
 
     // MARK: - And/Or/Xor Instructions (Opcodes 210-212)
 
-    @Test("JIT: And performs bitwise AND")
+    @Test("JIT: And performs bitwise AND", .disabled("Known issue: arm64 JIT arithmetic backend returns incorrect AND result"))
     func jitAnd() async {
         // LoadImm64 r1, 0xFF00FF00
         // LoadImm64 r2, 0xFFFF0000
@@ -503,7 +503,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 0x0000_0000_FF00_0000)
     }
 
-    @Test("JIT: Or performs bitwise OR")
+    @Test("JIT: Or performs bitwise OR", .disabled("Known issue: arm64 JIT arithmetic backend returns incorrect OR result"))
     func jitOr() async {
         // LoadImm64 r1, 0xF0
         // LoadImm64 r2, 0x0F
@@ -563,7 +563,7 @@ struct JITArithmeticTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: 0)
     }
 
-    @Test("JIT vs Interpreter: And parity")
+    @Test("JIT vs Interpreter: And parity", .disabled("Known issue: arm64 JIT arithmetic backend fails AND parity"))
     func jitAndParity() async {
         var code = Data()
 
@@ -594,7 +594,7 @@ struct JITArithmeticTests {
 
     // MARK: - Edge Cases
 
-    @Test("JIT: Add64 with zero register")
+    @Test("JIT: Add64 with zero register", .disabled("Known issue: arm64 JIT arithmetic backend returns incorrect Add64 result"))
     func jitAdd64WithZero() async {
         // LoadImm64 r1, 100
         // LoadImm64 r2, 0

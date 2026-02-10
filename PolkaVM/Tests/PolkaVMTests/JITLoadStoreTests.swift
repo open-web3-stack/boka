@@ -36,7 +36,7 @@ private func encodeVarint(_ value: UInt64) -> [UInt8] {
 }
 
 /// JIT Load/Store Instruction Tests
-@Suite(.disabled("Temporarily disabled: JIT load/store results are unstable in current backend"))
+@Suite
 struct JITLoadStoreTests {
     // MARK: - LoadImm Instructions (Opcodes 51, 20)
 
@@ -80,7 +80,7 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 3), equals: UInt64.max)
     }
 
-    @Test("JIT: LoadImm loads 32-bit immediate with sign extension")
+    @Test("JIT: LoadImm loads 32-bit immediate with sign extension", .disabled("Known issue: arm64 JIT decodes LoadImm immediate width incorrectly"))
     func jitLoadImm32() async {
         // LoadImm r1, 0x12345678 (sign-extended to 64-bit)
         // LoadImm format: [opcode][reg_index][value_32bit] (6 bytes total)
@@ -148,7 +148,7 @@ struct JITLoadStoreTests {
 
     // MARK: - LoadU8/I8/U16/I16/U32/I32/U64 Instructions (Opcodes 52-58)
 
-    @Test("JIT: LoadU8 loads unsigned byte")
+    @Test("JIT: LoadU8 loads unsigned byte", .disabled("Known issue: arm64 JIT load path returns zero for LoadU8"))
     func jitLoadU8() async {
         // LoadU8 r2, [0x10000] - load from read-only data using DIRECT addressing
         // Halt
@@ -178,7 +178,7 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: 0x0000_0000_0000_00AB)
     }
 
-    @Test("JIT: LoadI8 sign-extends byte")
+    @Test("JIT: LoadI8 sign-extends byte", .disabled("Known issue: arm64 JIT load path returns zero for LoadI8"))
     func jitLoadI8() async {
         // LoadI8 r2, [0x10000] - load 0xFF (should sign-extend to -1)
         // Halt
@@ -207,7 +207,7 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: UInt64(0xFFFF_FFFF_FFFF_FFFF))
     }
 
-    @Test("JIT: LoadU16 loads unsigned halfword")
+    @Test("JIT: LoadU16 loads unsigned halfword", .disabled("Known issue: arm64 JIT load path returns zero for LoadU16"))
     func jitLoadU16() async {
         // LoadU16 r2, [0x10000] - load 0x1234
         // Halt
@@ -236,7 +236,7 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: 0x0000_0000_0000_1234)
     }
 
-    @Test("JIT vs Interpreter: LoadU8 parity")
+    @Test("JIT vs Interpreter: LoadU8 parity", .disabled("Known issue: arm64 JIT load path fails LoadU8 parity"))
     func jitLoadU8Parity() async {
         var code = Data()
 
@@ -267,7 +267,7 @@ struct JITLoadStoreTests {
 
     // MARK: - StoreU8/U16/U32/U64 Instructions (Opcodes 59-62)
 
-    @Test("JIT: StoreU8 stores byte to memory")
+    @Test("JIT: StoreU8 stores byte to memory", .disabled("Known issue: arm64 JIT store path fails StoreU8"))
     func jitStoreU8() async {
         // LoadImm64 r1, value (0xAB)
         // StoreU8 [0x20000], r1
@@ -307,7 +307,7 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: 0x0000_0000_0000_00AB)
     }
 
-    @Test("JIT: StoreU16 stores halfword to memory")
+    @Test("JIT: StoreU16 stores halfword to memory", .disabled("Known issue: arm64 JIT store path fails StoreU16"))
     func jitStoreU16() async {
         // LoadImm64 r1, value (0x1234)
         // StoreU16 [0x20000], r1
@@ -345,7 +345,7 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: 0x0000_0000_0000_1234)
     }
 
-    @Test("JIT vs Interpreter: StoreU8 parity")
+    @Test("JIT vs Interpreter: StoreU8 parity", .disabled("Known issue: arm64 JIT store path fails StoreU8 parity"))
     func jitStoreU8Parity() async {
         var code = Data()
 
@@ -379,7 +379,7 @@ struct JITLoadStoreTests {
 
     // MARK: - StoreImmU8/U16/U32/U64 Instructions (Opcodes 30-33)
 
-    @Test("JIT: StoreImmU8 stores immediate byte")
+    @Test("JIT: StoreImmU8 stores immediate byte", .disabled("Known issue: arm64 JIT store-immediate path fails StoreImmU8"))
     func jitStoreImmU8() async {
         // LoadImm64 r1, writeable address
         // StoreImmU8 [r1], 0xAB
@@ -418,7 +418,7 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: 0x0000_0000_0000_00AB)
     }
 
-    @Test("JIT: StoreImmU32 stores immediate 32-bit value")
+    @Test("JIT: StoreImmU32 stores immediate 32-bit value", .disabled("Known issue: arm64 JIT store-immediate path fails StoreImmU32"))
     func jitStoreImmU32() async {
         // LoadImm64 r1, writeable address
         // StoreImmU32 [r1], 0x12345678
@@ -457,7 +457,7 @@ struct JITLoadStoreTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 2), equals: 0x0000_0000_1234_5678)
     }
 
-    @Test("JIT vs Interpreter: StoreImmU8 parity")
+    @Test("JIT vs Interpreter: StoreImmU8 parity", .disabled("Known issue: arm64 JIT store-immediate path fails StoreImmU8 parity"))
     func jitStoreImmU8Parity() async {
         var code = Data()
 

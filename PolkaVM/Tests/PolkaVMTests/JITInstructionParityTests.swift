@@ -13,7 +13,7 @@ import Utils
 private let logger = Logger(label: "JITInstructionParityTests")
 
 /// JIT vs Interpreter parity tests
-@Suite(.disabled("Temporarily disabled: JIT vs interpreter parity is unstable"))
+@Suite
 struct JITInstructionParityTests {
     /// Create a minimal test program with a single instruction
     private func createSingleInstructionProgram(_ instructionBytes: [UInt8]) -> Data {
@@ -90,9 +90,9 @@ struct JITInstructionParityTests {
     @Test("JIT vs Interpreter: LoadImm32")
     func loadImm32() async throws {
         // LoadImm32 r1, 0x12345678 (sign-extended)
-        // Opcode 0x32, dest_reg=0x01, immediate=0x78, 0x56, 0x34, 0x12
+        // Opcode 0x33, dest_reg=0x01, immediate=0x78, 0x56, 0x34, 0x12
         let instruction: [UInt8] = [
-            0x32, 0x01, 0x78, 0x56, 0x34, 0x12,
+            0x33, 0x01, 0x78, 0x56, 0x34, 0x12,
         ]
         try await compareExecution(
             instructionBytes: instruction,

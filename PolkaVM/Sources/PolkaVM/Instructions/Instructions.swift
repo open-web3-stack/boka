@@ -1433,7 +1433,8 @@ extension CppHelper.Instructions.BranchGeS: BranchInstructionBase2 {
 extension CppHelper.Instructions.LoadImmJumpInd: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, minus: 2, startIdx: 1)
+        // Format: [packed_ra_rb][varint_value][varint_offset]
+        let (value, offset, _): (UInt32, UInt32, Int) = try Instructions.decodeVarintPair(data, offset: 1)
         self.init(ra: ra, rb: rb, value: value, offset: offset)
     }
 
