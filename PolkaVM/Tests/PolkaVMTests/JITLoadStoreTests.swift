@@ -12,27 +12,14 @@ import Utils
 
 private let logger = Logger(label: "JITLoadStoreTests")
 
-/// Helper function to encode unsigned integers as varint (LEB128)
-/// Uses high bit (0x80) to indicate continuation
-private func encodeVarint(_ value: UInt64) -> [UInt8] {
-    guard value > 0 else { return [0] }
-
-    var bytes: [UInt8] = []
-    var remaining = value
-
-    while remaining > 0 {
-        var byte = UInt8(remaining & 0x7F)
-        remaining >>= 7
-
-        // Set continuation bit if more bytes follow
-        if remaining > 0 {
-            byte |= 0x80
-        }
-
-        bytes.append(byte)
+/// Encode a signed immediate in compact little-endian form.
+/// Length must be 1...4 to match PVM compact immediate operands.
+private func encodeCompactImmediate(_ value: Int32, length: Int) -> [UInt8] {
+    precondition((1 ... 4).contains(length))
+    let raw = UInt32(bitPattern: value)
+    return (0 ..< length).map { i in
+        UInt8(truncatingIfNeeded: raw >> (i * 8))
     }
-
-    return bytes
 }
 
 /// JIT Load/Store Instruction Tests
@@ -393,10 +380,12 @@ struct JITLoadStoreTests {
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
         // StoreImmIndU8 [r1 + 0], 0xAB
+        // Format: [opcode][packed_rA_lX][immed_X][immed_Y]
+        // packed_rA_lX: low nibble=rA (base reg), high bits=l_X (offset bytes)
         code.append(0x46) // StoreImmIndU8 opcode (70)
-        code.append(0x01) // r1
-        code.append(contentsOf: encodeVarint(0)) // offset (varint)
-        code.append(contentsOf: encodeVarint(0xAB)) // value (varint)
+        code.append(0x11) // rA=1, l_X=1
+        code.append(contentsOf: encodeCompactImmediate(0, length: 1)) // immed_X (offset)
+        code.append(contentsOf: encodeCompactImmediate(0xAB, length: 4)) // immed_Y (value)
 
         // LoadU8 r2, [0x20000] to verify (direct addressing)
         code.append(0x34) // LoadU8 opcode
@@ -433,9 +422,9 @@ struct JITLoadStoreTests {
 
         // StoreImmIndU32 [r1 + 0], 0x12345678
         code.append(0x48) // StoreImmIndU32 opcode (72)
-        code.append(0x01) // r1
-        code.append(contentsOf: encodeVarint(0)) // offset (varint)
-        code.append(contentsOf: encodeVarint(0x1234_5678)) // value (varint)
+        code.append(0x11) // rA=1, l_X=1
+        code.append(contentsOf: encodeCompactImmediate(0, length: 1)) // immed_X (offset)
+        code.append(contentsOf: encodeCompactImmediate(0x1234_5678, length: 4)) // immed_Y (value)
 
         // LoadU32 r2, [0x20000] to verify (direct addressing)
         code.append(0x38) // LoadU32 opcode
@@ -466,9 +455,9 @@ struct JITLoadStoreTests {
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
         code.append(0x46) // StoreImmIndU8 [r1+0], 0xCD
-        code.append(0x01) // r1
-        code.append(contentsOf: encodeVarint(0)) // offset (varint)
-        code.append(contentsOf: encodeVarint(0xCD)) // value (varint)
+        code.append(0x11) // rA=1, l_X=1
+        code.append(contentsOf: encodeCompactImmediate(0, length: 1)) // immed_X (offset)
+        code.append(contentsOf: encodeCompactImmediate(0xCD, length: 4)) // immed_Y (value)
 
         code.append(0x00) // Trap (proper termination per spec)
 

@@ -52,10 +52,12 @@ final class BasicBlockBuilder {
                 blocks[UInt32(currentPC)] = currentBlock!
             }
 
-            // Get instruction length using C++ implementation
-            let instructionLength = program.code.withUnsafeBytes { bytes -> UInt32 in
+            // Prefer C++ opcode sizing for fixed-width opcodes.
+            // For compact variable-width opcodes this returns 0, then we fall back
+            // to ProgramCode skip/bitmask length.
+            let cxxLength = program.code.withUnsafeBytes { bytes -> UInt32 in
                 guard let baseAddress = bytes.baseAddress else {
-                    return 0 // Empty code - signal error
+                    return 0
                 }
                 return get_instruction_size(
                     baseAddress.assumingMemoryBound(to: UInt8.self),
@@ -64,11 +66,15 @@ final class BasicBlockBuilder {
                 )
             }
 
-            // Handle unknown opcodes - return 0 signals error
-            if instructionLength == 0 {
-                // Unknown opcode - stop parsing at this point
-                // This is safer than continuing with incorrect sizes
-                // logger.warning("Unknown opcode \(opcode) at PC \(currentPC), stopping block parsing")
+            let instructionLength: UInt32
+            if cxxLength > 0 {
+                instructionLength = cxxLength
+            } else {
+                instructionLength = program.skip(UInt32(currentPC)) + 1
+            }
+
+            if instructionLength == 0 || currentPC + Int(instructionLength) > program.code.count {
+                // Unknown or invalid instruction length - stop parsing safely.
                 break
             }
 

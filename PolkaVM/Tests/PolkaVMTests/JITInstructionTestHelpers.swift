@@ -39,10 +39,10 @@ struct JITTestResult {
 
 /// Helper to build PolkaVM program blobs from raw instructions
 enum ProgramBlobBuilder {
-    /// Encode a value as varint using the Codec library's variableWidth encoding
+    /// Encode a value using the general natural-number codec from spec/serialization.tex.
     /// - Parameter value: Value to encode
-    /// - Returns: Varint-encoded data
-    static func encodeVarint(_ value: UInt64) -> Data {
+    /// - Returns: Variable-width natural-number encoded data
+    static func encodeNatural(_ value: UInt64) -> Data {
         Data(value.encode(method: .variableWidth))
     }
 
@@ -137,14 +137,14 @@ enum ProgramBlobBuilder {
         // Create ProgramCode blob
         var programCode = Data()
 
-        // Jump table entry count (varint: 0)
-        programCode.append(contentsOf: encodeVarint(0))
+        // Jump table entry count (natural-number encoding: 0)
+        programCode.append(contentsOf: encodeNatural(0))
 
         // Encode size (1 byte: 0)
         programCode.append(0)
 
-        // Code length (varint for instruction count)
-        programCode.append(contentsOf: encodeVarint(UInt64(instructionBytes.count)))
+        // Code length (natural-number encoding)
+        programCode.append(contentsOf: encodeNatural(UInt64(instructionBytes.count)))
 
         // No jump table entries
 
@@ -196,14 +196,14 @@ enum ProgramBlobBuilder {
     static func createProgramCodeBlob(_ instructionBytes: [UInt8]) -> Data {
         var programCode = Data()
 
-        // Jump table entry count (varint: 0)
-        programCode.append(contentsOf: encodeVarint(0))
+        // Jump table entry count (natural-number encoding: 0)
+        programCode.append(contentsOf: encodeNatural(0))
 
         // Encode size (1 byte: 0)
         programCode.append(0)
 
-        // Code length (varint for instruction count)
-        programCode.append(contentsOf: encodeVarint(UInt64(instructionBytes.count)))
+        // Code length (natural-number encoding)
+        programCode.append(contentsOf: encodeNatural(UInt64(instructionBytes.count)))
 
         // No jump table entries
 
@@ -232,19 +232,13 @@ enum ProgramBlobBuilder {
     /// Create a program blob with a jump table
     /// - Parameters:
     ///   - instructions: Instruction bytes array
-    ///   - jumpTable: Dictionary mapping jump indices to offsets
+    ///   - jumpTable: Mapping of 1-based dynamic jump indices to target PCs
     /// - Returns: Complete program blob with jump table
     static func createProgramWithJumpTable(
         instructions: [[UInt8]],
         jumpTable: [UInt64: Int],
     ) -> Data {
-        var blob = Data()
-
-        // Jump table entry count
-        blob.append(contentsOf: encodeVarint(UInt64(jumpTable.count)))
-
-        // Encode size (0)
-        blob.append(0)
+        var programCode = Data()
 
         // Flatten instructions
         var code = Data()
@@ -252,25 +246,58 @@ enum ProgramBlobBuilder {
             code.append(contentsOf: instructions)
         }
 
-        // Code length
-        blob.append(contentsOf: encodeVarint(UInt64(code.count)))
+        // Build dense fixed-width jump table entries per spec/pvm.tex:
+        // p = encode(len(j)) ++ encode[1](z) ++ encode(len(c)) ++ encode[z](j) ++ encode(c) ++ encode(k)
+        let maxIndex = jumpTable.keys.max().flatMap(Int.init(exactly:)) ?? 0
+        var jumpTableEntries = Array(repeating: UInt32(0), count: max(0, maxIndex))
+        for (index, targetPC) in jumpTable {
+            guard index > 0, targetPC >= 0 else {
+                continue
+            }
+            guard let entryIndex = Int(exactly: index - 1), entryIndex < jumpTableEntries.count else {
+                continue
+            }
+            jumpTableEntries[entryIndex] = UInt32(clamping: targetPC)
+        }
 
-        // Jump table entries (sorted by index)
-        let sortedEntries = jumpTable.sorted { $0.key < $1.key }
-        for (index, offset) in sortedEntries {
-            blob.append(contentsOf: encodeVarint(index))
-            blob.append(contentsOf: encodeVarint(UInt64(offset)))
+        let jumpTableEntrySize: UInt8 = {
+            guard !jumpTableEntries.isEmpty else {
+                return 0
+            }
+            let maxTarget = jumpTableEntries.max() ?? 0
+            if maxTarget <= UInt32(UInt8.max) {
+                return 1
+            }
+            if maxTarget <= UInt32(UInt16.max) {
+                return 2
+            }
+            if maxTarget <= 0x00FF_FFFF {
+                return 3
+            }
+            return 4
+        }()
+
+        programCode.append(contentsOf: encodeNatural(UInt64(jumpTableEntries.count)))
+        programCode.append(jumpTableEntrySize)
+        programCode.append(contentsOf: encodeNatural(UInt64(code.count)))
+
+        if jumpTableEntrySize > 0 {
+            for targetPC in jumpTableEntries {
+                let littleEndian = targetPC.littleEndian
+                withUnsafeBytes(of: littleEndian) { bytes in
+                    programCode.append(contentsOf: bytes.prefix(Int(jumpTableEntrySize)))
+                }
+            }
         }
 
         // Code section
-        blob.append(contentsOf: code)
+        programCode.append(contentsOf: code)
 
         // Bitmask
         let bitmaskSize = (code.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+        programCode.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
 
         // Wrap in StandardProgram format
-        let programCode = blob
         return createStandardProgram(programCode: programCode)
     }
 
@@ -392,10 +419,16 @@ enum ProgramBlobBuilder {
             return 2 + clamped_l_X + l_Y
         }
 
-        // LoadImmJumpInd - fixed size
-        // Format: opcode (1) + ra_rb_packed (1) + value_byte (1) + offset_byte (1) = 4 bytes
+        // LoadImmJumpInd
+        // Format: [opcode][packed_ra_rb][len][immed_X][immed_Y]
+        // For tests we use compact immediates with a single len byte.
         if opcode == 0xB4 { // LoadImmJumpInd (opcode 180)
-            return 4
+            guard pc + 2 < instructionBytes.count else { return 1 }
+            let lenByte = instructionBytes[pc + 2]
+            let l_X = min(Int(lenByte & 0x07), 4)
+            let remaining = instructionBytes.count - (pc + 3 + l_X)
+            let l_Y = max(0, min(4, remaining))
+            return 3 + l_X + l_Y
         }
 
         // Arithmetic instructions (3 bytes: opcode + packed registers + rd)
@@ -432,52 +465,24 @@ enum ProgramBlobBuilder {
             return 7
         }
 
-        // StoreImmU8/U16/U32/U64 (direct store: opcode + address_varint + value_varint)
+        // StoreImmU8/U16/U32/U64 (direct store with compact immediates)
         if opcode == 0x1E || opcode == 0x1F || opcode == 0x20 || opcode == 0x21 {
-            var size = 1 // opcode
-            var offset = pc + 1
-
-            // Decode address varint
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break }
-            }
-
-            // Decode value varint
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break }
-            }
-
-            return size
+            guard pc + 1 < instructionBytes.count else { return 1 }
+            let lenByte = instructionBytes[pc + 1]
+            let l_X = min(Int(lenByte & 0x07), 4)
+            let remaining = instructionBytes.count - (pc + 2 + l_X)
+            let l_Y = max(0, min(4, remaining))
+            return 2 + l_X + l_Y
         }
 
-        // StoreImmIndU8/U16/U32/U64 (register-relative: opcode + reg + offset_varint + value_varint)
+        // StoreImmIndU8/U16/U32/U64 (register-relative with compact immediates)
         if opcode >= 0x46, opcode <= 0x49 {
-            var size = 2 // opcode + reg
-            var offset = pc + 2
-
-            // Decode offset varint
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break }
-            }
-
-            // Decode value varint
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break }
-            }
-
-            return size
+            guard pc + 1 < instructionBytes.count else { return 1 }
+            let packed = instructionBytes[pc + 1]
+            let l_X = min(Int((packed >> 4) & 0x07), 4)
+            let remaining = instructionBytes.count - (pc + 2 + l_X)
+            let l_Y = max(0, min(4, remaining))
+            return 2 + l_X + l_Y
         }
 
         // 64-bit Immediate instructions (opcodes 149-161: 0x95-0xA1)

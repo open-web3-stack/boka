@@ -165,7 +165,7 @@ struct JITControlFlowTests {
         // LoadImm r3, 0x42 (should be skipped)
         code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode
         code.append(0x03) // r3
-        code.append(0x42) // immediate 0x42 (varint: single byte)
+        code.append(0x42) // immediate 0x42 (compact single-byte immediate)
 
         // JumpInd r1 - jumps to PC 21
         code.append(PVMOpcodes.jumpInd.rawValue) // JumpInd opcode
@@ -179,7 +179,7 @@ struct JITControlFlowTests {
         // We need to manually build the programCode blob with jump table
         print("[DEBUG] code.count = \(code.count)")
         var programCode = Data()
-        programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(1)) // 1 jump table entry
+        programCode.append(contentsOf: ProgramBlobBuilder.encodeNatural(1)) // 1 jump table entry
         programCode.append(0) // encode size (0 = no offset encoding, means 0-byte jump table entries)
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
         programCode.append(contentsOf: codeLength)
@@ -286,7 +286,7 @@ struct JITControlFlowTests {
 
         // Build blob with jump table (0 entries - LoadImmJumpInd is a runtime jump)
         var programCode = Data()
-        programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(0)) // 0 jump table entries
+        programCode.append(contentsOf: ProgramBlobBuilder.encodeNatural(0)) // 0 jump table entries
         programCode.append(0) // encode size (0 = no offset encoding)
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
         programCode.append(contentsOf: codeLength)
@@ -320,7 +320,7 @@ struct JITControlFlowTests {
 
         // Build blob with jump table (0 entries - LoadImmJumpInd is a runtime jump)
         var programCode = Data()
-        programCode.append(contentsOf: ProgramBlobBuilder.encodeVarint(0)) // 0 jump table entries
+        programCode.append(contentsOf: ProgramBlobBuilder.encodeNatural(0)) // 0 jump table entries
         programCode.append(0) // encode size (0 = no offset encoding)
         let codeLength = Data(UInt64(code.count).encode(method: .variableWidth))
         programCode.append(contentsOf: codeLength)
@@ -382,7 +382,7 @@ struct JITControlFlowTests {
         for _ in 0 ..< 100 {
             code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode
             code.append(0x00) // r0
-            code.append(0x00) // immediate 0 (varint: single byte)
+            code.append(0x00) // immediate 0 (compact single-byte immediate)
         }
 
         // Fallthrough (will trap when execution continues past end)

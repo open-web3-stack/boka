@@ -9,6 +9,7 @@
 #include "opcodes.hh"
 #include <asmjit/x86.h>
 #include <asmjit/core.h>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -67,38 +68,98 @@ extern "C" bool jit_emitter_emit_basic_block_instructions(
     uint32_t start_pc,
     uint32_t end_pc);
 
-// Varint decoder for variable-length integer encoding
-// Returns the decoded value and updates out_size to include varint bytes
-// CRITICAL: Will return 0 and set out_size to 0 if max_size is exceeded (invalid varint)
-static uint64_t decode_varint(const uint8_t* bytecode, uint32_t offset, uint32_t max_size, uint32_t& out_size) {
-    uint64_t result = 0;
-    uint32_t shift = 0;
-    uint32_t i = 0;
+static inline uint32_t clamp_imm_len(uint32_t len) {
+    return (len > 4) ? 4 : len;
+}
 
-    while (true) {
-        // CRITICAL: Bounds check to prevent out-of-bounds read
-        if (offset + i >= max_size) {
-            // Unterminated varint (e.g., 0x80 at last byte) or malformed
-            out_size = 0;
-            return 0;
-        }
+static inline uint32_t second_immediate_len(uint32_t instr_size, uint32_t prefix_len, uint32_t first_immediate_len) {
+    if (instr_size <= prefix_len + first_immediate_len) {
+        return 0;
+    }
+    return clamp_imm_len(instr_size - prefix_len - first_immediate_len);
+}
 
-        uint8_t byte = bytecode[offset + i];
-        result |= (uint64_t(byte & 0x7F)) << shift;
-        i++;
-        if ((byte & 0x80) == 0) {
-            break;
-        }
-        shift += 7;
-        if (shift >= 64) {
-            // Varint too large, return 0
-            out_size = 1;
-            return 0;
+static inline uint64_t decode_immediate_raw(
+    const uint8_t* bytecode,
+    uint32_t offset,
+    uint32_t len,
+    uint32_t max_size)
+{
+    if (len == 0 || offset >= max_size || offset + len > max_size) {
+        return 0;
+    }
+    uint64_t value = 0;
+    for (uint32_t i = 0; i < len; ++i) {
+        value |= uint64_t(bytecode[offset + i]) << (8 * i);
+    }
+    return value;
+}
+
+static inline int64_t decode_immediate_signed(
+    const uint8_t* bytecode,
+    uint32_t offset,
+    uint32_t len,
+    uint32_t max_size)
+{
+    if (len == 0) {
+        return 0;
+    }
+    uint64_t value = decode_immediate_raw(bytecode, offset, len, max_size);
+    if (len < 8) {
+        const uint64_t sign_bit = uint64_t(1) << (len * 8 - 1);
+        if (value & sign_bit) {
+            value |= (~uint64_t(0)) << (len * 8);
         }
     }
+    return static_cast<int64_t>(value);
+}
 
-    out_size = i;
-    return result;
+static inline bool is_variable_length_opcode(uint8_t opcode) {
+    switch (static_cast<Opcode>(opcode)) {
+        case Opcode::Ecalli:
+        case Opcode::StoreImmU8:
+        case Opcode::StoreImmU16:
+        case Opcode::StoreImmU32:
+        case Opcode::StoreImmU64:
+        case Opcode::LoadImm:
+        case Opcode::LoadImmJump:
+        case Opcode::LoadImmJumpInd:
+        case Opcode::BranchEqImm:
+        case Opcode::BranchNeImm:
+        case Opcode::BranchLtUImm:
+        case Opcode::BranchLeUImm:
+        case Opcode::BranchGeUImm:
+        case Opcode::BranchGtUImm:
+        case Opcode::BranchLtSImm:
+        case Opcode::BranchLeSImm:
+        case Opcode::BranchGeSImm:
+        case Opcode::BranchGtSImm:
+        case Opcode::StoreImmIndU8:
+        case Opcode::StoreImmIndU16:
+        case Opcode::StoreImmIndU32:
+        case Opcode::StoreImmIndU64:
+        case Opcode::AddImm32:
+        case Opcode::AndImm:
+        case Opcode::XorImm:
+        case Opcode::OrImm:
+        case Opcode::MulImm32:
+        case Opcode::SetLtUImm:
+        case Opcode::SetLtSImm:
+        case Opcode::ShloLImm32:
+        case Opcode::ShloRImm32:
+        case Opcode::SharRImm32:
+        case Opcode::NegAddImm32:
+        case Opcode::SetGtUImm:
+        case Opcode::SetGtSImm:
+        case Opcode::ShloLImmAlt32:
+        case Opcode::ShloRImmAlt32:
+        case Opcode::SharRImmAlt32:
+        case Opcode::CmovIzImm:
+        case Opcode::CmovNzImm:
+            return true;
+        default:
+            return false;
+    }
 }
 
 // Helper to get instruction size
@@ -130,29 +191,47 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
         return pc + int32_t(offset);
     }
 
-    // Branch register instructions (7 bytes): [opcode][reg1][reg2][offset_32bit]
-    // BranchEq, BranchNe, BranchLtU, BranchLtS, BranchGeU, BranchGeS
-    if (instrSize == 7) {
-        if (pc + 7 > bytecodeSize) {
+    // Branch register instructions (fixed 7 bytes): [opcode][reg1][reg2][offset_32bit]
+    if (opcode_is(opcode, Opcode::BranchEq) ||
+        opcode_is(opcode, Opcode::BranchNe) ||
+        opcode_is(opcode, Opcode::BranchLtU) ||
+        opcode_is(opcode, Opcode::BranchLtS) ||
+        opcode_is(opcode, Opcode::BranchGeU) ||
+        opcode_is(opcode, Opcode::BranchGeS))
+    {
+        if (instrSize < 7 || pc + 7 > bytecodeSize) {
             fprintf(stderr, "[JIT] Branch instruction truncated at PC %u (need 7 bytes, have %zu)\n", pc, bytecodeSize);
             return pc + instrSize;
         }
-        uint32_t offset;
+        uint32_t offset = 0;
         memcpy(&offset, &bytecode[pc + 3], 4);
         return pc + int32_t(offset);
     }
 
-    // Branch immediate instructions (14 bytes): [opcode][reg_index][value_64bit][offset_32bit]
-    // BranchEqImm, BranchNeImm, BranchLtUImm, BranchLeUImm, BranchGeUImm, BranchGtUImm,
-    // BranchLtSImm, BranchLeSImm, BranchGeSImm, BranchGtSImm
-    if (instrSize == 14) {
-        if (pc + 14 > bytecodeSize) {
-            fprintf(stderr, "[JIT] BranchImm instruction truncated at PC %u (need 14 bytes, have %zu)\n", pc, bytecodeSize);
+    // Branch immediate instructions:
+    // [opcode][packed_rA_lX][immed_X][immed_Y]
+    if (opcode_is(opcode, Opcode::BranchEqImm) ||
+        opcode_is(opcode, Opcode::BranchNeImm) ||
+        opcode_is(opcode, Opcode::BranchLtUImm) ||
+        opcode_is(opcode, Opcode::BranchLeUImm) ||
+        opcode_is(opcode, Opcode::BranchGeUImm) ||
+        opcode_is(opcode, Opcode::BranchGtUImm) ||
+        opcode_is(opcode, Opcode::BranchLtSImm) ||
+        opcode_is(opcode, Opcode::BranchLeSImm) ||
+        opcode_is(opcode, Opcode::BranchGeSImm) ||
+        opcode_is(opcode, Opcode::BranchGtSImm))
+    {
+        if (instrSize < 2 || pc + instrSize > bytecodeSize) {
             return pc + instrSize;
         }
-        uint32_t offset;
-        memcpy(&offset, &bytecode[pc + 10], 4);  // Offset starts at byte 10
-        return pc + int32_t(offset);
+        uint8_t packed = bytecode[pc + 1];
+        uint32_t l_X = clamp_imm_len((packed >> 4) & 0x07);
+        if (instrSize < (2 + l_X)) {
+            return pc + instrSize;
+        }
+        const uint32_t l_Y = second_immediate_len(instrSize, 2, l_X);
+        int32_t offset = static_cast<int32_t>(decode_immediate_signed(bytecode, pc + 2 + l_X, l_Y, static_cast<uint32_t>(bytecodeSize)));
+        return pc + uint32_t(offset);
     }
 
     // LoadImmJump: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
@@ -166,15 +245,11 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
         uint32_t l_X = (byte1 >> 4) & 0x07;
         if (l_X > 4) l_X = 4;
 
-        // CRITICAL: Calculate l_Y from actual instruction size (instrSize parameter)
-        // This matches the main compilation loop and ensures consistency
-        uint32_t l_Y = instrSize - 2 - l_X;
-
-        // Validate l_Y is in valid range (0-4 per spec)
-        if (l_Y > 4 || (instrSize < 2 + l_X)) {
+        if (instrSize < (2 + l_X)) {
             // Invalid instruction, return fallthrough
             return pc + instrSize;
         }
+        const uint32_t l_Y = second_immediate_len(instrSize, 2, l_X);
 
         // Format: [opcode][byte1][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
         // immed_Y (jump offset) starts at: pc + 2 + l_X
@@ -185,20 +260,7 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
             return pc + instrSize;
         }
 
-        // Decode immed_Y as l_Y-byte signed integer
-        int64_t jumpOffset = 0;
-        if (l_Y > 0) {
-            // Read l_Y bytes and sign-extend
-            uint64_t rawValue = 0;
-            for (uint32_t i = 0; i < l_Y; i++) {
-                rawValue |= uint64_t(bytecode[offsetPos + i]) << (i * 8);
-            }
-
-            // Sign-extend based on l_Y
-            uint64_t signBit = 1ULL << (l_Y * 8 - 1);
-            jumpOffset = (rawValue & signBit) ? (rawValue | (~((1ULL << (l_Y * 8)) - 1))) : rawValue;
-        }
-
+        int32_t jumpOffset = static_cast<int32_t>(decode_immediate_signed(bytecode, offsetPos, l_Y, static_cast<uint32_t>(bytecodeSize)));
         return pc + uint32_t(jumpOffset);
     }
 
@@ -243,71 +305,52 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         return (bitmask[byteIndex] & (1 << bitIndex)) != 0;
     };
 
-    // Create lambda to get instruction size using skip table
-    // This is the authoritative source for variable-length encoded instructions
+    // Create lambda to get instruction size using skip table.
+    // Variable-length opcodes must use skip/bitmask rather than local re-decoding.
     auto getInstrSize = [&](uint32_t pc) -> uint32_t {
+        if (pc >= codeSize) {
+            return 0;
+        }
         uint8_t opcode = codeBuffer[pc];
+        const bool variableOpcode = is_variable_length_opcode(opcode);
 
-        // For LoadImm, getInstructionSize uses varint decoding which is incorrect
-        // LoadImm uses raw bytes for the immediate, not varint encoding
-        // So we need special handling for LoadImm
-        if (opcode_is(opcode, Opcode::LoadImm)) {
-            // Use skip table for LoadImm if available
-            if (skipTable != nullptr && pc < skipTableSize) {
-                uint32_t skip = skipTable[pc];
-                if (skip > 0) {
-                    return skip + 1;  // skip is additional bytes, +1 for opcode
-                }
-                // If skip is 0, fall through to use code size as fallback
+        if (variableOpcode && skipTable != nullptr && pc < skipTableSize) {
+            uint32_t skip = skipTable[pc];
+            if (pc + skip + 1 > codeSize) {
+                uint32_t maxSkip = codeSize - pc - 1;
+                fprintf(stderr, "[JIT] Invalid skip value %u at PC %u (max: %u)\n", skip, pc, maxSkip);
+                return 0;
             }
-            // Fallback: use remaining code size (works for single-instruction tests)
+            return skip + 1;
+        }
+
+        if (variableOpcode && bitmask != nullptr) {
+            for (uint32_t nextPC = pc + 1; nextPC < codeSize; ++nextPC) {
+                if (bitmask[nextPC / 8] & (1 << (nextPC % 8))) {
+                    return nextPC - pc;
+                }
+            }
             return codeSize - pc;
         }
 
-        // For LoadImmJump and LoadImmJumpInd, getInstructionSize is unreliable
-        // These instructions have variable length based on immediate value sizes
-        // Use bitmask scanning to find the next instruction boundary
-        if (opcode_is(opcode, Opcode::LoadImmJump) || opcode_is(opcode, Opcode::LoadImmJumpInd)) {
-            if (bitmask != nullptr) {
-                // Scan forward from pc+1 to find the next instruction boundary
-                for (uint32_t nextPC = pc + 1; nextPC < codeSize; nextPC++) {
-                    if (bitmask[nextPC / 8] & (1 << (nextPC % 8))) {
-                        return nextPC - pc;
-                    }
-                }
-                // No more instruction boundaries found - size is to end of code
-                return codeSize - pc;
-            }
-            // No bitmask available - fall through to use getInstructionSize
-        }
-
-        // For fixed-size instructions, ignore skip table and use known size
-        // This prevents corrupted/inconsistent skip tables from breaking compilation
         uint32_t fixedSize = getInstructionSize(codeBuffer, pc, codeSize);
         if (fixedSize > 0 && fixedSize <= 16) {
-            // Fixed-size instruction - use calculated size, not skip table
             return fixedSize;
         }
 
-        // For variable-length instructions, use skip table
+        // Fallback: if caller supplied skip table but opcode wasn't classified above,
+        // use it as a last resort for robustness.
         if (skipTable != nullptr && pc < skipTableSize) {
             uint32_t skip = skipTable[pc];
-
-            // CRITICAL: Validate skip won't cause buffer overflow
-            // skip is additional bytes beyond opcode, so pc + skip + 1 must be <= codeSize
             if (pc + skip + 1 > codeSize) {
-                // Invalid skip value - log and fall back to fixed-size calculation
                 uint32_t maxSkip = codeSize - pc - 1;
-                fprintf(stderr, "[JIT] Invalid skip value %u at PC %u (max: %u), using fallback\n",
-                        skip, pc, maxSkip);
-                return getInstructionSize(codeBuffer, pc, codeSize);
+                fprintf(stderr, "[JIT] Invalid skip value %u at PC %u (max: %u), using fallback\n", skip, pc, maxSkip);
+                return fixedSize;
             }
-
-            return skip + 1;  // skip is additional bytes, +1 for opcode
+            return skip + 1;
         }
 
-        // Fallback to fixed-size calculation (for safety)
-        return getInstructionSize(codeBuffer, pc, codeSize);
+        return fixedSize;
     };
 
     // Use the runtime from the context (owned by Swift)
@@ -767,21 +810,29 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode_is(opcode, Opcode::LoadImmJumpInd)) {
-            // LoadImmJumpInd: [opcode][ra_rb_packed][value_byte][offset_byte] = 4 bytes
-            // Per spec: simplified format using 1-byte values
-            if (pc + 4 > codeSize) {
-                fprintf(stderr, "[JIT] LoadImmJumpInd instruction truncated at PC %u (need 4 bytes, have %zu)\n", pc, codeSize);
+            // LoadImmJumpInd: [opcode][packed_ra_rb][len][immed_X][immed_Y]
+            if (instrSize < 3 || pc + instrSize > codeSize) {
+                fprintf(stderr, "[JIT] LoadImmJumpInd instruction truncated at PC %u (size=%u, codeSize=%zu)\n", pc, instrSize, codeSize);
                 return 3; // Compilation error
             }
+
             uint8_t packed_regs = codeBuffer[pc + 1];
             uint8_t dest_reg = packed_regs & 0x0F;  // bits 0-3
             uint8_t base_reg = (packed_regs >> 4) & 0x0F;  // bits 4-7
 
-            uint8_t value = codeBuffer[pc + 2];
-            uint8_t offset = codeBuffer[pc + 3];
+            uint8_t len_byte = codeBuffer[pc + 2];
+            uint32_t l_X = clamp_imm_len(len_byte & 0x07);
+            if (instrSize < (3 + l_X)) {
+                fprintf(stderr, "[JIT] LoadImmJumpInd invalid lengths at PC %u (l_X=%u, instrSize=%u)\n", pc, l_X, instrSize);
+                return 3;
+            }
+            uint32_t l_Y = second_immediate_len(instrSize, 3, l_X);
 
-            // Load immediate into destination register (zero-extended)
-            a.mov(x86::rax, value);
+            int64_t value = decode_immediate_signed(codeBuffer, pc + 3, l_X, static_cast<uint32_t>(codeSize));
+            int64_t offset = decode_immediate_signed(codeBuffer, pc + 3 + l_X, l_Y, static_cast<uint32_t>(codeSize));
+
+            // Load immediate into destination register.
+            a.mov(x86::rax, static_cast<uint64_t>(value));
             a.mov(x86::qword_ptr(x86::rbx, dest_reg * 8), x86::rax);
 
             // Load target address from base register
@@ -789,7 +840,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
 
             // Add offset
-            a.mov(x86::rcx, offset);
+            a.mov(x86::rcx, static_cast<uint64_t>(offset));
             a.add(x86::rax, x86::rcx);
 
             // Special case: check for halt address (0xFFFF0000)
@@ -890,17 +941,21 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.bind(dispatcherLoopNoJumpTable2);
             a.mov(x86::r15d, x86::eax);  // Update PC with target address
             a.jmp(dispatcherLoop);
-
-            pc += 4;  // opcode + packed_regs + value + offset
             goto next_instruction;
         }
 
         // === Ecalli (Host Call) ===
-        // Ecalli format: [opcode][call_index_32bit] = 5 bytes
+        // Ecalli format: [opcode][immed_X]
         if (opcode == 10) {  // Ecalli opcode is 10
-            // Extract call_index from instruction bytes
-            uint32_t call_index;
-            memcpy(&call_index, &codeBuffer[pc + 1], 4);
+            if (instrSize < 1 || pc + instrSize > codeSize) {
+                fprintf(stderr, "[JIT] Ecalli instruction truncated at PC %u (size=%u, codeSize=%zu)\n", pc, instrSize, codeSize);
+                return 3;
+            }
+
+            const uint32_t l_X = clamp_imm_len(instrSize - 1);
+            const uint32_t call_index = static_cast<uint32_t>(
+                decode_immediate_signed(codeBuffer, pc + 1, l_X, static_cast<uint32_t>(codeSize))
+            );
 
             // Emit host call using the pvm_host_call_trampoline
             // x86_64 calling convention:
@@ -948,29 +1003,27 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         // Per spec, executing past program end will hit implicit Trap instructions
 
         // === StoreImmInd Instructions ===
-        // Format: [opcode][base_reg][offset_varint][value_varint]
+        // Format: [opcode][packed_rA_lX][immed_X][immed_Y]
         if (opcode_is(opcode, Opcode::StoreImmIndU8) ||
             opcode_is(opcode, Opcode::StoreImmIndU16) ||
             opcode_is(opcode, Opcode::StoreImmIndU32) ||
             opcode_is(opcode, Opcode::StoreImmIndU64)) {
-
-            uint8_t base_reg = codeBuffer[pc + 1];
-
-            // Decode offset varint starting at pc + 2
-            uint32_t offset_varint_size = 0;
-            uint64_t offset = decode_varint(codeBuffer, pc + 2, codeSize, offset_varint_size);
-            if (offset_varint_size == 0) {
-                // Invalid varint encoding - compilation error
+            if (instrSize < 2 || pc + instrSize > codeSize) {
                 return 3;
             }
 
-            // Decode value varint starting after offset varint
-            uint32_t value_varint_size = 0;
-            uint64_t value = decode_varint(codeBuffer, pc + 2 + offset_varint_size, codeSize, value_varint_size);
-            if (value_varint_size == 0) {
-                // Invalid varint encoding - compilation error
+            const uint8_t packed = codeBuffer[pc + 1];
+            const uint8_t base_reg = packed & 0x0F;
+            const uint32_t l_X = clamp_imm_len((packed >> 4) & 0x07);
+            if (instrSize < (2 + l_X)) {
                 return 3;
             }
+            const uint32_t l_Y = second_immediate_len(instrSize, 2, l_X);
+
+            const int64_t offset = decode_immediate_signed(codeBuffer, pc + 2, l_X, static_cast<uint32_t>(codeSize));
+            const uint64_t value = static_cast<uint64_t>(
+                decode_immediate_signed(codeBuffer, pc + 2 + l_X, l_Y, static_cast<uint32_t>(codeSize))
+            );
 
             // Load base address from register
             a.mov(x86::rax, x86::qword_ptr(x86::rbx, base_reg * 8));
@@ -1505,17 +1558,27 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         // === StoreImm Instructions with Bounds Checking ===
-        // PVM Spec: addresses < 2^16 (65536) → panic, addresses >= memory_size → page fault
-        // Format: [opcode][value_Xbit][address_32bit]
+        // PVM spec format: [opcode][len][immed_X][immed_Y]
         if (opcode_is(opcode, Opcode::StoreImmU8)) {
-            // StoreImmU8: [opcode][value_8bit][address_32bit] = 6 bytes
-            uint8_t value = codeBuffer[pc + 1];
-            uint32_t address;
-            memcpy(&address, &codeBuffer[pc + 2], 4);
+            if (instrSize < 2 || pc + instrSize > codeSize) {
+                return 3;
+            }
+            uint8_t len_byte = codeBuffer[pc + 1];
+            uint32_t l_X = clamp_imm_len(len_byte & 0x07);
+            if (instrSize < (2 + l_X)) {
+                return 3;
+            }
+            uint32_t l_Y = second_immediate_len(instrSize, 2, l_X);
+            uint64_t address = static_cast<uint64_t>(
+                decode_immediate_signed(codeBuffer, pc + 2, l_X, static_cast<uint32_t>(codeSize))
+            );
+            uint64_t value = static_cast<uint64_t>(
+                decode_immediate_signed(codeBuffer, pc + 2 + l_X, l_Y, static_cast<uint32_t>(codeSize))
+            );
 
             // Load address into rax (zero-extended from 32-bit)
             // mov to 64-bit register zero-extends automatically
-            a.mov(x86::rax, uint64_t(address));
+            a.mov(x86::rax, address);
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
@@ -1527,7 +1590,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.jae(pagefaultLabel);
 
             // Store value to memory
-            a.mov(x86::cl, value);
+            a.mov(x86::cl, static_cast<uint8_t>(value));
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::cl);
 
@@ -1535,15 +1598,25 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode_is(opcode, Opcode::StoreImmU16)) {
-            // StoreImmU16: [opcode][value_16bit][address_32bit] = 7 bytes
-            uint16_t value;
-            uint32_t address;
-            memcpy(&value, &codeBuffer[pc + 1], 2);
-            memcpy(&address, &codeBuffer[pc + 3], 4);
+            if (instrSize < 2 || pc + instrSize > codeSize) {
+                return 3;
+            }
+            uint8_t len_byte = codeBuffer[pc + 1];
+            uint32_t l_X = clamp_imm_len(len_byte & 0x07);
+            if (instrSize < (2 + l_X)) {
+                return 3;
+            }
+            uint32_t l_Y = second_immediate_len(instrSize, 2, l_X);
+            uint64_t address = static_cast<uint64_t>(
+                decode_immediate_signed(codeBuffer, pc + 2, l_X, static_cast<uint32_t>(codeSize))
+            );
+            uint64_t value = static_cast<uint64_t>(
+                decode_immediate_signed(codeBuffer, pc + 2 + l_X, l_Y, static_cast<uint32_t>(codeSize))
+            );
 
             // Load address into rax (zero-extended from 32-bit)
             // mov to 64-bit register zero-extends automatically
-            a.mov(x86::rax, uint64_t(address));
+            a.mov(x86::rax, address);
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
@@ -1555,7 +1628,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.jae(pagefaultLabel);
 
             // Store value to memory
-            a.mov(x86::cx, value);
+            a.mov(x86::cx, static_cast<uint16_t>(value));
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::cx);
 
@@ -1563,15 +1636,25 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode_is(opcode, Opcode::StoreImmU32)) {
-            // StoreImmU32: [opcode][value_32bit][address_32bit] = 9 bytes
-            uint32_t value;
-            uint32_t address;
-            memcpy(&value, &codeBuffer[pc + 1], 4);
-            memcpy(&address, &codeBuffer[pc + 5], 4);
+            if (instrSize < 2 || pc + instrSize > codeSize) {
+                return 3;
+            }
+            uint8_t len_byte = codeBuffer[pc + 1];
+            uint32_t l_X = clamp_imm_len(len_byte & 0x07);
+            if (instrSize < (2 + l_X)) {
+                return 3;
+            }
+            uint32_t l_Y = second_immediate_len(instrSize, 2, l_X);
+            uint64_t address = static_cast<uint64_t>(
+                decode_immediate_signed(codeBuffer, pc + 2, l_X, static_cast<uint32_t>(codeSize))
+            );
+            uint64_t value = static_cast<uint64_t>(
+                decode_immediate_signed(codeBuffer, pc + 2 + l_X, l_Y, static_cast<uint32_t>(codeSize))
+            );
 
             // Load address into rax (zero-extended from 32-bit)
             // mov to 64-bit register zero-extends automatically
-            a.mov(x86::rax, uint64_t(address));
+            a.mov(x86::rax, address);
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
@@ -1583,7 +1666,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.jae(pagefaultLabel);
 
             // Store value to memory
-            a.mov(x86::ecx, value);
+            a.mov(x86::ecx, static_cast<uint32_t>(value));
             x86::Mem mem(x86::r12, x86::rax, 0, 0);
             a.mov(mem, x86::ecx);
 
@@ -1591,15 +1674,25 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode_is(opcode, Opcode::StoreImmU64)) {
-            // StoreImmU64: [opcode][value_64bit][address_32bit] = 13 bytes
-            uint64_t value;
-            uint32_t address;
-            memcpy(&value, &codeBuffer[pc + 1], 8);
-            memcpy(&address, &codeBuffer[pc + 9], 4);
+            if (instrSize < 2 || pc + instrSize > codeSize) {
+                return 3;
+            }
+            uint8_t len_byte = codeBuffer[pc + 1];
+            uint32_t l_X = clamp_imm_len(len_byte & 0x07);
+            if (instrSize < (2 + l_X)) {
+                return 3;
+            }
+            uint32_t l_Y = second_immediate_len(instrSize, 2, l_X);
+            uint64_t address = static_cast<uint64_t>(
+                decode_immediate_signed(codeBuffer, pc + 2, l_X, static_cast<uint32_t>(codeSize))
+            );
+            uint64_t value = static_cast<uint64_t>(
+                decode_immediate_signed(codeBuffer, pc + 2 + l_X, l_Y, static_cast<uint32_t>(codeSize))
+            );
 
             // Load address into rax (zero-extended from 32-bit)
             // mov to 64-bit register zero-extends automatically
-            a.mov(x86::rax, uint64_t(address));
+            a.mov(x86::rax, address);
 
             // Bounds check: address < 65536 → panic
             a.cmp(x86::rax, 65536);
@@ -1959,7 +2052,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint8_t destReg = codeBuffer[pc + 1];
 
             // Calculate l_X from instruction length per spec
-            uint32_t l_X = (instrLen - 1 > 4) ? 4 : instrLen - 1;
+            uint32_t l_X = (instrLen > 2) ? clamp_imm_len(instrLen - 2) : 0;
 
             // Validate we have enough bytes for the immediate
             if (pc + 2 + l_X > codeSize) {

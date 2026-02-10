@@ -6,6 +6,7 @@
 #include "opcodes.hh"
 #include <asmjit/x86.h>
 #include <asmjit/core.h>
+#include <algorithm>
 
 using namespace asmjit;
 using namespace asmjit::x86;
@@ -45,30 +46,37 @@ struct DecodedInstruction {
     uint8_t size;
 };
 
-// Decode varint (variable-length integer)
-// Returns the decoded value and updates size to include varint bytes
-uint64_t decode_varint(const uint8_t* bytecode, uint32_t offset, uint32_t& out_size) {
-    uint64_t result = 0;
-    uint32_t shift = 0;
-    uint32_t i = 0;
-
-    while (true) {
-        uint8_t byte = bytecode[offset + i];
-        result |= (uint64_t(byte & 0x7F)) << shift;
-        i++;
-        if ((byte & 0x80) == 0) {
-            break;
-        }
-        shift += 7;
-        if (shift >= 64) {
-            // Varint too large, return 0
-            out_size = 1;
-            return 0;
-        }
+static inline uint64_t decode_immediate_raw(
+    const uint8_t* bytecode,
+    uint32_t offset,
+    uint32_t bytes)
+{
+    uint64_t value = 0;
+    for (uint32_t i = 0; i < bytes; ++i) {
+        value |= uint64_t(bytecode[offset + i]) << (8 * i);
     }
+    return value;
+}
 
-    out_size = i;
-    return result;
+static inline uint64_t decode_immediate_signed(
+    const uint8_t* bytecode,
+    uint32_t offset,
+    uint32_t bytes)
+{
+    const uint32_t len = (bytes > 4) ? 4 : bytes;
+    return sign_extend(len, decode_immediate_raw(bytecode, offset, len));
+}
+
+static inline uint32_t second_immediate_len(
+    uint32_t instr_size,
+    uint32_t prefix_bytes,
+    uint32_t first_immediate_len)
+{
+    if (instr_size <= (prefix_bytes + first_immediate_len)) {
+        return 0;
+    }
+    const uint32_t remaining = instr_size - prefix_bytes - first_immediate_len;
+    return (remaining > 4) ? 4 : remaining;
 }
 
 // Decode LoadImm64 instruction
@@ -84,17 +92,18 @@ bool decode_load_imm_64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction
 }
 
 // Decode LoadImm instruction
-// Format: [opcode][reg_index][varint_32bit_value]
-bool decode_load_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+// Format: [opcode][reg_index][immed_X]
+bool decode_load_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
     decoded.dest_reg = bytecode[pc + 1];
 
-    // Decode varint immediate starting at pc + 2 (after register)
-    uint32_t varint_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 2, varint_size);
+    if (instr_size < 2) {
+        return false;
+    }
 
-    // Size: opcode (1) + reg (1) + varint (variable)
-    decoded.size = 2 + varint_size;
+    const uint32_t l_X = std::min<uint32_t>(4, instr_size - 2);
+    decoded.immediate = static_cast<uint32_t>(decode_immediate_signed(bytecode, pc + 2, l_X));
+    decoded.size = static_cast<uint8_t>(instr_size);
 
     return true;
 }
@@ -102,46 +111,26 @@ bool decode_load_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& d
 // Decode LoadImmJump instruction (opcode 80)
 // Per spec pvm.tex section 5.10:
 // Format: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
-// Note: This is a variable-length instruction that needs bounds checking
-// The caller (emit_basic_block_instructions) ensures pc < block_end_pc
-bool decode_load_imm_jump(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+bool decode_load_imm_jump(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
+    if (instr_size < 2) {
+        return false;
+    }
+
     uint8_t byte1 = bytecode[pc + 1];
     decoded.dest_reg = byte1 & 0x0F;  // r_A (lower 4 bits)
     uint32_t l_X = (byte1 >> 4) & 0x07;  // Length of immediate (bits 4-6)
 
-    // Safety: limit l_X to reasonable range (spec says 0-4 bytes)
     if (l_X > 4) l_X = 4;
-
-    // Decode immed_X (l_X bytes, sign-extended)
-    uint64_t imm_x = 0;
-    for (uint32_t i = 0; i < l_X; i++) {
-        imm_x |= (uint64_t)bytecode[pc + 2 + i] << (8 * i);
-    }
-    // Sign-extend to 64-bit
-    decoded.immediate = sign_extend(l_X, imm_x);
-
-    // Decode immed_Y (offset)
-    // The spec allows variable l_Y, tests use l_Y=1 with l_X=4
-    // We read up to 4 bytes for the offset
-    uint32_t l_Y = 1;  // Default to 1 byte for offset (as used in tests)
-    if (l_X <= 3) {
-        // If l_X is smaller, we can fit more bytes for l_Y
-        // Max total for immediates is typically 4-5 bytes
-        l_Y = 4 - l_X;
+    if (instr_size < (2 + l_X)) {
+        return false;
     }
 
-    int64_t offset_raw = 0;
-    for (uint32_t i = 0; i < l_Y; i++) {
-        offset_raw |= (int64_t)bytecode[pc + 2 + l_X + i] << (8 * i);
-    }
-    // Sign-extend the offset
-    int32_t l_Y_bits = l_Y * 8;
-    decoded.offset = sign_extend_32(l_Y_bits, offset_raw);
+    const uint32_t l_Y = second_immediate_len(instr_size, 2, l_X);
+    decoded.immediate = static_cast<uint32_t>(decode_immediate_signed(bytecode, pc + 2, l_X));
+    decoded.offset = static_cast<uint32_t>(decode_immediate_signed(bytecode, pc + 2 + l_X, l_Y));
     decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset);
-
-    // Size: opcode (1) + byte1 (1) + l_X + l_Y
-    decoded.size = 2 + l_X + l_Y;
+    decoded.size = static_cast<uint8_t>(instr_size);
 
     return true;
 }
@@ -280,168 +269,84 @@ bool decode_fallthrough(const uint8_t* bytecode, uint32_t pc, DecodedInstruction
     return true;
 }
 
-// Decode StoreImmU8 instruction (opcode 30)
-// Format: [opcode][varint_address][varint_value_8bit]
-bool decode_store_imm_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+static bool decode_store_imm_common(
+    const uint8_t* bytecode,
+    uint32_t pc,
+    uint32_t instr_size,
+    DecodedInstruction& decoded)
+{
     decoded.opcode = bytecode[pc];
+    if (instr_size < 2) {
+        return false;
+    }
 
-    // Decode first varint (address)
-    uint32_t varint1_size = 0;
-    uint64_t address = decode_varint(bytecode, pc + 1, varint1_size);
-    decoded.address = static_cast<uint32_t>(address);
-
-    // Decode second varint (value)
-    uint32_t varint2_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 1 + varint1_size, varint2_size);
-
-    // Size: opcode (1) + varint1 + varint2
-    decoded.size = 1 + varint1_size + varint2_size;
-
+    const uint8_t len_byte = bytecode[pc + 1];
+    const uint32_t l_X = std::min<uint32_t>(4, len_byte & 0x07);
+    if (instr_size < (2 + l_X)) {
+        return false;
+    }
+    const uint32_t l_Y = second_immediate_len(instr_size, 2, l_X);
+    decoded.address = static_cast<uint32_t>(decode_immediate_signed(bytecode, pc + 2, l_X));
+    decoded.immediate = decode_immediate_signed(bytecode, pc + 2 + l_X, l_Y);
+    decoded.size = static_cast<uint8_t>(instr_size);
     return true;
 }
 
-// Decode StoreImmU16 instruction (opcode 31)
-// Format: [opcode][varint_address][varint_value_16bit]
-bool decode_store_imm_u16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+bool decode_store_imm_u8(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_store_imm_common(bytecode, pc, instr_size, decoded);
+}
+
+bool decode_store_imm_u16(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_store_imm_common(bytecode, pc, instr_size, decoded);
+}
+
+bool decode_store_imm_u32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_store_imm_common(bytecode, pc, instr_size, decoded);
+}
+
+bool decode_store_imm_u64(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_store_imm_common(bytecode, pc, instr_size, decoded);
+}
+
+static bool decode_store_imm_ind_common(
+    const uint8_t* bytecode,
+    uint32_t pc,
+    uint32_t instr_size,
+    DecodedInstruction& decoded)
+{
     decoded.opcode = bytecode[pc];
+    if (instr_size < 2) {
+        return false;
+    }
 
-    // Decode first varint (address)
-    uint32_t varint1_size = 0;
-    uint64_t address = decode_varint(bytecode, pc + 1, varint1_size);
-    decoded.address = static_cast<uint32_t>(address);
+    const uint8_t packed = bytecode[pc + 1];
+    decoded.dest_reg = packed & 0x0F; // r_A
+    const uint32_t l_X = std::min<uint32_t>(4, (packed >> 4) & 0x07);
+    if (instr_size < (2 + l_X)) {
+        return false;
+    }
 
-    // Decode second varint (value)
-    uint32_t varint2_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 1 + varint1_size, varint2_size);
-
-    // Size: opcode (1) + varint1 + varint2
-    decoded.size = 1 + varint1_size + varint2_size;
-
+    const uint32_t l_Y = second_immediate_len(instr_size, 2, l_X);
+    decoded.address = static_cast<uint32_t>(decode_immediate_signed(bytecode, pc + 2, l_X));
+    decoded.immediate = decode_immediate_signed(bytecode, pc + 2 + l_X, l_Y);
+    decoded.size = static_cast<uint8_t>(instr_size);
     return true;
 }
 
-// Decode StoreImmU32 instruction (opcode 32)
-// Format: [opcode][varint_address][varint_value_32bit]
-bool decode_store_imm_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    decoded.opcode = bytecode[pc];
-
-    // Decode first varint (address)
-    uint32_t varint1_size = 0;
-    uint64_t address = decode_varint(bytecode, pc + 1, varint1_size);
-    decoded.address = static_cast<uint32_t>(address);
-
-    // Decode second varint (value)
-    uint32_t varint2_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 1 + varint1_size, varint2_size);
-
-    // Size: opcode (1) + varint1 + varint2
-    decoded.size = 1 + varint1_size + varint2_size;
-
-    return true;
+bool decode_store_imm_ind_u8(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_store_imm_ind_common(bytecode, pc, instr_size, decoded);
 }
 
-// Decode StoreImmU64 instruction (opcode 33)
-// Format: [opcode][varint_address][varint_value_64bit]
-bool decode_store_imm_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    decoded.opcode = bytecode[pc];
-
-    // Decode first varint (address)
-    uint32_t varint1_size = 0;
-    uint64_t address = decode_varint(bytecode, pc + 1, varint1_size);
-    decoded.address = static_cast<uint32_t>(address);
-
-    // Decode second varint (value)
-    uint32_t varint2_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 1 + varint1_size, varint2_size);
-
-    // Size: opcode (1) + varint1 + varint2
-    decoded.size = 1 + varint1_size + varint2_size;
-
-    return true;
+bool decode_store_imm_ind_u16(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_store_imm_ind_common(bytecode, pc, instr_size, decoded);
 }
 
-// Decode StoreImmIndU8 instruction (opcode 70)
-// Format: [opcode][reg_index][varint_address][varint_value_8bit]
-bool decode_store_imm_ind_u8(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    decoded.opcode = bytecode[pc];
-    decoded.dest_reg = bytecode[pc + 1];  // reg_index
-
-    // Decode first varint (address)
-    uint32_t varint1_size = 0;
-    uint64_t address = decode_varint(bytecode, pc + 2, varint1_size);
-    decoded.address = static_cast<uint32_t>(address);
-
-    // Decode second varint (value)
-    uint32_t varint2_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
-
-    // Size: opcode (1) + reg (1) + varint1 + varint2
-    decoded.size = 2 + varint1_size + varint2_size;
-
-    return true;
+bool decode_store_imm_ind_u32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_store_imm_ind_common(bytecode, pc, instr_size, decoded);
 }
 
-// Decode StoreImmIndU16 instruction (opcode 71)
-// Format: [opcode][reg_index][varint_address][varint_value_16bit]
-bool decode_store_imm_ind_u16(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    decoded.opcode = bytecode[pc];
-    decoded.dest_reg = bytecode[pc + 1];  // reg_index
-
-    // Decode first varint (address)
-    uint32_t varint1_size = 0;
-    uint64_t address = decode_varint(bytecode, pc + 2, varint1_size);
-    decoded.address = static_cast<uint32_t>(address);
-
-    // Decode second varint (value)
-    uint32_t varint2_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
-
-    // Size: opcode (1) + reg (1) + varint1 + varint2
-    decoded.size = 2 + varint1_size + varint2_size;
-
-    return true;
-}
-
-// Decode StoreImmIndU32 instruction (opcode 72)
-// Format: [opcode][reg_index][varint_address][varint_value_32bit]
-bool decode_store_imm_ind_u32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    decoded.opcode = bytecode[pc];
-    decoded.dest_reg = bytecode[pc + 1];  // reg_index
-
-    // Decode first varint (address)
-    uint32_t varint1_size = 0;
-    uint64_t address = decode_varint(bytecode, pc + 2, varint1_size);
-    decoded.address = static_cast<uint32_t>(address);
-
-    // Decode second varint (value)
-    uint32_t varint2_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
-
-    // Size: opcode (1) + reg (1) + varint1 + varint2
-    decoded.size = 2 + varint1_size + varint2_size;
-
-    return true;
-}
-
-// Decode StoreImmIndU64 instruction (opcode 73)
-// Format: [opcode][reg_index][varint_address][varint_value_64bit]
-bool decode_store_imm_ind_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    decoded.opcode = bytecode[pc];
-    decoded.dest_reg = bytecode[pc + 1];  // reg_index
-
-    // Decode first varint (address)
-    uint32_t varint1_size = 0;
-    uint64_t address = decode_varint(bytecode, pc + 2, varint1_size);
-    decoded.address = static_cast<uint32_t>(address);
-
-    // Decode second varint (value)
-    uint32_t varint2_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
-
-    // Size: opcode (1) + reg (1) + varint1 + varint2
-    decoded.size = 2 + varint1_size + varint2_size;
-
-    return true;
+bool decode_store_imm_ind_u64(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_store_imm_ind_common(bytecode, pc, instr_size, decoded);
 }
 
 // Decode StoreIndU8 instruction (opcode 120)
@@ -565,155 +470,165 @@ bool decode_load_ind_u64(const uint8_t* bytecode, uint32_t pc, DecodedInstructio
     return true;
 }
 
-// Decode BranchEqImm instruction (opcode 81)
-// Decode BranchEqImm instruction
-// Format: [opcode][reg_index][varint_value][varint_offset]
-// Both value and offset are varint-encoded
-bool decode_branch_eq_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+static bool decode_branch_imm_common(
+    const uint8_t* bytecode,
+    uint32_t pc,
+    uint32_t instr_size,
+    DecodedInstruction& decoded)
+{
     decoded.opcode = bytecode[pc];
-    decoded.dest_reg = bytecode[pc + 1];  // reg_index
+    if (instr_size < 2) {
+        return false;
+    }
 
-    // Decode first varint (value)
-    uint32_t varint1_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 2, varint1_size);
+    const uint8_t packed = bytecode[pc + 1];
+    decoded.dest_reg = packed & 0x0F; // r_A
+    const uint32_t l_X = std::min<uint32_t>(4, (packed >> 4) & 0x07);
+    if (instr_size < (2 + l_X)) {
+        return false;
+    }
 
-    // Decode second varint (offset)
-    uint32_t varint2_size = 0;
-    uint64_t offset_value = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
-    decoded.offset = static_cast<int32_t>(offset_value);
+    const uint32_t l_Y = second_immediate_len(instr_size, 2, l_X);
+    decoded.immediate = decode_immediate_signed(bytecode, pc + 2, l_X);
+    decoded.offset = static_cast<uint32_t>(decode_immediate_signed(bytecode, pc + 2 + l_X, l_Y));
     decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset);
-
-    // Size: opcode (1) + reg (1) + varint1 + varint2
-    decoded.size = 2 + varint1_size + varint2_size;
-
+    decoded.size = static_cast<uint8_t>(instr_size);
     return true;
 }
 
-// The remaining BranchImm opcodes (82-90) have the same format
-bool decode_branch_ne_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_branch_eq_imm(bytecode, pc, decoded);
+bool decode_branch_eq_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_branch_imm_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_branch_lt_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_branch_eq_imm(bytecode, pc, decoded);
+bool decode_branch_ne_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_branch_imm_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_branch_le_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_branch_eq_imm(bytecode, pc, decoded);
+bool decode_branch_lt_u_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_branch_imm_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_branch_ge_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_branch_eq_imm(bytecode, pc, decoded);
+bool decode_branch_le_u_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_branch_imm_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_branch_gt_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_branch_eq_imm(bytecode, pc, decoded);
+bool decode_branch_ge_u_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_branch_imm_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_branch_lt_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_branch_eq_imm(bytecode, pc, decoded);
+bool decode_branch_gt_u_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_branch_imm_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_branch_le_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_branch_eq_imm(bytecode, pc, decoded);
+bool decode_branch_lt_s_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_branch_imm_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_branch_ge_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_branch_eq_imm(bytecode, pc, decoded);
+bool decode_branch_le_s_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_branch_imm_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_branch_gt_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_branch_eq_imm(bytecode, pc, decoded);
+bool decode_branch_ge_s_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_branch_imm_common(bytecode, pc, instr_size, decoded);
 }
 
-// Decode AddImm32 instruction (opcode 131)
-// Format: [opcode][packed_ra_rb][varint_32bit_value]
-// where packed_ra_rb = (rb << 4) | ra (both in same byte)
-bool decode_add_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+bool decode_branch_gt_s_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_branch_imm_common(bytecode, pc, instr_size, decoded);
+}
+
+static bool decode_imm_32_common(
+    const uint8_t* bytecode,
+    uint32_t pc,
+    uint32_t instr_size,
+    DecodedInstruction& decoded)
+{
     decoded.opcode = bytecode[pc];
-    uint8_t packed = bytecode[pc + 1];
-    decoded.dest_reg = packed & 0x0F;  // ra (lower nibble)
-    decoded.src1_reg = (packed >> 4) & 0x0F;  // rb (upper nibble)
+    if (instr_size < 2) {
+        return false;
+    }
 
-    // Decode varint immediate starting at pc + 2 (after packed registers)
-    uint32_t varint_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 2, varint_size);
-
-    // Size: opcode (1) + packed (1) + varint (variable)
-    decoded.size = 2 + varint_size;
-
+    const uint8_t packed = bytecode[pc + 1];
+    decoded.dest_reg = packed & 0x0F;      // ra (lower nibble)
+    decoded.src1_reg = (packed >> 4) & 0x0F; // rb (upper nibble)
+    const uint32_t l_X = std::min<uint32_t>(4, instr_size - 2);
+    decoded.immediate = static_cast<uint32_t>(decode_immediate_signed(bytecode, pc + 2, l_X));
+    decoded.size = static_cast<uint8_t>(instr_size);
     return true;
+}
+
+bool decode_add_imm_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
 // AndImm, XorImm, OrImm have same format
-bool decode_and_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_and_imm_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_xor_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_xor_imm_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_or_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_or_imm_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_mul_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_mul_imm_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_set_lt_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_set_lt_u_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_set_lt_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_set_lt_s_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_shlo_l_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_shlo_l_imm_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_shlo_r_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_shlo_r_imm_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_shar_r_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_shar_r_imm_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_neg_add_imm_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_neg_add_imm_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_set_gt_u_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_set_gt_u_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_set_gt_s_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_set_gt_s_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
 // Alt shift variants have same format
-bool decode_shlo_l_imm_alt_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_shlo_l_imm_alt_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_shlo_r_imm_alt_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_shlo_r_imm_alt_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_shar_r_imm_alt_32(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_shar_r_imm_alt_32(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
 // Cmov immediate has same format
-bool decode_cmov_iz_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_cmov_iz_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
-bool decode_cmov_nz_imm(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
-    return decode_add_imm_32(bytecode, pc, decoded);
+bool decode_cmov_nz_imm(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
+    return decode_imm_32_common(bytecode, pc, instr_size, decoded);
 }
 
 // Decode AddImm64 instruction (opcode 149)
@@ -796,27 +711,33 @@ bool decode_jump_ind(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& d
 }
 
 // Decode LoadImmJumpInd instruction (opcode 180)
-// Format: [opcode][packed_ra_rb][varint_value][varint_offset]
-// where packed_ra_rb = (rb << 4) | ra
-// Both value and offset are varint-encoded
-bool decode_load_imm_jump_ind(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+// Format: [opcode][packed_ra_rb][len][immed_X][immed_Y]
+bool decode_load_imm_jump_ind(
+    const uint8_t* bytecode,
+    uint32_t pc,
+    uint32_t instr_size,
+    DecodedInstruction& decoded)
+{
     decoded.opcode = bytecode[pc];
+    if (instr_size < 3) {
+        return false;
+    }
+
     uint8_t packed = bytecode[pc + 1];
     decoded.dest_reg = packed & 0x0F;  // ra
     decoded.src1_reg = (packed >> 4) & 0x0F;  // rb
 
-    // Decode first varint (value) starting at pc + 2
-    uint32_t varint1_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 2, varint1_size);
+    const uint8_t len_byte = bytecode[pc + 2];
+    const uint32_t l_X = std::min<uint32_t>(4, len_byte & 0x07);
+    if (instr_size < (3 + l_X)) {
+        return false;
+    }
 
-    // Decode second varint (offset)
-    uint32_t varint2_size = 0;
-    uint64_t offset_value = decode_varint(bytecode, pc + 2 + varint1_size, varint2_size);
-    decoded.offset = static_cast<int32_t>(offset_value);
+    const uint32_t l_Y = second_immediate_len(instr_size, 3, l_X);
+    decoded.immediate = static_cast<uint32_t>(decode_immediate_signed(bytecode, pc + 3, l_X));
+    decoded.offset = static_cast<uint32_t>(decode_immediate_signed(bytecode, pc + 3 + l_X, l_Y));
     decoded.target_pc = pc + static_cast<uint32_t>(decoded.offset);
-
-    // Size: opcode (1) + packed (1) + varint1 + varint2
-    decoded.size = 2 + varint1_size + varint2_size;
+    decoded.size = static_cast<uint8_t>(instr_size);
 
     return true;
 }
@@ -1043,16 +964,16 @@ bool decode_branch_ne(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& 
 }
 
 // Decode Ecalli instruction (opcode 10)
-// Format: [opcode][varint_call_index]
-bool decode_ecalli(const uint8_t* bytecode, uint32_t pc, DecodedInstruction& decoded) {
+// Format: [opcode][immed_X]
+bool decode_ecalli(const uint8_t* bytecode, uint32_t pc, uint32_t instr_size, DecodedInstruction& decoded) {
     decoded.opcode = bytecode[pc];
+    if (instr_size < 1) {
+        return false;
+    }
 
-    // Decode varint call index
-    uint32_t varint_size = 0;
-    decoded.immediate = decode_varint(bytecode, pc + 1, varint_size);
-
-    // Size: opcode (1) + varint (variable)
-    decoded.size = 1 + varint_size;
+    const uint32_t l_X = std::min<uint32_t>(4, instr_size - 1);
+    decoded.immediate = static_cast<uint32_t>(decode_immediate_signed(bytecode, pc + 1, l_X));
+    decoded.size = static_cast<uint8_t>(instr_size);
 
     return true;
 }
@@ -2366,6 +2287,7 @@ bool emit_basic_block_instructions(
 
         // Decode instruction based on opcode
         uint8_t opcode = bytecode[current_pc];
+        const uint32_t instruction_span = block_end_pc - current_pc;
 
         // Dispatch to appropriate decoder based on opcode
         bool decoded_ok = false;
@@ -2384,20 +2306,24 @@ bool emit_basic_block_instructions(
                 decoded_ok = decode_load_imm_64(bytecode, current_pc, decoded);
                 break;
 
+            case static_cast<uint8_t>(Opcode::Ecalli):
+                decoded_ok = decode_ecalli(bytecode, current_pc, instruction_span, decoded);
+                break;
+
             case static_cast<uint8_t>(Opcode::StoreImmU8):
-                decoded_ok = decode_store_imm_u8(bytecode, current_pc, decoded);
+                decoded_ok = decode_store_imm_u8(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::StoreImmU16):
-                decoded_ok = decode_store_imm_u16(bytecode, current_pc, decoded);
+                decoded_ok = decode_store_imm_u16(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::StoreImmU32):
-                decoded_ok = decode_store_imm_u32(bytecode, current_pc, decoded);
+                decoded_ok = decode_store_imm_u32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::StoreImmU64):
-                decoded_ok = decode_store_imm_u64(bytecode, current_pc, decoded);
+                decoded_ok = decode_store_imm_u64(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::Jump):
@@ -2413,15 +2339,15 @@ bool emit_basic_block_instructions(
                 break;
 
             case static_cast<uint8_t>(Opcode::LoadImmJumpInd):
-                decoded_ok = decode_load_imm_jump_ind(bytecode, current_pc, decoded);
+                decoded_ok = decode_load_imm_jump_ind(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::LoadImm):
-                decoded_ok = decode_load_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_load_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::LoadImmJump):
-                decoded_ok = decode_load_imm_jump(bytecode, current_pc, decoded);
+                decoded_ok = decode_load_imm_jump(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case 100: // MoveReg - 2 register format (dest, src)
@@ -2431,117 +2357,117 @@ bool emit_basic_block_instructions(
             // Branch Immediate instructions (opcodes 81-90)
             // Format: [opcode][reg_index][value_64bit][offset_32bit]
             case static_cast<uint8_t>(Opcode::BranchEqImm):
-                decoded_ok = decode_branch_eq_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_branch_eq_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::BranchNeImm):
-                decoded_ok = decode_branch_ne_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_branch_ne_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::BranchLtUImm):
-                decoded_ok = decode_branch_lt_u_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_branch_lt_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::BranchLeUImm):
-                decoded_ok = decode_branch_le_u_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_branch_le_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::BranchGeUImm):
-                decoded_ok = decode_branch_ge_u_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_branch_ge_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::BranchGtUImm):
-                decoded_ok = decode_branch_gt_u_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_branch_gt_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::BranchLtSImm):
-                decoded_ok = decode_branch_lt_s_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_branch_lt_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::BranchLeSImm):
-                decoded_ok = decode_branch_le_s_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_branch_le_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::BranchGeSImm):
-                decoded_ok = decode_branch_ge_s_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_branch_ge_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::BranchGtSImm):
-                decoded_ok = decode_branch_gt_s_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_branch_gt_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             // 32-bit Immediate instructions (opcodes 131-148)
             // Format: [opcode][ra][rb][value_32bit]
             case static_cast<uint8_t>(Opcode::AddImm32):
-                decoded_ok = decode_add_imm_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_add_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::AndImm):
-                decoded_ok = decode_and_imm_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_and_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::XorImm):
-                decoded_ok = decode_xor_imm_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_xor_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::OrImm):
-                decoded_ok = decode_or_imm_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_or_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::MulImm32):
-                decoded_ok = decode_mul_imm_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_mul_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::SetLtUImm):
-                decoded_ok = decode_set_lt_u_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_set_lt_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::SetLtSImm):
-                decoded_ok = decode_set_lt_s_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_set_lt_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::ShloLImm32):
-                decoded_ok = decode_shlo_l_imm_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_shlo_l_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::ShloRImm32):
-                decoded_ok = decode_shlo_r_imm_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_shlo_r_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::SharRImm32):
-                decoded_ok = decode_shar_r_imm_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_shar_r_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::NegAddImm32):
-                decoded_ok = decode_neg_add_imm_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_neg_add_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::SetGtUImm):
-                decoded_ok = decode_set_gt_u_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_set_gt_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::SetGtSImm):
-                decoded_ok = decode_set_gt_s_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_set_gt_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::ShloLImmAlt32):
-                decoded_ok = decode_shlo_l_imm_alt_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_shlo_l_imm_alt_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::ShloRImmAlt32):
-                decoded_ok = decode_shlo_r_imm_alt_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_shlo_r_imm_alt_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::SharRImmAlt32):
-                decoded_ok = decode_shar_r_imm_alt_32(bytecode, current_pc, decoded);
+                decoded_ok = decode_shar_r_imm_alt_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::CmovIzImm):
-                decoded_ok = decode_cmov_iz_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_cmov_iz_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::CmovNzImm):
-                decoded_ok = decode_cmov_nz_imm(bytecode, current_pc, decoded);
+                decoded_ok = decode_cmov_nz_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             // 64-bit Immediate instructions (opcodes 149-161)
@@ -2644,19 +2570,19 @@ bool emit_basic_block_instructions(
 
             // Store Immediate Indirect instructions (opcodes 70-73)
             case static_cast<uint8_t>(Opcode::StoreImmIndU8):
-                decoded_ok = decode_store_imm_ind_u8(bytecode, current_pc, decoded);
+                decoded_ok = decode_store_imm_ind_u8(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::StoreImmIndU16):
-                decoded_ok = decode_store_imm_ind_u16(bytecode, current_pc, decoded);
+                decoded_ok = decode_store_imm_ind_u16(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::StoreImmIndU32):
-                decoded_ok = decode_store_imm_ind_u32(bytecode, current_pc, decoded);
+                decoded_ok = decode_store_imm_ind_u32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             case static_cast<uint8_t>(Opcode::StoreImmIndU64):
-                decoded_ok = decode_store_imm_ind_u64(bytecode, current_pc, decoded);
+                decoded_ok = decode_store_imm_ind_u64(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             // Store Indirect instructions (opcodes 120-123)
