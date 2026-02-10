@@ -112,8 +112,14 @@ extension Instructions {
         }
 
         let za = context.config.pvmDynamicAddressAlignmentFactor
+        let jumpTable = context.state.program.jumpTable
         let entrySize = Int(context.state.program.jumpTableEntrySize)
-        let numEntries = context.state.program.jumpTable.count
+        guard entrySize > 0 else {
+            return .exit(.panic(.invalidDynamicJump))
+        }
+
+        // Jump table length is encoded in bytes, so convert to number of entries.
+        let numEntries = jumpTable.count / entrySize
 
         if target == 0 || target > UInt32(numEntries * za) || Int(target) % za != 0 {
             return .exit(.panic(.invalidDynamicJump))
@@ -121,7 +127,6 @@ extension Instructions {
 
         let start = ((Int(target) / za) - 1) * entrySize
         let end = start + entrySize
-        let jumpTable = context.state.program.jumpTable
 
         #if DEBUG
             logger.trace("djump start (\(start)) end (\(end))")
@@ -177,69 +182,6 @@ extension Instructions {
         let rb = try Registers.Index(r2: data.at(relative: 0))
         let rd = try Registers.Index(r3: data.at(relative: 1))
         return (ra, rb, rd)
-    }
-
-    /// Decode two varint-encoded values from data starting at offset
-    /// Used for LoadImmJump, LoadImmJumpInd, and BranchImm instructions
-    /// - Parameters:
-    ///   - data: Instruction bytecode
-    ///   - offset: Starting offset for first varint (after register byte)
-    /// - Returns: Tuple of (firstValue, secondValue, bytesConsumed)
-    static func decodeVarintPair(_ data: Data, offset: Int = 1) throws -> (UInt32, UInt32, Int) {
-        var currentOffset = offset
-        var bytesConsumed = 0
-
-        // Decode first varint
-        var firstValue: UInt64 = 0
-        var shift = 0
-        var foundTerminator = false
-        while currentOffset < data.count {
-            let byte = data[currentOffset]
-            firstValue |= UInt64(byte & 0x7F) << shift
-            bytesConsumed += 1
-            currentOffset += 1
-
-            if (byte & 0x80) == 0 {
-                foundTerminator = true
-                break
-            }
-
-            shift += 7
-            if shift >= 64 {
-                throw InstructionDecodingError.varintOverflow
-            }
-        }
-
-        guard foundTerminator else {
-            throw InstructionDecodingError.insufficientData
-        }
-
-        // Decode second varint
-        var secondValue: UInt64 = 0
-        shift = 0
-        foundTerminator = false
-        while currentOffset < data.count {
-            let byte = data[currentOffset]
-            secondValue |= UInt64(byte & 0x7F) << shift
-            bytesConsumed += 1
-            currentOffset += 1
-
-            if (byte & 0x80) == 0 {
-                foundTerminator = true
-                break
-            }
-
-            shift += 7
-            if shift >= 64 {
-                throw InstructionDecodingError.varintOverflow
-            }
-        }
-
-        guard foundTerminator else {
-            throw InstructionDecodingError.insufficientData
-        }
-
-        return (UInt32(truncatingIfNeeded: firstValue), UInt32(truncatingIfNeeded: secondValue), bytesConsumed)
     }
 
     /// Decode a single varint-encoded value from data starting at offset

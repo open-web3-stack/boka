@@ -43,17 +43,17 @@ struct FuzzTests {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: [])
     }
 
-    // @Test(arguments: try loadTests(
-    //     version: "0.7.2",
-    //     filters: [
-    //         ("0.7.2/1767827127_1243", "00404399")
-    //     ],
-    //     ignore: [
-    //     ],
-    // ))
-    // func v072_sandbox(input: Testcase) async throws {
-    //     try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .sandboxed)
-    // }
+    @Test(arguments: try loadTests(
+        version: "0.7.2",
+        filters: [
+            ("0.7.2/1767827127_1243", "00404399")
+        ],
+        ignore: [
+        ],
+    ))
+    func v072_sandbox(input: Testcase) async throws {
+        try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .sandboxed)
+    }
 
     // @Test(arguments: try loadTests(
     //     version: "0.7.2",

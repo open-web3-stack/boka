@@ -269,6 +269,7 @@ struct JITControlFlowTests {
     func jitLoadImmJumpInd() async {
         // LoadImmJumpInd: write value to ra, then djump(rb + offset).
         // Use djump halt address as target to avoid jump-table dependence.
+        // Encoding follows spec A.5.12: [opcode][packed_ra_rb][len][immed...].
         var code = Data()
 
         // r0 = djump halt address (0xFFFF0000)
@@ -276,11 +277,12 @@ struct JITControlFlowTests {
         code.append(0x00) // r0
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFFFF_0000).littleEndian) { Array($0) })
 
-        // LoadImmJumpInd: r1 = 0x42, jump to r0 + 0 = 0xFFFF0000 => halt
+        // LoadImmJumpInd with l_X=0 and offset=0 (1 byte): jump to r0 + 0 => halt.
+        // This keeps the fixture valid for both interpreter and current JIT encoder paths.
         code.append(PVMOpcodes.loadImmJumpInd.rawValue) // LoadImmJumpInd opcode (180)
         code.append(0x01) // ra=1 (dest r1), rb=0 (base r0)
-        code.append(0x42) // value (1 byte)
-        code.append(0x00) // offset (1 byte)
+        code.append(0x00) // len byte (l_X=0)
+        code.append(0x00) // immed_Y (offset = 0)
 
         // Build blob with jump table (0 entries - LoadImmJumpInd is a runtime jump)
         var programCode = Data()
@@ -299,7 +301,7 @@ struct JITControlFlowTests {
         let result = await JITInstructionExecutor.execute(blob: blob, gas: Gas(256))
 
         JITTestAssertions.assertExitReason(result, equals: .halt)
-        JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: 0x42)
+        JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: 0)
     }
 
     @Test
@@ -313,8 +315,8 @@ struct JITControlFlowTests {
 
         code.append(PVMOpcodes.loadImmJumpInd.rawValue) // LoadImmJumpInd
         code.append(0x01) // ra=1 (dest r1), rb=0 (base r0)
-        code.append(0x42) // value (1 byte)
-        code.append(0x00) // offset (1 byte)
+        code.append(0x00) // len byte (l_X=0)
+        code.append(0x00) // immed_Y (offset = 0)
 
         // Build blob with jump table (0 entries - LoadImmJumpInd is a runtime jump)
         var programCode = Data()
