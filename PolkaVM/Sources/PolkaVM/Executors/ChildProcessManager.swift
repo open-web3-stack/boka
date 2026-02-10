@@ -33,7 +33,7 @@ actor ChildProcessManager {
     func spawnChildProcess(executablePath: String) async throws -> (handle: ProcessHandle, clientFD: Int32) {
         #if os(Linux)
             logger.debug("Spawning child process: \(executablePath)")
-            /// Create socket pair for IPC
+            // Create socket pair for IPC
             var sockets: [Int32] = [0, 0]
 
             // Use raw constants to avoid Linux/Darwin type signature differences.
@@ -58,8 +58,8 @@ actor ChildProcessManager {
             let childFlags = fcntl(childFD, F_GETFL)
             logger.debug("Socketpair validation: parentFD flags=\(parentFlags), childFD flags=\(childFlags)")
 
-            /// Convert executable path to null-terminated C string array BEFORE fork
-            /// This is async-signal-safe and avoids unsafe withCString in child after fork
+            // Convert executable path to null-terminated C string array BEFORE fork
+            // This is async-signal-safe and avoids unsafe withCString in child after fork
             let execPathCArray = executablePath.utf8CString
 
             // Fork child process
@@ -137,7 +137,7 @@ actor ChildProcessManager {
         #elseif os(macOS)
             logger.debug("Spawning child process: \(executablePath)")
 
-            /// Create socket pair for IPC
+            // Create socket pair for IPC
             var sockets: [Int32] = [0, 0]
             let domain: Int32 = 1 // AF_UNIX
             let socketType: Int32 = 1 // SOCK_STREAM

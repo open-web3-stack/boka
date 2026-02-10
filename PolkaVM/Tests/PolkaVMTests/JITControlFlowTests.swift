@@ -20,7 +20,7 @@ private let logger = Logger(label: "JITControlFlowTests")
 struct JITControlFlowTests {
     // MARK: - Halt Instruction (Opcode 1)
 
-    @Test("JIT: Fallthrough instruction at end of program traps")
+    @Test
     func jitHalt() async {
         // Create a program with just fallthrough (opcode 1) at the end
         // Per spec, when execution continues past the program end, it should trap
@@ -32,7 +32,7 @@ struct JITControlFlowTests {
         JITTestAssertions.assertExitReason(result, equals: .panic(.trap))
     }
 
-    @Test("JIT vs Interpreter: Fallthrough parity")
+    @Test
     func jitHaltParity() async {
         let program = ProgramBlobBuilder.createSingleInstructionProgram([0x01]) // fallthrough
 
@@ -56,7 +56,7 @@ struct JITControlFlowTests {
 
     // MARK: - Trap Instruction (Opcode 0)
 
-    @Test("JIT: Trap instruction stops execution")
+    @Test
     func jitTrap() async {
         // Trap program - single trap instruction
         let trapProgram = ProgramBlobBuilder.createSingleInstructionProgram([0x00]) // trap instruction
@@ -67,7 +67,7 @@ struct JITControlFlowTests {
         JITTestAssertions.assertExitReason(result, equals: .panic(.trap))
     }
 
-    @Test("JIT: Trap does not consume excessive gas")
+    @Test
     func jitTrapGasConsumption() async {
         let trapProgram = ProgramBlobBuilder.createSingleInstructionProgram([0x00]) // trap instruction
 
@@ -80,7 +80,7 @@ struct JITControlFlowTests {
         )
     }
 
-    @Test("JIT vs Interpreter: Trap parity")
+    @Test
     func jitTrapParity() async {
         let (_, _, differences) = await JITParityComparator.compareSingleInstruction(
             [0x00],
@@ -95,7 +95,7 @@ struct JITControlFlowTests {
 
     // MARK: - Jump Instruction (Opcode 40)
 
-    @Test("JIT: Jump self-loop consumes gas and exits outOfGas")
+    @Test
     func jitJumpForward() async {
         // Build a simple loop program: Jump(0) at PC=0.
         // This verifies the JIT handles taken jumps without crashing.
@@ -116,7 +116,7 @@ struct JITControlFlowTests {
         )
     }
 
-    @Test("JIT vs Interpreter: Jump self-loop parity")
+    @Test
     func jitJumpParity() async {
         // Jump to self at PC=0 in both engines.
         let jumpOffset = Int32(0)
@@ -142,7 +142,7 @@ struct JITControlFlowTests {
 
     // MARK: - JumpInd Instruction (Opcode 50)
 
-    @Test("JIT vs Interpreter: JumpInd parity")
+    @Test
     func jitJumpIndParity() async {
         // JumpInd through register - jump forward to Halt
         var code = Data()
@@ -208,7 +208,7 @@ struct JITControlFlowTests {
 
     // MARK: - LoadImmJump Instruction (Opcode 80)
 
-    @Test("JIT: LoadImmJump loads then jumps")
+    @Test
     func jitLoadImmJump() async {
         // Minimal deterministic program:
         //   PC 0:  LoadImmJump r1, 0x12345678, +7
@@ -235,7 +235,7 @@ struct JITControlFlowTests {
         JITTestAssertions.assertExitReason(result, equals: .panic(.trap))
     }
 
-    @Test("JIT vs Interpreter: LoadImmJump parity")
+    @Test
     func jitLoadImmJumpParity() async {
         // Same deterministic LoadImmJump -> Trap sequence as jitLoadImmJump.
         var code = Data()
@@ -265,7 +265,7 @@ struct JITControlFlowTests {
 
     // MARK: - LoadImmJumpInd Instruction (Opcode 180)
 
-    @Test("JIT: LoadImmJumpInd loads register and halts via dynamic jump")
+    @Test
     func jitLoadImmJumpInd() async {
         // LoadImmJumpInd: write value to ra, then djump(rb + offset).
         // Use djump halt address as target to avoid jump-table dependence.
@@ -302,7 +302,7 @@ struct JITControlFlowTests {
         JITTestAssertions.assertRegister(result, Registers.Index(raw: 1), equals: 0x42)
     }
 
-    @Test("JIT vs Interpreter: LoadImmJumpInd halt-target parity")
+    @Test
     func jitLoadImmJumpIndParity() async {
         // Same halt-target strategy as jitLoadImmJumpInd.
         var code = Data()
@@ -344,7 +344,7 @@ struct JITControlFlowTests {
 
     // MARK: - Edge Cases
 
-    @Test("JIT: Jump to invalid target causes panic", .disabled("Known issue: JIT can spin on invalid static jump targets on arm64 backend"))
+    @Test
     func jitJumpInvalidTarget() async {
         // Out-of-bounds jump with explicit trap fallthrough.
         // Some backends treat invalid jump targets as fallthrough, so accept either panic path.
@@ -363,7 +363,7 @@ struct JITControlFlowTests {
         )
     }
 
-    @Test("JIT: Large jump offset")
+    @Test
     func jitJumpLargeOffset() async {
         // Test jumping with a large offset value
         var code = Data()
@@ -391,13 +391,12 @@ struct JITControlFlowTests {
 
         let result = await JITInstructionExecutor.execute(blob: blob, gas: Gas(256))
 
-        // Current JIT behavior for this stress case is to keep executing until gas exhausts.
-        JITTestAssertions.assertExitReason(result, equals: .outOfGas)
+        // Jump lands on the explicit fallthrough opcode at the end of code.
+        // Executing past the end traps, so panic(.trap) is the expected outcome.
+        JITTestAssertions.assertExitReason(result, equals: .panic(.trap))
     }
 
-    @Test(
-        "Interpreter: Branch validation using bitmask",
-    )
+    @Test
     func interpreterBranchValidation() async throws {
         // Interpreter branch validation on a minimal out-of-bounds jump.
 

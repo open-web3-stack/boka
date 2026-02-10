@@ -74,7 +74,7 @@ public enum ConcurrentFetchHelpers {
             var activeTasks = 0
             var currentIndex = 0
 
-            // Helper to add tasks up to the concurrency limit
+            /// Helper to add tasks up to the concurrency limit
             func addTasksIfNeeded() {
                 while activeTasks < maxConcurrentRequests, currentIndex < fetchPairs.count {
                     let pair = fetchPairs[currentIndex]

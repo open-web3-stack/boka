@@ -10,7 +10,7 @@ import Utils
 
 @Suite(.serialized)
 struct ChildProcessManagerTests {
-    @Test("Spawn child process in sandbox mode")
+    @Test
     func spawnChildProcess() async throws {
         #if os(macOS) || os(Linux)
             let manager = ChildProcessManager(defaultTimeout: 5.0)
@@ -31,7 +31,7 @@ struct ChildProcessManagerTests {
         #endif
     }
 
-    @Test("invokePVM sandbox mode uses child process launcher")
+    @Test
     func invokePVMSandboxPathRespected() async {
         #if os(macOS) || os(Linux)
             let key = "BOKA_SANDBOX_PATH"
@@ -70,7 +70,7 @@ struct ChildProcessManagerTests {
         #endif
     }
 
-    @Test("invokePVM sandbox mode executes via boka-sandbox")
+    @Test
     func invokePVMSandboxExecution() async {
         #if os(macOS) || os(Linux)
             let key = "BOKA_SANDBOX_PATH"

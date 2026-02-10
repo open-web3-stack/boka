@@ -9,6 +9,7 @@
 #include "opcodes.hh"
 #include <asmjit/a64.h>
 #include <asmjit/core.h>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -200,6 +201,30 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     auto getInstrSize = [&](uint32_t pc) -> uint32_t {
         uint8_t opcode = codeBuffer[pc];
 
+        // For LoadImm, getInstructionSize uses varint decoding which is incorrect.
+        // LoadImm uses raw bytes for the immediate, so use skip table or remaining code size.
+        if (opcode_is(opcode, Opcode::LoadImm)) {
+            if (skipTable != nullptr && pc < skipTableSize) {
+                uint32_t skip = skipTable[pc];
+                if (skip > 0) {
+                    return skip + 1;  // skip is additional bytes, +1 for opcode
+                }
+            }
+            return codeSize - pc;
+        }
+
+        // For LoadImmJump and LoadImmJumpInd, scan instruction boundaries when possible.
+        if (opcode_is(opcode, Opcode::LoadImmJump) || opcode_is(opcode, Opcode::LoadImmJumpInd)) {
+            if (bitmask != nullptr) {
+                for (uint32_t nextPC = pc + 1; nextPC < codeSize; nextPC++) {
+                    if (bitmask[nextPC / 8] & (1 << (nextPC % 8))) {
+                        return nextPC - pc;
+                    }
+                }
+                return codeSize - pc;
+            }
+        }
+
         // For fixed-size instructions, ignore skip table and use known size
         // This prevents corrupted/inconsistent skip tables from breaking compilation
         uint32_t fixedSize = getInstructionSize(codeBuffer, pc, codeSize);
@@ -363,11 +388,12 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
     };
 
     // === MAIN COMPILATION PASS: ONLY COMPILE REACHABLE CODE ===
-    // Iterate through reachable PCs instead of scanning all PCs sequentially
-    // This matches interpreter behavior by only compiling code that will be executed
+    // Iterate in ascending PC order so fallthrough semantics match bytecode order.
     const auto& reachablePCs = cfg.getReachablePCs();
+    std::vector<uint32_t> orderedReachablePCs(reachablePCs.begin(), reachablePCs.end());
+    std::sort(orderedReachablePCs.begin(), orderedReachablePCs.end());
 
-    for (uint32_t pc : reachablePCs) {
+    for (uint32_t pc : orderedReachablePCs) {
         uint8_t opcode = codeBuffer[pc];
         uint32_t instrSize = getInstrSize(pc);
 
@@ -390,6 +416,13 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         // Handle control flow instructions with labels
         if (opcode_is(opcode, Opcode::Jump)) {
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
+
+            // Invalid static jump target: treat as fallthrough.
+            // This matches x64 behavior and prevents spinning on invalid labels.
+            if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
+                continue;
+            }
+
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_jump_labeled(&a, "aarch64", targetLabel);
             continue;
@@ -399,6 +432,11 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             uint8_t reg1 = codeBuffer[pc + 1];
             uint8_t reg2 = codeBuffer[pc + 2];
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
+
+            // Invalid branch target: treat as fallthrough.
+            if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
+                continue;
+            }
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_branch_eq_labeled(&a, "aarch64", reg1, reg2, targetLabel);
@@ -410,6 +448,11 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             uint8_t reg1 = codeBuffer[pc + 1];
             uint8_t reg2 = codeBuffer[pc + 2];
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
+
+            // Invalid branch target: treat as fallthrough.
+            if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
+                continue;
+            }
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_branch_ne_labeled(&a, "aarch64", reg1, reg2, targetLabel);
@@ -467,6 +510,11 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             }
 
             uint32_t targetPC = pc + uint32_t(int32_t(jumpOffset));  // Offset is relative
+
+            // Invalid static jump target: treat as fallthrough.
+            if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
+                continue;
+            }
 
             Label targetLabel = labelManager.getOrCreateLabel(&a, targetPC, "aarch64");
             jit_emit_load_imm_jump_labeled(&a, "aarch64", destReg, uint32_t(immediate), targetLabel);
@@ -756,6 +804,62 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         // Opcode 1 (Halt/Fallthrough) is handled as normal instruction - just continues execution
         // Per spec, executing past program end will hit implicit Trap instructions
 
+        // === StoreImmInd Instructions ===
+        // Format: [opcode][base_reg][offset_varint][value_varint]
+        if (opcode_is(opcode, Opcode::StoreImmIndU8) ||
+            opcode_is(opcode, Opcode::StoreImmIndU16) ||
+            opcode_is(opcode, Opcode::StoreImmIndU32) ||
+            opcode_is(opcode, Opcode::StoreImmIndU64)) {
+            uint8_t base_reg = codeBuffer[pc + 1];
+
+            // Decode offset varint starting at pc + 2
+            uint32_t offset_varint_size = 0;
+            uint64_t offset = decode_varint(codeBuffer, pc + 2, codeSize, offset_varint_size);
+            if (offset_varint_size == 0) {
+                return 3;
+            }
+
+            // Decode value varint starting after offset varint
+            uint32_t value_varint_size = 0;
+            uint64_t value = decode_varint(codeBuffer, pc + 2 + offset_varint_size, codeSize, value_varint_size);
+            if (value_varint_size == 0) {
+                return 3;
+            }
+
+            // Load base address from register
+            a.ldr(a64::x0, a64::ptr(a64::x19, base_reg * 8));
+
+            // Add offset (truncate to 32-bit for parity with interpreter behavior)
+            a.mov(a64::w5, static_cast<uint32_t>(offset));
+            a.add(a64::x0, a64::x0, a64::x5);
+
+            // Bounds check: address < 65536 → panic
+            a.cmp(a64::x0, 65536);
+            a.b_lo(panicLabel);
+
+            // Runtime check: address >= memory_size → page fault
+            a.mov(a64::w1, a64::w21);
+            a.cmp(a64::x0, a64::x1);
+            a.b_hs(pagefaultLabel);
+
+            // Store immediate value
+            if (opcode_is(opcode, Opcode::StoreImmIndU8)) {
+                a.mov(a64::w1, static_cast<uint8_t>(value));
+                a.strb(a64::w1, a64::ptr(a64::x20, a64::x0));
+            } else if (opcode_is(opcode, Opcode::StoreImmIndU16)) {
+                a.mov(a64::w1, static_cast<uint16_t>(value));
+                a.strh(a64::w1, a64::ptr(a64::x20, a64::x0));
+            } else if (opcode_is(opcode, Opcode::StoreImmIndU32)) {
+                a.mov(a64::w1, static_cast<uint32_t>(value));
+                a.str(a64::w1, a64::ptr(a64::x20, a64::x0));
+            } else if (opcode_is(opcode, Opcode::StoreImmIndU64)) {
+                a.mov(a64::x1, static_cast<uint64_t>(value));
+                a.str(a64::x1, a64::ptr(a64::x20, a64::x0));
+            }
+
+            continue;
+        }
+
         // === Division Instructions with Zero-Check ===
         // Division by zero causes undefined behavior - must check explicitly
         // Format: [opcode][dest_reg][src_reg] = 3 bytes
@@ -795,25 +899,13 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             opcode_is(opcode, Opcode::LoadU32) ||
             opcode_is(opcode, Opcode::LoadI32) ||
             opcode_is(opcode, Opcode::LoadU64)) {
-            // Decode instruction: [opcode][dest_reg][ptr_reg][offset_16bit]
+            // Decode instruction: [opcode][dest_reg][address_32bit]
             uint8_t dest_reg = codeBuffer[pc + 1];
-            uint8_t ptr_reg = codeBuffer[pc + 2];
-            int16_t offset;
-            memcpy(&offset, &codeBuffer[pc + 3], 2);
+            uint32_t address;
+            memcpy(&address, &codeBuffer[pc + 2], 4);
 
-            // Load pointer register into x0
-            a.ldr(a64::x0, a64::ptr(a64::x19, ptr_reg * 8));
-
-            // Add offset to get final address
-            // ARM64 add immediate only supports 12-bit values (-4095 to 4095)
-            // For larger offsets, load into temporary register (x5) and add
-            // Note: x5 is safe to use here (invocation_context_ptr is in x24)
-            if (offset >= -4095 && offset <= 4095) {
-                a.add(a64::x0, a64::x0, offset);
-            } else {
-                a.mov(a64::x5, offset);  // Load offset into temporary register
-                a.add(a64::x0, a64::x0, a64::x5);
-            }
+            // Use direct address
+            a.mov(a64::x0, address);
 
             // Bounds check: address < 65536 → panic
             a.cmp(a64::x0, 65536);
@@ -853,29 +945,18 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
         }
 
         // === Store Instructions with Bounds Checking ===
+        // NOTE: StoreU8/16/32 use direct addressing: [opcode][reg][address_32bit]
+        // StoreU64 is handled separately below.
         if (opcode_is(opcode, Opcode::StoreU8) ||
             opcode_is(opcode, Opcode::StoreU16) ||
-            opcode_is(opcode, Opcode::StoreU32) ||
-            opcode_is(opcode, Opcode::StoreU64)) {
-            // Decode instruction: [opcode][ptr_reg][src_reg][offset_16bit]
-            uint8_t ptr_reg = codeBuffer[pc + 1];
-            uint8_t src_reg = codeBuffer[pc + 2];
-            int16_t offset;
-            memcpy(&offset, &codeBuffer[pc + 3], 2);
+            opcode_is(opcode, Opcode::StoreU32)) {
+            // Decode instruction: [opcode][src_reg][address_32bit]
+            uint8_t src_reg = codeBuffer[pc + 1];
+            uint32_t address;
+            memcpy(&address, &codeBuffer[pc + 2], 4);
 
-            // Load pointer register into x0
-            a.ldr(a64::x0, a64::ptr(a64::x19, ptr_reg * 8));
-
-            // Add offset to get final address
-            // ARM64 add immediate only supports 12-bit values (-4095 to 4095)
-            // For larger offsets, load into temporary register (x5) and add
-            // Note: x5 is safe to use here (invocation_context_ptr is in x24)
-            if (offset >= -4095 && offset <= 4095) {
-                a.add(a64::x0, a64::x0, offset);
-            } else {
-                a.mov(a64::x5, offset);  // Load offset into temporary register
-                a.add(a64::x0, a64::x0, a64::x5);
-            }
+            // Use direct address
+            a.mov(a64::x0, address);
 
             // Bounds check: address < 65536 → panic
             a.cmp(a64::x0, 65536);
@@ -896,8 +977,6 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
                 a.strh(a64::w1, a64::ptr(a64::x20, a64::x0));
             } else if (opcode_is(opcode, Opcode::StoreU32)) {
                 a.str(a64::w1, a64::ptr(a64::x20, a64::x0));
-            } else if (opcode_is(opcode, Opcode::StoreU64)) {
-                a.str(a64::x1, a64::ptr(a64::x20, a64::x0));
             }
 
             continue;
@@ -1135,6 +1214,117 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.sub(a64::x0, a64::x0, a64::x1);
 
             // Store to rd
+            a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
+
+            continue;
+        }
+
+        // AddImm64: 64-bit add with sign-extended 32-bit immediate
+        if (opcode_is(opcode, Opcode::AddImm64)) {
+            // AddImm64: [opcode][packed_ra_rb][value_le32] = 6 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;  // dest register
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;  // source register
+
+            int32_t imm32;
+            memcpy(&imm32, &codeBuffer[pc + 2], 4);
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, rb * 8));  // source value
+            a.mov(a64::w1, static_cast<uint32_t>(imm32)); // low 32-bit immediate
+            a.sxtw(a64::x1, a64::w1); // sign-extend to 64-bit
+            a.add(a64::x0, a64::x0, a64::x1);
+            a.str(a64::x0, a64::ptr(a64::x19, ra * 8));  // store result
+
+            continue;
+        }
+
+        // Mul64: 64-bit multiplication
+        if (opcode_is(opcode, Opcode::Mul64)) {
+            // Mul64: [opcode][ra|rb<<4][rd] = 4 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+            a.ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
+            a.mul(a64::x0, a64::x0, a64::x1);
+            a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
+
+            continue;
+        }
+
+        // ShloL64: logical shift-left by register (shift masked to 0-63)
+        if (opcode_is(opcode, Opcode::ShloL64)) {
+            // ShloL64: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+            a.ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
+            a.and_(a64::x1, a64::x1, 0x3F);
+            a.lsl(a64::x0, a64::x0, a64::x1);
+            a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
+
+            continue;
+        }
+
+        // ShloR64: logical shift-right by register (shift masked to 0-63)
+        if (opcode_is(opcode, Opcode::ShloR64)) {
+            // ShloR64: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+            a.ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
+            a.and_(a64::x1, a64::x1, 0x3F);
+            a.lsr(a64::x0, a64::x0, a64::x1);
+            a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
+
+            continue;
+        }
+
+        // SharR64: arithmetic shift-right by register (shift masked to 0-63)
+        if (opcode_is(opcode, Opcode::SharR64)) {
+            // SharR64: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+            a.ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
+            a.and_(a64::x1, a64::x1, 0x3F);
+            a.asr(a64::x0, a64::x0, a64::x1);
+            a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
+
+            continue;
+        }
+
+        // And: bitwise AND
+        if (opcode_is(opcode, Opcode::And)) {
+            // And: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+            a.ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
+            a.and_(a64::x0, a64::x0, a64::x1);
+            a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
+
+            continue;
+        }
+
+        // Or: bitwise OR
+        if (opcode_is(opcode, Opcode::Or)) {
+            // Or: [opcode][ra|rb<<4][rd] = 3 bytes
+            uint8_t ra = (codeBuffer[pc + 1] >> 0) & 0x0F;
+            uint8_t rb = (codeBuffer[pc + 1] >> 4) & 0x0F;
+            uint8_t rd = codeBuffer[pc + 2];
+
+            a.ldr(a64::x0, a64::ptr(a64::x19, ra * 8));
+            a.ldr(a64::x1, a64::ptr(a64::x19, rb * 8));
+            a.orr(a64::x0, a64::x0, a64::x1);
             a.str(a64::x0, a64::ptr(a64::x19, rd * 8));
 
             continue;

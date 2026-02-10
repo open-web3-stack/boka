@@ -14,7 +14,7 @@ import Utils
 @Suite(.serialized)
 struct SandboxPoolTests {
     /// Test single worker execution with detailed logging
-    @Test("Single worker execution - detailed")
+    @Test
     func singleWorkerExecution() async {
         let config = SandboxPoolConfiguration(
             poolSize: 1,
@@ -82,7 +82,7 @@ struct SandboxPoolTests {
     }
 
     /// Test multiple executions to check for worker stability
-    @Test("Multiple executions - stability check")
+    @Test
     func multipleExecutionsStability() async {
         let config = SandboxPoolConfiguration(
             poolSize: 1,
@@ -136,7 +136,7 @@ struct SandboxPoolTests {
     }
 
     /// Test with small pool size to reduce noise
-    @Test("Small pool - 2 workers")
+    @Test
     func smallPoolTwoWorkers() async {
         let config = SandboxPoolConfiguration(
             poolSize: 2,
