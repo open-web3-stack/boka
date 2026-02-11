@@ -44,16 +44,18 @@ public func invokePVM(
                 let (addr, len): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
                 let output = try? state.readMemory(address: addr, length: Int(len))
                 return (.halt, gasUsed, output ?? Data())
+            case .panic(.trap):
+                return (.panic(.trap), gasUsed, nil)
             default:
-                logger.error("invokePVM: Unhandled exit reason: \(exitReason)")
+                logger.trace("invokePVM: Unhandled exit reason: \(exitReason)")
                 return (.panic(.trap), gasUsed, nil)
             }
         }
     } catch let e as StandardProgram.Error {
-        logger.error("standard program initialization failed: \(e)")
+        logger.trace("standard program initialization failed: \(e)")
         return (.panic(.trap), Gas(0), nil)
     } catch let e {
-        logger.error("unknown error: \(e)")
+        logger.trace("unknown error: \(e)")
         return (.panic(.trap), Gas(0), nil)
     }
 }

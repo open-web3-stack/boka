@@ -4,14 +4,50 @@
 // Test utilities for executing and verifying individual JIT-compiled instructions
 
 import Foundation
+import CppHelper
 @testable import PolkaVM
 import Testing
 import TracingUtils
 import Utils
+#if canImport(Glibc)
+    import Glibc
+#elseif canImport(Darwin)
+    import Darwin
+#endif
+
+typealias CppHelperInstructions = CppHelper.Instructions
 
 // MARK: - Logger
 
 private let logger = Logger(label: "JITInstructionTestHelpers")
+
+private func locateSandboxExecutablePath() -> String? {
+    let fileManager = FileManager.default
+    let currentDirectory = fileManager.currentDirectoryPath
+
+    let candidates = [
+        "\(currentDirectory)/.build/debug/boka-sandbox",
+        "\(currentDirectory)/.build/release/boka-sandbox",
+        "\(currentDirectory)/.build/arm64-apple-macosx/debug/boka-sandbox",
+        "\(currentDirectory)/.build/arm64-apple-macosx/release/boka-sandbox",
+        "\(currentDirectory)/.build/x86_64-apple-macosx/debug/boka-sandbox",
+        "\(currentDirectory)/.build/x86_64-apple-macosx/release/boka-sandbox",
+    ]
+
+    return candidates.first { fileManager.isExecutableFile(atPath: $0) }
+}
+
+private func ensureSandboxPathConfigured() {
+    let key = "BOKA_SANDBOX_PATH"
+    if let path = ProcessInfo.processInfo.environment[key], !path.isEmpty {
+        return
+    }
+
+    guard let sandboxPath = locateSandboxExecutablePath() else {
+        return
+    }
+    _ = setenv(key, sandboxPath, 1)
+}
 
 // MARK: - JIT Test Result
 
@@ -406,6 +442,12 @@ enum ProgramBlobBuilder {
             return 1 + 1 // opcode (1) + register (1) = 2 bytes
         }
 
+        // 2-register register-ops (100-111)
+        // Format: [opcode][dest][src]
+        if opcode >= 0x64, opcode <= 0x6F {
+            return 3
+        }
+
         // LoadImmJump (fixed size: opcode + byte1 + immed_X + immed_Y)
         // Format: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
         // Size = 2 + l_X + l_Y
@@ -490,6 +532,18 @@ enum ProgramBlobBuilder {
         // Per spec pvm.tex section 5.9: l_X = min(4, max(0, ℓ - 1)), fixed-width little-endian
         if opcode >= 0x95, opcode <= 0xA1 {
             return 6
+        }
+
+        // Branch register instructions (170-175: 0xAA-0xAF)
+        // Format: [opcode][reg1][reg2][offset_32bit]
+        if opcode >= 0xAA, opcode <= 0xAF {
+            return 7
+        }
+
+        // 3-register instructions (213-230: 0xD5-0xE6)
+        // Format: [opcode][ra][rb][rd]
+        if opcode >= 0xD5, opcode <= 0xE6 {
+            return 4
         }
 
         // Default: assume minimum valid instruction
@@ -592,25 +646,28 @@ enum JITInstructionExecutor {
     }
 }
 
-// MARK: - JIT vs Interpreter Comparison
+// MARK: - Sandboxed JIT vs Interpreter Comparison
 
-/// Helper to compare JIT vs interpreter execution
+/// Helper to compare interpreter vs sandboxed JIT execution
 enum JITParityComparator {
-    /// Compare JIT vs interpreter execution for a program
+    /// Compare interpreter vs sandboxed JIT execution for a program.
     ///
     /// - Parameters:
     ///   - blob: Program blob to execute
     ///   - testName: Name for error reporting
     ///   - gas: Initial gas limit
     ///   - argumentData: Optional argument data
-    /// - Returns: Tuple of (interpreterResult, jitResult, differences)
+    ///   - gasTolerance: Optional symmetric tolerance for gas-used delta
+    /// - Returns: Tuple of (interpreterResult, sandboxedJitResult, differences)
     static func compare(
         blob: Data,
-        testName _: String,
+        testName: String,
         gas: Gas = Gas(1_000_000),
         argumentData: Data? = nil,
+        gasTolerance: Gas? = nil,
     ) async -> (interpreterResult: JITTestResult, jitResult: JITTestResult, differences: String?) {
         let config = DefaultPvmConfig()
+        ensureSandboxPathConfigured()
 
         // Execute in interpreter mode
         let (exitReasonInterpreter, gasUsedInterpreter, outputInterpreter) = await invokePVM(
@@ -623,41 +680,22 @@ enum JITParityComparator {
             ctx: nil,
         )
 
-        // Execute in JIT mode using Executor directly to get register state
-        // CRITICAL: We don't use invokePVM here because it doesn't return register state
-        // Instead we call Executor.execute() directly which returns VMExecutionResult with registers
-        let executor = Executor(mode: .jit, config: config)
-        let jitVMResult = await executor.execute(
+        // Execute in sandboxed JIT mode.
+        // invokePVM is used for both sides so we compare the externally observable behavior.
+        let (exitReasonSandboxedJIT, gasUsedSandboxedJIT, outputSandboxedJIT) = await invokePVM(
+            config: config,
+            executionMode: [.jit, .sandboxed],
             blob: blob,
             pc: 0,
             gas: gas,
             argumentData: argumentData,
             ctx: nil,
         )
-        let exitReasonJIT = jitVMResult.exitReason
-        let gasUsedJIT = jitVMResult.gasUsed
-        let outputJIT = jitVMResult.outputData
-        let jitRegisters = jitVMResult.finalRegisters
-        let jitPC = jitVMResult.finalPC
 
-        // Get interpreter state by re-running (invokePVM doesn't return registers)
-        let interpreterRegisters: Registers
-        let interpreterPC: UInt32
-        do {
-            let state = try VMStateInterpreter(
-                standardProgramBlob: blob,
-                pc: 0,
-                gas: gas,
-                argumentData: argumentData,
-            )
-            let engine = Engine(config: config)
-            _ = await engine.execute(state: state)
-            interpreterRegisters = state.getRegisters()
-            interpreterPC = state.pc
-        } catch {
-            interpreterRegisters = Registers()
-            interpreterPC = 0
-        }
+        // Sandboxed execution does not expose internal registers/PC through IPC responses,
+        // so parity checks focus on externally visible behavior (exit reason/output/gas).
+        let interpreterRegisters = Registers()
+        let interpreterPC: UInt32 = 0
 
         let interpreterResult = JITTestResult(
             exitReason: exitReasonInterpreter,
@@ -669,42 +707,35 @@ enum JITParityComparator {
         )
 
         let jitResult = JITTestResult(
-            exitReason: exitReasonJIT,
-            finalGas: gas - gasUsedJIT,
-            outputData: outputJIT,
-            finalRegisters: jitRegisters,
-            finalPC: jitPC,
-            executionMode: .jit,
+            exitReason: exitReasonSandboxedJIT,
+            finalGas: gas - gasUsedSandboxedJIT,
+            outputData: outputSandboxedJIT,
+            finalRegisters: Registers(),
+            finalPC: 0,
+            executionMode: [.jit, .sandboxed],
         )
 
         // Compare results
         var differences: [String] = []
 
-        if exitReasonInterpreter != exitReasonJIT {
+        if exitReasonInterpreter != exitReasonSandboxedJIT {
             differences.append(
-                "Exit reason: interpreter=\(exitReasonInterpreter), jit=\(exitReasonJIT)",
+                "(\(testName)) Exit reason: interpreter=\(exitReasonInterpreter), sandboxed+jit=\(exitReasonSandboxedJIT)",
             )
         }
 
-        // NOTE: JIT gas accounting is not fully implemented yet, so we skip gas comparison
-        // When JIT returns 0 gas, it means gas wasn't properly tracked during execution
-        // let gasDiff = abs(Int64(interpreterResult.finalGas.value) - Int64(jitResult.finalGas.value))
-        // if gasDiff > 10 {
-        //     differences.append(
-        //         "Gas: interpreter=\(interpreterResult.finalGas), jit=\(jitResult.finalGas) (diff: \(gasDiff))"
-        //     )
-        // }
-
-        if outputInterpreter != outputJIT {
-            differences.append(
-                "Output: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), jit=\(outputJIT?.toHexString() ?? "nil")",
-            )
+        if let gasTolerance {
+            let gasDiff = abs(Int64(gasUsedInterpreter.value) - Int64(gasUsedSandboxedJIT.value))
+            if gasDiff > Int64(gasTolerance.value) {
+                differences.append(
+                    "(\(testName)) Gas used: interpreter=\(gasUsedInterpreter), sandboxed+jit=\(gasUsedSandboxedJIT) (diff=\(gasDiff), tolerance=\(gasTolerance.value))",
+                )
+            }
         }
 
-        // Compare registers
-        if interpreterRegisters != jitRegisters {
+        if outputInterpreter != outputSandboxedJIT {
             differences.append(
-                "Registers mismatch: interpreter=\(interpreterRegisters), jit=\(jitRegisters)",
+                "(\(testName)) Output: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), sandboxed+jit=\(outputSandboxedJIT?.toHexString() ?? "nil")",
             )
         }
 

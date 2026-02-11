@@ -148,31 +148,31 @@ struct JITControlFlowTests {
         var code = Data()
 
         // LoadImm64 r1, 22 (jump target offset - points to Halt at PC 22)
-        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 opcode
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 opcode
         code.append(0x01) // r1
         code.append(contentsOf: [0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]) // immediate = 22
 
         // Skipped instructions - use Trap as padding
         // LoadImm64 is 10 bytes (PC 0-9), we need padding before JumpInd
-        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 10
-        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 11
-        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 12
-        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 13
-        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 14
-        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 15
-        code.append(PVMOpcodes.trap.rawValue) // Trap at PC 16
+        code.append(CppHelperInstructions.Trap.opcode) // Trap at PC 10
+        code.append(CppHelperInstructions.Trap.opcode) // Trap at PC 11
+        code.append(CppHelperInstructions.Trap.opcode) // Trap at PC 12
+        code.append(CppHelperInstructions.Trap.opcode) // Trap at PC 13
+        code.append(CppHelperInstructions.Trap.opcode) // Trap at PC 14
+        code.append(CppHelperInstructions.Trap.opcode) // Trap at PC 15
+        code.append(CppHelperInstructions.Trap.opcode) // Trap at PC 16
 
         // LoadImm r3, 0x42 (should be skipped)
-        code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode
+        code.append(CppHelperInstructions.LoadImm.opcode) // LoadImm opcode
         code.append(0x03) // r3
         code.append(0x42) // immediate 0x42 (compact single-byte immediate)
 
         // JumpInd r1 - jumps to PC 21
-        code.append(PVMOpcodes.jumpInd.rawValue) // JumpInd opcode
+        code.append(CppHelperInstructions.JumpInd.opcode) // JumpInd opcode
         code.append(0x01) // r1
 
         // Halt at PC 22 (target of JumpInd)
-        code.append(PVMOpcodes.halt.rawValue)
+        code.append(CppHelperInstructions.Fallthrough.opcode)
 
         // Build blob with jump table using helper
         // Since we need a jump table, we can't use createProgramCode directly
@@ -218,12 +218,12 @@ struct JITControlFlowTests {
 
         // LoadImmJump format:
         // [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
-        code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump opcode (80/0x50)
+        code.append(CppHelperInstructions.LoadImmJump.opcode) // LoadImmJump opcode (80/0x50)
         code.append(0x01 | (4 << 4)) // r1=1, l_X=4 => instruction size is 7 bytes in this test
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }) // immed_X
         code.append(7) // immed_Y: jump target = PC 0 + 7 (Trap below)
 
-        code.append(PVMOpcodes.trap.rawValue) // Jump target
+        code.append(CppHelperInstructions.Trap.opcode) // Jump target
 
         // Build blob using helper
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
@@ -240,11 +240,11 @@ struct JITControlFlowTests {
         // Same deterministic LoadImmJump -> Trap sequence as jitLoadImmJump.
         var code = Data()
 
-        code.append(PVMOpcodes.loadImmJump.rawValue) // LoadImmJump opcode (80/0x50)
+        code.append(CppHelperInstructions.LoadImmJump.opcode) // LoadImmJump opcode (80/0x50)
         code.append(0x01 | (4 << 4)) // r1=1 (lower 4 bits), l_X=4 (bits 4-6)
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x1234_5678).littleEndian) { Array($0) }) // immed_X
         code.append(7) // immed_Y: jump to trap at PC 7
-        code.append(PVMOpcodes.trap.rawValue)
+        code.append(CppHelperInstructions.Trap.opcode)
 
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
 
@@ -273,13 +273,13 @@ struct JITControlFlowTests {
         var code = Data()
 
         // r0 = djump halt address (0xFFFF0000)
-        code.append(PVMOpcodes.loadImmU64.rawValue)
+        code.append(CppHelperInstructions.LoadImm64.opcode)
         code.append(0x00) // r0
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFFFF_0000).littleEndian) { Array($0) })
 
         // LoadImmJumpInd with l_X=0 and offset=0 (1 byte): jump to r0 + 0 => halt.
         // This keeps the fixture valid for both interpreter and current JIT encoder paths.
-        code.append(PVMOpcodes.loadImmJumpInd.rawValue) // LoadImmJumpInd opcode (180)
+        code.append(CppHelperInstructions.LoadImmJumpInd.opcode) // LoadImmJumpInd opcode (180)
         code.append(0x01) // ra=1 (dest r1), rb=0 (base r0)
         code.append(0x00) // len byte (l_X=0)
         code.append(0x00) // immed_Y (offset = 0)
@@ -309,11 +309,11 @@ struct JITControlFlowTests {
         // Same halt-target strategy as jitLoadImmJumpInd.
         var code = Data()
 
-        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r0, 0xFFFF0000
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r0, 0xFFFF0000
         code.append(0x00) // r0
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0xFFFF_0000).littleEndian) { Array($0) })
 
-        code.append(PVMOpcodes.loadImmJumpInd.rawValue) // LoadImmJumpInd
+        code.append(CppHelperInstructions.LoadImmJumpInd.opcode) // LoadImmJumpInd
         code.append(0x01) // ra=1 (dest r1), rb=0 (base r0)
         code.append(0x00) // len byte (l_X=0)
         code.append(0x00) // immed_Y (offset = 0)
@@ -351,10 +351,10 @@ struct JITControlFlowTests {
         // Out-of-bounds jump with explicit trap fallthrough.
         // Some backends treat invalid jump targets as fallthrough, so accept either panic path.
         let jumpOffset = Int32(512)
-        let jumpInst: [UInt8] = [PVMOpcodes.jump.rawValue] + withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) }
+        let jumpInst: [UInt8] = [CppHelperInstructions.Jump.opcode] + withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) }
         let blob = ProgramBlobBuilder.createMultiInstructionProgram([
             jumpInst,
-            [PVMOpcodes.trap.rawValue],
+            [CppHelperInstructions.Trap.opcode],
         ])
 
         let result = await JITInstructionExecutor.execute(blob: blob, gas: Gas(64))
@@ -375,18 +375,18 @@ struct JITControlFlowTests {
         // Jump instruction is at PC=0, Fallthrough is at PC=5 + 100*3 = 305
         // So offset should be 305
         let jumpOffset = Int32(305) // Target PC = 0 + 305 = 305 (Fallthrough instruction)
-        code.append(PVMOpcodes.jump.rawValue) // Jump opcode
+        code.append(CppHelperInstructions.Jump.opcode) // Jump opcode
         code.append(contentsOf: withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) })
 
         // Add padding NOPs (using LoadImm to r0 which is a no-op since r0 is always 0)
         for _ in 0 ..< 100 {
-            code.append(PVMOpcodes.loadImm.rawValue) // LoadImm opcode
+            code.append(CppHelperInstructions.LoadImm.opcode) // LoadImm opcode
             code.append(0x00) // r0
             code.append(0x00) // immediate 0 (compact single-byte immediate)
         }
 
         // Fallthrough (will trap when execution continues past end)
-        code.append(PVMOpcodes.halt.rawValue) // opcode 1 = fallthrough
+        code.append(CppHelperInstructions.Fallthrough.opcode) // opcode 1 = fallthrough
 
         // Build blob using helper
         let blob = ProgramBlobBuilder.createProgramCode(Array(code))
@@ -403,7 +403,7 @@ struct JITControlFlowTests {
         // Interpreter branch validation on a minimal out-of-bounds jump.
 
         let jumpOffset = Int32(512) // Jump beyond code (invalid)
-        let code = [PVMOpcodes.jump.rawValue] + withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) }
+        let code = [CppHelperInstructions.Jump.opcode] + withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) }
 
         // Use createProgramCodeBlob which returns just ProgramCode (not StandardProgram)
         let codeBlob = ProgramBlobBuilder.createProgramCodeBlob(code)

@@ -103,13 +103,14 @@ public class Log: HostCall {
             service: service,
         )
 
+        // max debug to avoid spam
         switch level {
         case 0:
-            logger.error(Logger.Message(stringLiteral: details.str))
+            logger.debug(Logger.Message(stringLiteral: details.str))
         case 1:
-            logger.warning(Logger.Message(stringLiteral: details.str))
+            logger.debug(Logger.Message(stringLiteral: details.str))
         case 2:
-            logger.info(Logger.Message(stringLiteral: details.str))
+            logger.debug(Logger.Message(stringLiteral: details.str))
         case 3:
             logger.debug(Logger.Message(stringLiteral: details.str))
         case 4:

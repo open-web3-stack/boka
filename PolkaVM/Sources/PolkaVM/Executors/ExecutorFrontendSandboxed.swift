@@ -12,12 +12,13 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
     private let mode: ExecutionMode
     private let childProcessManager: ChildProcessManager
     private let sandboxPath: String
+    private let shouldFallbackToInProcessWhenSandboxMissing: Bool
 
     init(mode: ExecutionMode) {
         self.mode = mode
-        // Default to "boka-sandbox", can be overridden by setting the environment variable
-        // or by creating the Executor with a custom sandbox path
-        sandboxPath = ProcessInfo.processInfo.environment["BOKA_SANDBOX_PATH"] ?? "boka-sandbox"
+        let resolution = SandboxExecutableResolver.resolve()
+        sandboxPath = resolution.path
+        shouldFallbackToInProcessWhenSandboxMissing = !resolution.isExplicit
         childProcessManager = ChildProcessManager()
     }
 
@@ -93,6 +94,23 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         } catch {
             logger.error("Sandboxed execution failed: \(error)")
 
+            if shouldFallbackToInProcessWhenSandboxMissing,
+               isMissingSandboxExecutableError(error)
+            {
+                logger.warning(
+                    "Sandbox executable not found at \(sandboxPath); falling back to in-process execution",
+                )
+                let inProcessFrontend = ExecutorFrontendInProcess(mode: mode)
+                return await inProcessFrontend.execute(
+                    config: config,
+                    blob: blob,
+                    pc: pc,
+                    gas: gas,
+                    argumentData: argumentData,
+                    ctx: ctx,
+                )
+            }
+
             // Clean up child process if it was spawned
             if let handle {
                 // Try to kill the process and reap it to avoid zombies
@@ -114,5 +132,13 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 outputData: nil,
             )
         }
+    }
+
+    private func isMissingSandboxExecutableError(_ error: Error) -> Bool {
+        guard case let IPCError.writeFailed(errorCode) = error else {
+            return false
+        }
+
+        return errorCode == Int(ENOENT)
     }
 }

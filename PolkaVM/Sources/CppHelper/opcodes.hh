@@ -230,4 +230,8 @@ inline bool opcode_is(uint8_t opcode, Opcode target) {
     return static_cast<Opcode>(opcode) == target;
 }
 
+inline Opcode opcode_from_u8(uint8_t opcode) {
+    return static_cast<Opcode>(opcode);
+}
+
 } // namespace PVM

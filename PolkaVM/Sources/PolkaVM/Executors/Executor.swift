@@ -11,8 +11,7 @@ public final class Executor: @unchecked Sendable {
     public init(mode: ExecutionMode, config: PvmConfig) {
         self.mode = mode
         self.config = config
-        // Read sandbox path from environment variable, default to "boka-sandbox"
-        sandboxPath = ProcessInfo.processInfo.environment["BOKA_SANDBOX_PATH"] ?? "boka-sandbox"
+        sandboxPath = SandboxExecutableResolver.resolve().path
 
         if mode.contains(.sandboxed) {
             frontend = ExecutorFrontendSandboxed(mode: mode)

@@ -1009,37 +1009,37 @@ bool emit_instruction_decoded(
 
     // Dispatch based on opcode
     // Note: These opcode numbers match the PVM::Opcode enum from opcodes.hh
-    switch (decoded.opcode) {
-        case static_cast<uint8_t>(Opcode::Trap):
+    switch (opcode_from_u8(decoded.opcode)) {
+        case Opcode::Trap:
             return jit_instruction::jit_emit_trap(assembler, target_arch);
 
-        case static_cast<uint8_t>(Opcode::Halt):
+        case Opcode::Halt:
             // No emission needed for fallthrough
             return true;
 
-        case 10: // Ecalli - opcode 10
+        case Opcode::Ecalli:
             // Ecalli uses decoded.immediate for call_index
             // gas_ptr is passed as nullptr because the JIT implementation uses the VM_GAS_PTR register (r14/x22) directly
             return jit_instruction::jit_generateEcalli(assembler, target_arch,
                 static_cast<uint32_t>(decoded.immediate), nullptr);
 
-        case static_cast<uint8_t>(Opcode::LoadImmU64):
+        case Opcode::LoadImmU64:
             return jit_instruction::jit_emit_load_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.immediate
             );
 
-        case static_cast<uint8_t>(Opcode::StoreImmU8):
-        case static_cast<uint8_t>(Opcode::StoreImmU16):
-        case static_cast<uint8_t>(Opcode::StoreImmU32):
-        case static_cast<uint8_t>(Opcode::StoreImmU64):
+        case Opcode::StoreImmU8:
+        case Opcode::StoreImmU16:
+        case Opcode::StoreImmU32:
+        case Opcode::StoreImmU64:
             // StoreImm instructions are handled explicitly in x64_labeled_helper.cpp
             // before calling the dispatcher, so these cases should never be reached.
             a->nop();
             return true;
 
-        case static_cast<uint8_t>(Opcode::Jump):
+        case Opcode::Jump:
             // NOTE: Jump target calculation handled in dispatcher
             // Labeled JIT implementation (compilePolkaVMCode_x64_labeled) handles labels properly
             return jit_instruction::jit_emit_jump(
@@ -1047,7 +1047,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc  // Use target_pc instead of offset
             );
 
-        case static_cast<uint8_t>(Opcode::JumpInd):
+        case Opcode::JumpInd:
             // JumpInd format: [opcode][reg_index]
             // The reg_index specifies which register contains the target PC
             return jit_instruction::jit_emit_jump_ind(
@@ -1056,14 +1056,14 @@ bool emit_instruction_decoded(
                 0  // offset (not used in JumpInd - register contains absolute target)
             );
 
-        case static_cast<uint8_t>(Opcode::LoadImm):
+        case Opcode::LoadImm:
             return jit_instruction::jit_emit_load_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
                 static_cast<uint32_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::LoadImmJump):
+        case Opcode::LoadImmJump:
             return jit_instruction::jit_emit_load_imm_jump(
                 assembler, target_arch,
                 decoded.dest_reg,      // ra (register to load immediate into)
@@ -1071,7 +1071,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc      // target PC
             );
 
-        case static_cast<uint8_t>(Opcode::LoadImmJumpInd):
+        case Opcode::LoadImmJumpInd:
             return jit_instruction::jit_emit_load_imm_jump_ind(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1082,7 +1082,7 @@ bool emit_instruction_decoded(
 
         // Branch Immediate instructions (opcodes 81-90)
         // Format: [opcode][reg_index][value_64bit][offset_32bit]
-        case static_cast<uint8_t>(Opcode::BranchEqImm):
+        case Opcode::BranchEqImm:
             return jit_instruction::jit_emit_branch_eq_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1090,7 +1090,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchNeImm):
+        case Opcode::BranchNeImm:
             return jit_instruction::jit_emit_branch_ne_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1098,7 +1098,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchLtUImm):
+        case Opcode::BranchLtUImm:
             return jit_instruction::jit_emit_branch_lt_u_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1106,7 +1106,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchLeUImm):
+        case Opcode::BranchLeUImm:
             return jit_instruction::jit_emit_branch_le_u_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1114,7 +1114,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchGeUImm):
+        case Opcode::BranchGeUImm:
             return jit_instruction::jit_emit_branch_ge_u_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1122,7 +1122,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchGtUImm):
+        case Opcode::BranchGtUImm:
             return jit_instruction::jit_emit_branch_gt_u_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1130,7 +1130,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchLtSImm):
+        case Opcode::BranchLtSImm:
             return jit_instruction::jit_emit_branch_lt_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1138,7 +1138,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchLeSImm):
+        case Opcode::BranchLeSImm:
             return jit_instruction::jit_emit_branch_le_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1146,7 +1146,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchGeSImm):
+        case Opcode::BranchGeSImm:
             return jit_instruction::jit_emit_branch_ge_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1154,7 +1154,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchGtSImm):
+        case Opcode::BranchGtSImm:
             return jit_instruction::jit_emit_branch_gt_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1164,7 +1164,7 @@ bool emit_instruction_decoded(
 
         // 32-bit Immediate instructions (opcodes 131-148)
         // Format: [opcode][ra][rb][value_32bit]
-        case static_cast<uint8_t>(Opcode::AddImm32):
+        case Opcode::AddImm32:
             return jit_instruction::jit_emit_add_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1172,7 +1172,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::AndImm):
+        case Opcode::AndImm:
             return jit_instruction::jit_emit_and_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1180,7 +1180,7 @@ bool emit_instruction_decoded(
                 static_cast<uint32_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::XorImm):
+        case Opcode::XorImm:
             return jit_instruction::jit_emit_xor_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1188,7 +1188,7 @@ bool emit_instruction_decoded(
                 static_cast<uint32_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::OrImm):
+        case Opcode::OrImm:
             return jit_instruction::jit_emit_or_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1196,7 +1196,7 @@ bool emit_instruction_decoded(
                 static_cast<uint32_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::MulImm32):
+        case Opcode::MulImm32:
             return jit_instruction::jit_emit_mul_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1204,7 +1204,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::SetLtUImm):
+        case Opcode::SetLtUImm:
             return jit_instruction::jit_emit_lt_imm_u(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1212,7 +1212,7 @@ bool emit_instruction_decoded(
                 decoded.immediate
             );
 
-        case static_cast<uint8_t>(Opcode::SetLtSImm):
+        case Opcode::SetLtSImm:
             return jit_instruction::jit_emit_lt_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1220,7 +1220,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::ShloLImm32):
+        case Opcode::ShloLImm32:
             return jit_instruction::jit_emit_shl_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1228,7 +1228,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::ShloRImm32):
+        case Opcode::ShloRImm32:
             return jit_instruction::jit_emit_shr_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1236,7 +1236,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::SharRImm32):
+        case Opcode::SharRImm32:
             return jit_instruction::jit_emit_sar_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1244,7 +1244,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::NegAddImm32):
+        case Opcode::NegAddImm32:
             // NegAddImm32: ra = value - rb (negated addition)
             return jit_instruction::jit_emit_neg_add_imm_32(
                 assembler, target_arch,
@@ -1253,7 +1253,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::SetGtUImm):
+        case Opcode::SetGtUImm:
             // SetGtUImm: ra = (rb > value) ? 1 : 0
             // Implemented as: lt_u(value, rb) (swap operands)
             return jit_instruction::jit_emit_gt_imm_u(
@@ -1263,7 +1263,7 @@ bool emit_instruction_decoded(
                 decoded.immediate
             );
 
-        case static_cast<uint8_t>(Opcode::SetGtSImm):
+        case Opcode::SetGtSImm:
             // SetGtSImm: ra = (rb > value) ? 1 : 0 (signed)
             return jit_instruction::jit_emit_gt_imm(
                 assembler, target_arch,
@@ -1272,7 +1272,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::ShloLImmAlt32):
+        case Opcode::ShloLImmAlt32:
             // Alt shift variants - same functionality
             return jit_instruction::jit_emit_shl_imm_32(
                 assembler, target_arch,
@@ -1281,7 +1281,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::ShloRImmAlt32):
+        case Opcode::ShloRImmAlt32:
             return jit_instruction::jit_emit_shr_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1289,7 +1289,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::SharRImmAlt32):
+        case Opcode::SharRImmAlt32:
             return jit_instruction::jit_emit_sar_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1297,7 +1297,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::CmovIzImm):
+        case Opcode::CmovIzImm:
             return jit_instruction::jit_emit_cmov_iz_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1305,7 +1305,7 @@ bool emit_instruction_decoded(
                 static_cast<uint32_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::CmovNzImm):
+        case Opcode::CmovNzImm:
             return jit_instruction::jit_emit_cmov_nz_imm(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1315,7 +1315,7 @@ bool emit_instruction_decoded(
 
         // 64-bit Immediate instructions (opcodes 149-161)
         // Format: [opcode][ra][rb][value_64bit]
-        case static_cast<uint8_t>(Opcode::AddImm64):
+        case Opcode::AddImm64:
             return jit_instruction::jit_emit_add_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1323,7 +1323,7 @@ bool emit_instruction_decoded(
                 decoded.immediate
             );
 
-        case static_cast<uint8_t>(Opcode::MulImm64):
+        case Opcode::MulImm64:
             return jit_instruction::jit_emit_mul_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1331,7 +1331,7 @@ bool emit_instruction_decoded(
                 decoded.immediate
             );
 
-        case static_cast<uint8_t>(Opcode::ShloLImm64):
+        case Opcode::ShloLImm64:
             return jit_instruction::jit_emit_shl_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1339,7 +1339,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::ShloRImm64):
+        case Opcode::ShloRImm64:
             return jit_instruction::jit_emit_shr_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1347,7 +1347,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::SharRImm64):
+        case Opcode::SharRImm64:
             return jit_instruction::jit_emit_sar_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1355,7 +1355,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::NegAddImm64):
+        case Opcode::NegAddImm64:
             // NegAddImm64: ra = value - rb (negated addition)
             return jit_instruction::jit_emit_neg_add_imm_64(
                 assembler, target_arch,
@@ -1364,7 +1364,7 @@ bool emit_instruction_decoded(
                 decoded.immediate
             );
 
-        case static_cast<uint8_t>(Opcode::ShloLImmAlt64):
+        case Opcode::ShloLImmAlt64:
             return jit_instruction::jit_emit_shl_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1372,7 +1372,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::ShloRImmAlt64):
+        case Opcode::ShloRImmAlt64:
             return jit_instruction::jit_emit_shr_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1380,7 +1380,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::SharRImmAlt64):
+        case Opcode::SharRImmAlt64:
             return jit_instruction::jit_emit_sar_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1388,7 +1388,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::RotR64Imm):
+        case Opcode::RotR64Imm:
             return jit_instruction::jit_emit_rot_r_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1396,7 +1396,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::RotR64ImmAlt):
+        case Opcode::RotR64ImmAlt:
             return jit_instruction::jit_emit_rot_r_imm_64(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1404,7 +1404,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::RotR32Imm):
+        case Opcode::RotR32Imm:
             return jit_instruction::jit_emit_rot_r_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1412,7 +1412,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::RotR32ImmAlt):
+        case Opcode::RotR32ImmAlt:
             return jit_instruction::jit_emit_rot_r_imm_32(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -1420,7 +1420,7 @@ bool emit_instruction_decoded(
                 static_cast<uint8_t>(decoded.immediate)
             );
 
-        case static_cast<uint8_t>(Opcode::LoadU8):
+        case Opcode::LoadU8:
             // LoadU8 format: [opcode][reg_index][address_32bit]
             // PVM uses direct addressing (no ptr_reg), base register is implicit
             return jit_instruction::jit_emit_load_u8_direct(
@@ -1429,7 +1429,7 @@ bool emit_instruction_decoded(
                 decoded.address
             );
 
-        case static_cast<uint8_t>(Opcode::LoadI8):
+        case Opcode::LoadI8:
             // LoadI8 format: [opcode][reg_index][address_32bit]
             return jit_instruction::jit_emit_load_i8_direct(
                 assembler, target_arch,
@@ -1437,7 +1437,7 @@ bool emit_instruction_decoded(
                 decoded.address
             );
 
-        case static_cast<uint8_t>(Opcode::LoadU16):
+        case Opcode::LoadU16:
             // LoadU16 format: [opcode][reg_index][address_32bit]
             return jit_instruction::jit_emit_load_u16_direct(
                 assembler, target_arch,
@@ -1445,7 +1445,7 @@ bool emit_instruction_decoded(
                 decoded.address
             );
 
-        case static_cast<uint8_t>(Opcode::LoadI16):
+        case Opcode::LoadI16:
             // LoadI16 format: [opcode][reg_index][address_32bit]
             return jit_instruction::jit_emit_load_i16_direct(
                 assembler, target_arch,
@@ -1453,7 +1453,7 @@ bool emit_instruction_decoded(
                 decoded.address
             );
 
-        case static_cast<uint8_t>(Opcode::LoadU32):
+        case Opcode::LoadU32:
             // LoadU32 format: [opcode][reg_index][address_32bit]
             return jit_instruction::jit_emit_load_u32_direct(
                 assembler, target_arch,
@@ -1461,7 +1461,7 @@ bool emit_instruction_decoded(
                 decoded.address
             );
 
-        case static_cast<uint8_t>(Opcode::LoadI32):
+        case Opcode::LoadI32:
             // LoadI32 format: [opcode][reg_index][address_32bit]
             return jit_instruction::jit_emit_load_i32_direct(
                 assembler, target_arch,
@@ -1469,7 +1469,7 @@ bool emit_instruction_decoded(
                 decoded.address
             );
 
-        case static_cast<uint8_t>(Opcode::LoadU64):
+        case Opcode::LoadU64:
             // LoadU64 format: [opcode][reg_index][address_32bit]
             return jit_instruction::jit_emit_load_u64_direct(
                 assembler, target_arch,
@@ -1477,7 +1477,7 @@ bool emit_instruction_decoded(
                 decoded.address
             );
 
-        case static_cast<uint8_t>(Opcode::StoreU8):
+        case Opcode::StoreU8:
             // StoreU8 format: [opcode][reg_index][address_32bit]
             // PVM uses direct addressing (no ptr_reg), base register is implicit
             return jit_instruction::jit_emit_store_u8_direct(
@@ -1486,7 +1486,7 @@ bool emit_instruction_decoded(
                 decoded.dest_reg
             );
 
-        case static_cast<uint8_t>(Opcode::StoreU16):
+        case Opcode::StoreU16:
             // StoreU16 format: [opcode][reg_index][address_32bit]
             // PVM uses direct addressing (no ptr_reg), base register is implicit
             return jit_instruction::jit_emit_store_u16_direct(
@@ -1495,7 +1495,7 @@ bool emit_instruction_decoded(
                 decoded.dest_reg
             );
 
-        case static_cast<uint8_t>(Opcode::StoreU32):
+        case Opcode::StoreU32:
             // StoreU32 format: [opcode][reg_index][address_32bit]
             // PVM uses direct addressing (no ptr_reg), base register is implicit
             return jit_instruction::jit_emit_store_u32_direct(
@@ -1504,7 +1504,7 @@ bool emit_instruction_decoded(
                 decoded.dest_reg
             );
 
-        case static_cast<uint8_t>(Opcode::StoreU64):
+        case Opcode::StoreU64:
             // StoreU64 format: [opcode][reg_index][address_32bit]
             // PVM uses direct addressing (no ptr_reg), base register is implicit
             return jit_instruction::jit_emit_store_u64_direct(
@@ -1516,7 +1516,7 @@ bool emit_instruction_decoded(
         // Store Immediate Indirect instructions (opcodes 70-73)
         // Format: [opcode][reg_index][address_32bit][value_Nbit]
         // Store immediate to memory at reg + address
-        case static_cast<uint8_t>(Opcode::StoreImmIndU8):
+        case Opcode::StoreImmIndU8:
             {
                 auto* a = static_cast<x86::Assembler*>(assembler);
                 // Load base address from register
@@ -1527,7 +1527,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::StoreImmIndU16):
+        case Opcode::StoreImmIndU16:
             {
                 auto* a = static_cast<x86::Assembler*>(assembler);
                 // Load base address from register
@@ -1538,7 +1538,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::StoreImmIndU32):
+        case Opcode::StoreImmIndU32:
             {
                 auto* a = static_cast<x86::Assembler*>(assembler);
                 // Load base address from register
@@ -1549,7 +1549,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::StoreImmIndU64):
+        case Opcode::StoreImmIndU64:
             {
                 auto* a = static_cast<x86::Assembler*>(assembler);
                 // Load base address from register
@@ -1563,7 +1563,7 @@ bool emit_instruction_decoded(
         // Store Indirect instructions (opcodes 120-123)
         // Format: [opcode][src_reg][dest_reg][offset_32bit]
         // Store src_reg to memory at dest_reg + offset
-        case static_cast<uint8_t>(Opcode::StoreIndU8):
+        case Opcode::StoreIndU8:
             // Use existing store_8 with ptr_reg = base register
             // NOTE: jit_emit_store_* functions expect int16_t offset
             // This is a known limitation - for now we truncate to 16-bit
@@ -1575,7 +1575,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.address)  // offset truncated to 16-bit
             );
 
-        case static_cast<uint8_t>(Opcode::StoreIndU16):
+        case Opcode::StoreIndU16:
             return jit_instruction::jit_emit_store_16(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg
@@ -1583,7 +1583,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.address)  // offset truncated to 16-bit
             );
 
-        case static_cast<uint8_t>(Opcode::StoreIndU32):
+        case Opcode::StoreIndU32:
             return jit_instruction::jit_emit_store_32(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg
@@ -1591,7 +1591,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.address)  // offset truncated to 16-bit
             );
 
-        case static_cast<uint8_t>(Opcode::StoreIndU64):
+        case Opcode::StoreIndU64:
             return jit_instruction::jit_emit_store_64(
                 assembler, target_arch,
                 decoded.src1_reg,  // ptr_reg
@@ -1602,7 +1602,7 @@ bool emit_instruction_decoded(
         // Load Indirect instructions (opcodes 124-130)
         // Format: [opcode][ra][rb][offset_32bit]
         // Load from memory at rb + offset into ra
-        case static_cast<uint8_t>(Opcode::LoadIndU8):
+        case Opcode::LoadIndU8:
             return jit_instruction::jit_emit_load_u8(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra (destination)
@@ -1610,7 +1610,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.address)  // offset
             );
 
-        case static_cast<uint8_t>(Opcode::LoadIndI8):
+        case Opcode::LoadIndI8:
             return jit_instruction::jit_emit_load_i8(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -1618,7 +1618,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.address)
             );
 
-        case static_cast<uint8_t>(Opcode::LoadIndU16):
+        case Opcode::LoadIndU16:
             return jit_instruction::jit_emit_load_u16(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -1626,7 +1626,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.address)
             );
 
-        case static_cast<uint8_t>(Opcode::LoadIndI16):
+        case Opcode::LoadIndI16:
             return jit_instruction::jit_emit_load_i16(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -1634,7 +1634,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.address)
             );
 
-        case static_cast<uint8_t>(Opcode::LoadIndU32):
+        case Opcode::LoadIndU32:
             return jit_instruction::jit_emit_load_u32(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -1642,7 +1642,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.address)
             );
 
-        case static_cast<uint8_t>(Opcode::LoadIndI32):
+        case Opcode::LoadIndI32:
             return jit_instruction::jit_emit_load_i32(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -1650,7 +1650,7 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.address)
             );
 
-        case static_cast<uint8_t>(Opcode::LoadIndU64):
+        case Opcode::LoadIndU64:
             return jit_instruction::jit_emit_load_u64(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -1658,14 +1658,14 @@ bool emit_instruction_decoded(
                 static_cast<int32_t>(decoded.address)
             );
 
-        case 100: // MoveReg
+        case Opcode::MoveReg:
             return jit_instruction::jit_emit_copy(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 101: // Sbrk
+        case Opcode::Sbrk:
             // Sbrk format: sbrk dest, src
             // dest = register to store result (previous heap end)
             // src = register containing allocation size
@@ -1675,76 +1675,76 @@ bool emit_instruction_decoded(
                 decoded.src1_reg   // source register (allocation size)
             );
 
-        case 102: // CountSetBits64
+        case Opcode::CountSetBits64:
             return jit_instruction::jit_emit_pop_count(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 103: // CountSetBits32
+        case Opcode::CountSetBits32:
             return jit_instruction::jit_emit_pop_count(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 104: // LeadingZeroBits64
+        case Opcode::LeadingZeroBits64:
             return jit_instruction::jit_emit_clz_64(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 105: // LeadingZeroBits32
+        case Opcode::LeadingZeroBits32:
             return jit_instruction::jit_emit_clz(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 106: // TrailingZeroBits64
+        case Opcode::TrailingZeroBits64:
             return jit_instruction::jit_emit_ctz_64(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 107: // TrailingZeroBits32
+        case Opcode::TrailingZeroBits32:
             return jit_instruction::jit_emit_ctz(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 108: // SignExtend8
+        case Opcode::SignExtend8:
             return jit_instruction::jit_emit_sext_8(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 109: // SignExtend16
+        case Opcode::SignExtend16:
             return jit_instruction::jit_emit_sext_16(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 110: // ZeroExtend16
+        case Opcode::ZeroExtend16:
             return jit_instruction::jit_emit_zext_16(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 111: // ReverseBytes
+        case Opcode::ReverseBytes:
             return jit_instruction::jit_emit_bswap(
                 assembler, target_arch,
                 decoded.dest_reg  // bswap only takes dest_reg
             );
 
-        case static_cast<uint8_t>(Opcode::BranchEq):
+        case Opcode::BranchEq:
             // NOTE: Branch target calculation handled in dispatcher
             // Labeled JIT implementation handles labels properly
             return jit_instruction::jit_emit_branch_eq(
@@ -1754,7 +1754,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc  // Use target_pc instead of offset
             );
 
-        case static_cast<uint8_t>(Opcode::BranchNe):
+        case Opcode::BranchNe:
             // NOTE: Branch target calculation handled in dispatcher
             // Labeled JIT implementation handles labels properly
             return jit_instruction::jit_emit_branch_ne(
@@ -1764,7 +1764,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc  // Use target_pc instead of offset
             );
 
-        case static_cast<uint8_t>(Opcode::BranchLtU):
+        case Opcode::BranchLtU:
             return jit_instruction::jit_emit_branch_lt_u(
                 assembler, target_arch,
                 decoded.src1_reg,
@@ -1772,7 +1772,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchLtS):
+        case Opcode::BranchLtS:
             return jit_instruction::jit_emit_branch_lt(
                 assembler, target_arch,
                 decoded.src1_reg,
@@ -1780,7 +1780,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchGeU):
+        case Opcode::BranchGeU:
             return jit_instruction::jit_emit_branch_gt_u(
                 assembler, target_arch,
                 decoded.src2_reg,  // Swap operands for Ge (a >= b => !(b > a))
@@ -1788,7 +1788,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::BranchGeS):
+        case Opcode::BranchGeS:
             return jit_instruction::jit_emit_branch_gt(
                 assembler, target_arch,
                 decoded.src2_reg,  // Swap operands for Ge (a >= b => !(b > a))
@@ -1796,7 +1796,7 @@ bool emit_instruction_decoded(
                 decoded.target_pc
             );
 
-        case static_cast<uint8_t>(Opcode::Add32):
+        case Opcode::Add32:
             {
                 // rd = ra + rb (3-operand format)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -1807,7 +1807,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::Sub32):
+        case Opcode::Sub32:
             {
                 // rd = ra - rb (3-operand format)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -1818,7 +1818,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::Mul32):
+        case Opcode::Mul32:
             {
                 // rd = ra * rb (3-operand format)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -1829,7 +1829,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::DivU32):
+        case Opcode::DivU32:
             {
                 // rd = ra / rb (3-operand format)
                 // Per spec: when rb == 0, return UInt64.max (matches interpreter behavior)
@@ -1857,7 +1857,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::DivS32):
+        case Opcode::DivS32:
             {
                 // rd = ra / rb (3-operand format, signed)
                 // Per spec: when b == 0, return UInt64.max
@@ -1898,7 +1898,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::RemU32):
+        case Opcode::RemU32:
             {
                 // Per spec: when rb == 0, return ra (the dividend, sign-extended to 64-bit), matches interpreter behavior
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -1926,7 +1926,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::RemS32):
+        case Opcode::RemS32:
             {
                 // Per spec: when b == 0, return a (the dividend, sign-extended to 64-bit), matches interpreter behavior
                 // Also handles a == Int32.min && b == -1 case (returns 0)
@@ -1968,28 +1968,28 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::ShloL32):
+        case Opcode::ShloL32:
             return jit_instruction::jit_emit_shlo_l_32(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case static_cast<uint8_t>(Opcode::ShloR32):
+        case Opcode::ShloR32:
             return jit_instruction::jit_emit_shlo_r_32(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case static_cast<uint8_t>(Opcode::SharR32):
+        case Opcode::SharR32:
             return jit_instruction::jit_emit_shar_r_32(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case static_cast<uint8_t>(Opcode::Add64):
+        case Opcode::Add64:
             {
                 // rd = ra + rb (3-operand format, 64-bit)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -2000,7 +2000,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::Sub64):
+        case Opcode::Sub64:
             {
                 // rd = ra - rb (3-operand format, 64-bit)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -2011,7 +2011,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::Mul64):
+        case Opcode::Mul64:
             {
                 // rd = ra * rb (3-operand format, 64-bit)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -2022,7 +2022,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::DivU64):
+        case Opcode::DivU64:
             {
                 // rd = ra / rb (3-operand format, 64-bit unsigned)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -2034,7 +2034,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::DivS64):
+        case Opcode::DivS64:
             {
                 // rd = ra / rb (3-operand format, 64-bit signed)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -2046,7 +2046,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::RemU64):
+        case Opcode::RemU64:
             {
                 // rd = ra % rb (3-operand format, 64-bit unsigned)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -2058,7 +2058,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::RemS64):
+        case Opcode::RemS64:
             {
                 // rd = ra % rb (3-operand format, 64-bit signed)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -2070,7 +2070,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::ShloL64):
+        case Opcode::ShloL64:
             return jit_instruction::jit_emit_shlo_l_64_3reg(
                 assembler, target_arch,
                 decoded.src1_reg,  // ra
@@ -2078,7 +2078,7 @@ bool emit_instruction_decoded(
                 decoded.dest_reg   // rd
             );
 
-        case static_cast<uint8_t>(Opcode::ShloR64):
+        case Opcode::ShloR64:
             return jit_instruction::jit_emit_shlo_r_64_3reg(
                 assembler, target_arch,
                 decoded.src1_reg,  // ra
@@ -2086,7 +2086,7 @@ bool emit_instruction_decoded(
                 decoded.dest_reg   // rd
             );
 
-        case static_cast<uint8_t>(Opcode::SharR64):
+        case Opcode::SharR64:
             return jit_instruction::jit_emit_shar_r_64_3reg(
                 assembler, target_arch,
                 decoded.src1_reg,  // ra
@@ -2094,7 +2094,7 @@ bool emit_instruction_decoded(
                 decoded.dest_reg   // rd
             );
 
-        case static_cast<uint8_t>(Opcode::And):
+        case Opcode::And:
             {
                 // rd = ra & rb (3-operand format, 64-bit)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -2105,7 +2105,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::Xor):
+        case Opcode::Xor:
             {
                 // rd = ra ^ rb (3-operand format, 64-bit)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -2116,7 +2116,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case static_cast<uint8_t>(Opcode::Or):
+        case Opcode::Or:
             {
                 // rd = ra | rb (3-operand format, 64-bit)
                 auto* a = static_cast<x86::Assembler*>(assembler);
@@ -2127,7 +2127,7 @@ bool emit_instruction_decoded(
             }
             return true;
 
-        case 213: // MulUpperSS
+        case Opcode::MulUpperSS:
             return jit_instruction::jit_emit_mul_upper_s_s(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2135,7 +2135,7 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 214: // MulUpperUU
+        case Opcode::MulUpperUU:
             return jit_instruction::jit_emit_mul_upper_uu(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2143,7 +2143,7 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 215: // MulUpperSU
+        case Opcode::MulUpperSU:
             return jit_instruction::jit_emit_mul_upper_su(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2151,7 +2151,7 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 216: // SetLtU
+        case Opcode::SetLtU:
             return jit_instruction::jit_emit_set_lt_u(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2159,7 +2159,7 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 217: // SetLtS
+        case Opcode::SetLtS:
             return jit_instruction::jit_emit_set_lt_s(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2167,7 +2167,7 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 218: // CmovIz
+        case Opcode::CmovIz:
             return jit_instruction::jit_emit_cmov_iz(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2175,7 +2175,7 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 219: // CmovNz
+        case Opcode::CmovNz:
             return jit_instruction::jit_emit_cmov_nz(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2183,7 +2183,7 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 220: // RotL64
+        case Opcode::RotL64:
             return jit_instruction::jit_emit_rol_64(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2191,7 +2191,7 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 221: // RotL32
+        case Opcode::RotL32:
             return jit_instruction::jit_emit_rot_l_32(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2199,7 +2199,7 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 222: // RotR64
+        case Opcode::RotR64:
             return jit_instruction::jit_emit_ror_64(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2207,7 +2207,7 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 223: // RotR32
+        case Opcode::RotR32:
             return jit_instruction::jit_emit_rot_r_32(
                 assembler, target_arch,
                 decoded.dest_reg,  // ra
@@ -2215,49 +2215,49 @@ bool emit_instruction_decoded(
                 decoded.src2_reg   // rd
             );
 
-        case 224: // AndInv
+        case Opcode::AndInv:
             return jit_instruction::jit_emit_and_inv(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 225: // OrInv
+        case Opcode::OrInv:
             return jit_instruction::jit_emit_or_inv(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 226: // Xnor
+        case Opcode::Xnor:
             return jit_instruction::jit_emit_xnor(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 227: // Max
+        case Opcode::Max:
             return jit_instruction::jit_emit_max(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 228: // MaxU
+        case Opcode::MaxU:
             return jit_instruction::jit_emit_max_u(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 229: // Min
+        case Opcode::Min:
             return jit_instruction::jit_emit_min(
                 assembler, target_arch,
                 decoded.dest_reg,
                 decoded.src1_reg
             );
 
-        case 230: // MinU
+        case Opcode::MinU:
             return jit_instruction::jit_emit_min_u(
                 assembler, target_arch,
                 decoded.dest_reg,
@@ -2293,449 +2293,466 @@ bool emit_basic_block_instructions(
         bool decoded_ok = false;
 
         // Use switch for efficient opcode dispatch
-        switch (opcode) {
-            case static_cast<uint8_t>(Opcode::Trap):
+        switch (opcode_from_u8(opcode)) {
+            case Opcode::Trap:
                 decoded_ok = decode_trap(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Halt):
+            case Opcode::Halt:
                 decoded_ok = decode_fallthrough(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadImmU64):
+            case Opcode::LoadImmU64:
                 decoded_ok = decode_load_imm_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Ecalli):
+            case Opcode::Ecalli:
                 decoded_ok = decode_ecalli(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreImmU8):
+            case Opcode::StoreImmU8:
                 decoded_ok = decode_store_imm_u8(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreImmU16):
+            case Opcode::StoreImmU16:
                 decoded_ok = decode_store_imm_u16(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreImmU32):
+            case Opcode::StoreImmU32:
                 decoded_ok = decode_store_imm_u32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreImmU64):
+            case Opcode::StoreImmU64:
                 decoded_ok = decode_store_imm_u64(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Jump):
+            case Opcode::Jump:
                 decoded_ok = decode_jump(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::JumpInd):
+            case Opcode::JumpInd:
                 decoded_ok = decode_jump_ind(bytecode, current_pc, decoded);
                 break;
 
-            case 2: // JumpInd (old opcode number for backwards compatibility)
-                decoded_ok = decode_jump_ind(bytecode, current_pc, decoded);
-                break;
-
-            case static_cast<uint8_t>(Opcode::LoadImmJumpInd):
+            case Opcode::LoadImmJumpInd:
                 decoded_ok = decode_load_imm_jump_ind(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadImm):
+            case Opcode::LoadImm:
                 decoded_ok = decode_load_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadImmJump):
+            case Opcode::LoadImmJump:
                 decoded_ok = decode_load_imm_jump(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case 100: // MoveReg - 2 register format (dest, src)
+            case Opcode::MoveReg: // 2 register format (dest, src)
+                decoded_ok = decode_2_reg(bytecode, current_pc, decoded);
+                break;
+
+            case Opcode::Sbrk:
+            case Opcode::CountSetBits64:
+            case Opcode::CountSetBits32:
+            case Opcode::LeadingZeroBits64:
+            case Opcode::LeadingZeroBits32:
+            case Opcode::TrailingZeroBits64:
+            case Opcode::TrailingZeroBits32:
+            case Opcode::SignExtend8:
+            case Opcode::SignExtend16:
+            case Opcode::ZeroExtend16:
+            case Opcode::ReverseBytes:
                 decoded_ok = decode_2_reg(bytecode, current_pc, decoded);
                 break;
 
             // Branch Immediate instructions (opcodes 81-90)
             // Format: [opcode][reg_index][value_64bit][offset_32bit]
-            case static_cast<uint8_t>(Opcode::BranchEqImm):
+            case Opcode::BranchEqImm:
                 decoded_ok = decode_branch_eq_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchNeImm):
+            case Opcode::BranchNeImm:
                 decoded_ok = decode_branch_ne_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchLtUImm):
+            case Opcode::BranchLtUImm:
                 decoded_ok = decode_branch_lt_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchLeUImm):
+            case Opcode::BranchLeUImm:
                 decoded_ok = decode_branch_le_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchGeUImm):
+            case Opcode::BranchGeUImm:
                 decoded_ok = decode_branch_ge_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchGtUImm):
+            case Opcode::BranchGtUImm:
                 decoded_ok = decode_branch_gt_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchLtSImm):
+            case Opcode::BranchLtSImm:
                 decoded_ok = decode_branch_lt_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchLeSImm):
+            case Opcode::BranchLeSImm:
                 decoded_ok = decode_branch_le_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchGeSImm):
+            case Opcode::BranchGeSImm:
                 decoded_ok = decode_branch_ge_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchGtSImm):
+            case Opcode::BranchGtSImm:
                 decoded_ok = decode_branch_gt_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             // 32-bit Immediate instructions (opcodes 131-148)
             // Format: [opcode][ra][rb][value_32bit]
-            case static_cast<uint8_t>(Opcode::AddImm32):
+            case Opcode::AddImm32:
                 decoded_ok = decode_add_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::AndImm):
+            case Opcode::AndImm:
                 decoded_ok = decode_and_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::XorImm):
+            case Opcode::XorImm:
                 decoded_ok = decode_xor_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::OrImm):
+            case Opcode::OrImm:
                 decoded_ok = decode_or_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::MulImm32):
+            case Opcode::MulImm32:
                 decoded_ok = decode_mul_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::SetLtUImm):
+            case Opcode::SetLtUImm:
                 decoded_ok = decode_set_lt_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::SetLtSImm):
+            case Opcode::SetLtSImm:
                 decoded_ok = decode_set_lt_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloLImm32):
+            case Opcode::ShloLImm32:
                 decoded_ok = decode_shlo_l_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloRImm32):
+            case Opcode::ShloRImm32:
                 decoded_ok = decode_shlo_r_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::SharRImm32):
+            case Opcode::SharRImm32:
                 decoded_ok = decode_shar_r_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::NegAddImm32):
+            case Opcode::NegAddImm32:
                 decoded_ok = decode_neg_add_imm_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::SetGtUImm):
+            case Opcode::SetGtUImm:
                 decoded_ok = decode_set_gt_u_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::SetGtSImm):
+            case Opcode::SetGtSImm:
                 decoded_ok = decode_set_gt_s_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloLImmAlt32):
+            case Opcode::ShloLImmAlt32:
                 decoded_ok = decode_shlo_l_imm_alt_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloRImmAlt32):
+            case Opcode::ShloRImmAlt32:
                 decoded_ok = decode_shlo_r_imm_alt_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::SharRImmAlt32):
+            case Opcode::SharRImmAlt32:
                 decoded_ok = decode_shar_r_imm_alt_32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::CmovIzImm):
+            case Opcode::CmovIzImm:
                 decoded_ok = decode_cmov_iz_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::CmovNzImm):
+            case Opcode::CmovNzImm:
                 decoded_ok = decode_cmov_nz_imm(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             // 64-bit Immediate instructions (opcodes 149-161)
             // Format: [opcode][ra][rb][value_64bit]
-            case static_cast<uint8_t>(Opcode::AddImm64):
+            case Opcode::AddImm64:
                 decoded_ok = decode_add_imm_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::MulImm64):
+            case Opcode::MulImm64:
                 decoded_ok = decode_mul_imm_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloLImm64):
+            case Opcode::ShloLImm64:
                 decoded_ok = decode_shlo_l_imm_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloRImm64):
+            case Opcode::ShloRImm64:
                 decoded_ok = decode_shlo_r_imm_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::SharRImm64):
+            case Opcode::SharRImm64:
                 decoded_ok = decode_shar_r_imm_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::NegAddImm64):
+            case Opcode::NegAddImm64:
                 decoded_ok = decode_neg_add_imm_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloLImmAlt64):
+            case Opcode::ShloLImmAlt64:
                 decoded_ok = decode_shlo_l_imm_alt_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloRImmAlt64):
+            case Opcode::ShloRImmAlt64:
                 decoded_ok = decode_shlo_r_imm_alt_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::SharRImmAlt64):
+            case Opcode::SharRImmAlt64:
                 decoded_ok = decode_shar_r_imm_alt_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::RotR64Imm):
+            case Opcode::RotR64Imm:
                 decoded_ok = decode_rot_r_64_imm(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::RotR64ImmAlt):
+            case Opcode::RotR64ImmAlt:
                 decoded_ok = decode_rot_r_64_imm_alt(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::RotR32Imm):
+            case Opcode::RotR32Imm:
                 decoded_ok = decode_rot_r_32_imm(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::RotR32ImmAlt):
+            case Opcode::RotR32ImmAlt:
                 decoded_ok = decode_rot_r_32_imm_alt(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadU8):
+            case Opcode::LoadU8:
                 decoded_ok = decode_load_u8(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadI8):
+            case Opcode::LoadI8:
                 decoded_ok = decode_load_i8(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadU16):
+            case Opcode::LoadU16:
                 decoded_ok = decode_load_u16(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadI16):
+            case Opcode::LoadI16:
                 decoded_ok = decode_load_i16(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadU32):
+            case Opcode::LoadU32:
                 decoded_ok = decode_load_u32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadI32):
+            case Opcode::LoadI32:
                 decoded_ok = decode_load_i32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadU64):
+            case Opcode::LoadU64:
                 decoded_ok = decode_load_u64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreU8):
+            case Opcode::StoreU8:
                 decoded_ok = decode_store_u8(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreU16):
+            case Opcode::StoreU16:
                 decoded_ok = decode_store_u16(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreU32):
+            case Opcode::StoreU32:
                 decoded_ok = decode_store_u32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreU64):
+            case Opcode::StoreU64:
                 decoded_ok = decode_store_u64(bytecode, current_pc, decoded);
                 break;
 
             // Store Immediate Indirect instructions (opcodes 70-73)
-            case static_cast<uint8_t>(Opcode::StoreImmIndU8):
+            case Opcode::StoreImmIndU8:
                 decoded_ok = decode_store_imm_ind_u8(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreImmIndU16):
+            case Opcode::StoreImmIndU16:
                 decoded_ok = decode_store_imm_ind_u16(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreImmIndU32):
+            case Opcode::StoreImmIndU32:
                 decoded_ok = decode_store_imm_ind_u32(bytecode, current_pc, instruction_span, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreImmIndU64):
+            case Opcode::StoreImmIndU64:
                 decoded_ok = decode_store_imm_ind_u64(bytecode, current_pc, instruction_span, decoded);
                 break;
 
             // Store Indirect instructions (opcodes 120-123)
-            case static_cast<uint8_t>(Opcode::StoreIndU8):
+            case Opcode::StoreIndU8:
                 decoded_ok = decode_store_ind_u8(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreIndU16):
+            case Opcode::StoreIndU16:
                 decoded_ok = decode_store_ind_u16(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreIndU32):
+            case Opcode::StoreIndU32:
                 decoded_ok = decode_store_ind_u32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::StoreIndU64):
+            case Opcode::StoreIndU64:
                 decoded_ok = decode_store_ind_u64(bytecode, current_pc, decoded);
                 break;
 
             // Load Indirect instructions (opcodes 124-130)
-            case static_cast<uint8_t>(Opcode::LoadIndU8):
+            case Opcode::LoadIndU8:
                 decoded_ok = decode_load_ind_u8(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadIndI8):
+            case Opcode::LoadIndI8:
                 decoded_ok = decode_load_ind_i8(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadIndU16):
+            case Opcode::LoadIndU16:
                 decoded_ok = decode_load_ind_u16(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadIndI16):
+            case Opcode::LoadIndI16:
                 decoded_ok = decode_load_ind_i16(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadIndU32):
+            case Opcode::LoadIndU32:
                 decoded_ok = decode_load_ind_u32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadIndI32):
+            case Opcode::LoadIndI32:
                 decoded_ok = decode_load_ind_i32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::LoadIndU64):
+            case Opcode::LoadIndU64:
                 decoded_ok = decode_load_ind_u64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchEq):
+            case Opcode::BranchEq:
                 decoded_ok = decode_branch_eq(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchNe):
+            case Opcode::BranchNe:
                 decoded_ok = decode_branch_ne(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::BranchLtU):
-            case static_cast<uint8_t>(Opcode::BranchLtS):
-            case static_cast<uint8_t>(Opcode::BranchGeU):
-            case static_cast<uint8_t>(Opcode::BranchGeS):
+            case Opcode::BranchLtU:
+            case Opcode::BranchLtS:
+            case Opcode::BranchGeU:
+            case Opcode::BranchGeS:
                 // Same format as BranchEq/BranchNe: [opcode][reg1][reg2][offset_32bit]
                 decoded_ok = decode_branch_eq(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Add32):
+            case Opcode::Add32:
                 decoded_ok = decode_add_32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Sub32):
+            case Opcode::Sub32:
                 decoded_ok = decode_sub_32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Mul32):
+            case Opcode::Mul32:
                 decoded_ok = decode_mul_32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::DivU32):
+            case Opcode::DivU32:
                 decoded_ok = decode_div_u32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::DivS32):
+            case Opcode::DivS32:
                 decoded_ok = decode_div_s32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::RemU32):
+            case Opcode::RemU32:
                 decoded_ok = decode_rem_u32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::RemS32):
+            case Opcode::RemS32:
                 decoded_ok = decode_rem_s32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloL32):
-            case static_cast<uint8_t>(Opcode::ShloR32):
-            case static_cast<uint8_t>(Opcode::SharR32):
+            case Opcode::ShloL32:
+            case Opcode::ShloR32:
+            case Opcode::SharR32:
                 // Same 2-register format as arithmetic: [opcode][dest_reg][src_reg]
                 decoded_ok = decode_add_32(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Add64):
+            case Opcode::Add64:
                 decoded_ok = decode_add_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Sub64):
+            case Opcode::Sub64:
                 decoded_ok = decode_sub_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Mul64):
+            case Opcode::Mul64:
                 decoded_ok = decode_mul_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::And):
+            case Opcode::DivU64:
+            case Opcode::DivS64:
+            case Opcode::RemU64:
+            case Opcode::RemS64:
+                decoded_ok = decode_add_64(bytecode, current_pc, decoded);
+                break;
+
+            case Opcode::And:
                 decoded_ok = decode_and(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Xor):
+            case Opcode::Xor:
                 decoded_ok = decode_xor(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::Or):
+            case Opcode::Or:
                 decoded_ok = decode_or(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloL64):
+            case Opcode::ShloL64:
                 decoded_ok = decode_shlo_l_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::ShloR64):
+            case Opcode::ShloR64:
                 decoded_ok = decode_shlo_r_64(bytecode, current_pc, decoded);
                 break;
 
-            case static_cast<uint8_t>(Opcode::SharR64):
+            case Opcode::SharR64:
                 decoded_ok = decode_shar_r_64(bytecode, current_pc, decoded);
                 break;
 
-            case 213: // MulUpperSS
-            case 214: // MulUpperUU
-            case 215: // MulUpperSU
-            case 216: // SetLtU
-            case 217: // SetLtS
-            case 218: // CmovIz
-            case 219: // CmovNz
-            case 220: // RotL64
-            case 221: // RotL32
-            case 222: // RotR64
-            case 223: // RotR32
-            case 224: // AndInv
-            case 225: // OrInv
-            case 226: // Xnor
-            case 227: // Max
-            case 228: // MaxU
-            case 229: // Min
-            case 230: // MinU
+            case Opcode::MulUpperSS:
+            case Opcode::MulUpperUU:
+            case Opcode::MulUpperSU:
+            case Opcode::SetLtU:
+            case Opcode::SetLtS:
+            case Opcode::CmovIz:
+            case Opcode::CmovNz:
+            case Opcode::RotL64:
+            case Opcode::RotL32:
+            case Opcode::RotR64:
+            case Opcode::RotR32:
+            case Opcode::AndInv:
+            case Opcode::OrInv:
+            case Opcode::Xnor:
+            case Opcode::Max:
+            case Opcode::MaxU:
+            case Opcode::Min:
+            case Opcode::MinU:
                 decoded_ok = decode_3_reg(bytecode, current_pc, decoded);
                 break;
 

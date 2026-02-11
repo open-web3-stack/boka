@@ -90,7 +90,7 @@ final class BasicBlockBuilder {
                 currentBlock = nil
 
                 // If this is a branch, record the target as a jump target
-                if opcode == PVMOpcodes.branchEq.rawValue || opcode == PVMOpcodes.branchNe.rawValue {
+                if opcode == CppHelperInstructions.BranchEq.opcode || opcode == CppHelperInstructions.BranchNe.opcode {
                     // BranchEq/Ne instructions - target is encoded in instruction
                     // For now, we'll mark all subsequent PCs as potential targets
                     // TODO: Parse branch target from instruction data
@@ -108,11 +108,11 @@ final class BasicBlockBuilder {
         // Second pass: mark jump targets
         for (_, block) in blocks {
             for (opcode, _) in block.instructions {
-                if opcode == PVMOpcodes.branchEq.rawValue ||
-                    opcode == PVMOpcodes.branchNe.rawValue ||
-                    opcode == PVMOpcodes.jump.rawValue ||
-                    opcode == PVMOpcodes.jumpInd.rawValue ||
-                    opcode == PVMOpcodes.loadImmJump.rawValue
+                if opcode == CppHelperInstructions.BranchEq.opcode ||
+                    opcode == CppHelperInstructions.BranchNe.opcode ||
+                    opcode == CppHelperInstructions.Jump.opcode ||
+                    opcode == CppHelperInstructions.JumpInd.opcode ||
+                    opcode == CppHelperInstructions.LoadImmJump.opcode
                 {
                     // TODO: Parse target offset and mark as jump target
                     // For now, skip this as we need to implement instruction parsing

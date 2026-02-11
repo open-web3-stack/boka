@@ -143,12 +143,12 @@ struct JITLoadStoreTests {
         var code = Data()
 
         // LoadU8 r2, [0x10000] - direct address (not register-relative!)
-        code.append(PVMOpcodes.loadU8.rawValue) // LoadU8 opcode
+        code.append(CppHelperInstructions.LoadU8.opcode) // LoadU8 opcode
         code.append(0x02) // r2 (destination register)
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) }) // address
 
         // Halt
-        code.append(PVMOpcodes.halt.rawValue)
+        code.append(CppHelperInstructions.Fallthrough.opcode)
 
         // Create program with read-only data containing 0xAB at offset 0
         let readOnlyData = Data([0xAB]) // Only 1 byte
@@ -173,7 +173,7 @@ struct JITLoadStoreTests {
         var code = Data()
 
         // LoadI8 r2, [0x10000]
-        code.append(PVMOpcodes.loadI8.rawValue) // LoadI8 opcode
+        code.append(CppHelperInstructions.LoadI8.opcode) // LoadI8 opcode
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) })
 
@@ -202,7 +202,7 @@ struct JITLoadStoreTests {
         var code = Data()
 
         // LoadU16 r2, [0x10000]
-        code.append(PVMOpcodes.loadU16.rawValue) // LoadU16 opcode
+        code.append(CppHelperInstructions.LoadU16.opcode) // LoadU16 opcode
         code.append(0x02) // r2
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) })
 
@@ -252,6 +252,56 @@ struct JITLoadStoreTests {
         )
     }
 
+    @Test
+    func jitLoadI8Parity() async {
+        var code = Data()
+
+        code.append(CppHelperInstructions.LoadI8.opcode) // LoadI8 r2, [0x10000]
+        code.append(0x02)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) })
+        code.append(CppHelperInstructions.Trap.opcode)
+
+        let readOnlyData = Data([0xFE]) // -2
+        let blob = ProgramBlobBuilder.createStandardProgram(
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
+            readOnlyData: readOnlyData,
+            readWriteData: Data(),
+            heapPages: 0,
+        )
+
+        let (_, _, differences) = await JITParityComparator.compare(
+            blob: blob,
+            testName: "LoadI8",
+        )
+
+        #expect(differences == nil)
+    }
+
+    @Test
+    func jitLoadU16Parity() async {
+        var code = Data()
+
+        code.append(CppHelperInstructions.LoadU16.opcode) // LoadU16 r2, [0x10000]
+        code.append(0x02)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0001_0000).littleEndian) { Array($0) })
+        code.append(CppHelperInstructions.Trap.opcode)
+
+        let readOnlyData = Data([0xCD, 0xAB])
+        let blob = ProgramBlobBuilder.createStandardProgram(
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
+            readOnlyData: readOnlyData,
+            readWriteData: Data(),
+            heapPages: 0,
+        )
+
+        let (_, _, differences) = await JITParityComparator.compare(
+            blob: blob,
+            testName: "LoadU16",
+        )
+
+        #expect(differences == nil)
+    }
+
     // MARK: - StoreU8/U16/U32/U64 Instructions (Opcodes 59-62)
 
     @Test
@@ -263,12 +313,12 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0xAB
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r1, 0xAB
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00AB).littleEndian) { Array($0) })
 
         // StoreU8 [0x20000], r1
-        code.append(PVMOpcodes.storeU8.rawValue) // StoreU8 opcode
+        code.append(CppHelperInstructions.StoreU8.opcode) // StoreU8 opcode
         code.append(0x01) // r1 (source register)
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) }) // address
 
@@ -303,7 +353,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x1234
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r1, 0x1234
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_1234).littleEndian) { Array($0) })
 
@@ -336,7 +386,7 @@ struct JITLoadStoreTests {
     func jitStoreU8Parity() async {
         var code = Data()
 
-        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0xFF
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r1, 0xFF
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00FF).littleEndian) { Array($0) })
 
@@ -364,6 +414,36 @@ struct JITLoadStoreTests {
         )
     }
 
+    @Test
+    func jitStoreU16Parity() async {
+        var code = Data()
+
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r1, 0xBEEF
+        code.append(0x01)
+        code.append(contentsOf: withUnsafeBytes(of: UInt64(0xBEEF).littleEndian) { Array($0) })
+
+        code.append(CppHelperInstructions.StoreU16.opcode) // StoreU16 [0x20000], r1
+        code.append(0x01)
+        code.append(contentsOf: withUnsafeBytes(of: UInt32(0x0002_0000).littleEndian) { Array($0) })
+
+        code.append(CppHelperInstructions.Trap.opcode)
+
+        let heapData = Data([0x00, 0x00, 0x00, 0x00])
+        let blob = ProgramBlobBuilder.createStandardProgram(
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
+            readOnlyData: Data(),
+            readWriteData: heapData,
+            heapPages: 0,
+        )
+
+        let (_, _, differences) = await JITParityComparator.compare(
+            blob: blob,
+            testName: "StoreU16",
+        )
+
+        #expect(differences == nil)
+    }
+
     // MARK: - StoreImmU8/U16/U32/U64 Instructions (Opcodes 30-33)
 
     @Test
@@ -375,7 +455,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x20000
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
@@ -416,7 +496,7 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x20000
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
@@ -450,7 +530,7 @@ struct JITLoadStoreTests {
     func jitStoreImmU8Parity() async {
         var code = Data()
 
-        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x20000
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r1, 0x20000
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
 
@@ -479,16 +559,47 @@ struct JITLoadStoreTests {
         )
     }
 
+    @Test
+    func jitStoreImmU32Parity() async {
+        var code = Data()
+
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r1, 0x20000
+        code.append(0x01)
+        code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0002_0000).littleEndian) { Array($0) })
+
+        code.append(CppHelperInstructions.StoreImmIndU32.opcode) // StoreImmIndU32 [r1+0], 0x89ABCDEF
+        code.append(0x11) // rA=1, l_X=1
+        code.append(contentsOf: encodeCompactImmediate(0, length: 1))
+        code.append(contentsOf: encodeCompactImmediate(Int32(bitPattern: 0x89AB_CDEF), length: 4))
+
+        code.append(CppHelperInstructions.Trap.opcode)
+
+        let heapData = Data([0x00, 0x00, 0x00, 0x00])
+        let blob = ProgramBlobBuilder.createStandardProgram(
+            programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
+            readOnlyData: Data(),
+            readWriteData: heapData,
+            heapPages: 0,
+        )
+
+        let (_, _, differences) = await JITParityComparator.compare(
+            blob: blob,
+            testName: "StoreImmU32",
+        )
+
+        #expect(differences == nil)
+    }
+
     // MARK: - Edge Cases
 
     @Test
     func jitLoadInvalidAddress() async {
         // LoadU8 r1, [0xFFFF0000] where address equals memory_size, so it must page fault.
         var code = Data()
-        code.append(PVMOpcodes.loadU8.rawValue)
+        code.append(CppHelperInstructions.LoadU8.opcode)
         code.append(0x01) // r1
         code.append(contentsOf: withUnsafeBytes(of: UInt32(0xFFFF_0000).littleEndian) { Array($0) })
-        code.append(PVMOpcodes.halt.rawValue)
+        code.append(CppHelperInstructions.Fallthrough.opcode)
 
         let blob = ProgramBlobBuilder.createStandardProgram(
             programCode: ProgramBlobBuilder.createProgramCodeBlob(Array(code)),
@@ -517,11 +628,11 @@ struct JITLoadStoreTests {
 
         var code = Data()
 
-        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r1, 0x10000 (read-only)
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r1, 0x10000 (read-only)
         code.append(0x01)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0001_0000).littleEndian) { Array($0) })
 
-        code.append(PVMOpcodes.loadImmU64.rawValue) // LoadImm64 r2, 0xAB
+        code.append(CppHelperInstructions.LoadImm64.opcode) // LoadImm64 r2, 0xAB
         code.append(0x02)
         code.append(contentsOf: withUnsafeBytes(of: UInt64(0x0000_0000_0000_00AB).littleEndian) { Array($0) })
 

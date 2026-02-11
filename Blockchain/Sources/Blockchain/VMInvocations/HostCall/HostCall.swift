@@ -18,7 +18,7 @@ extension HostCall {
         logger.debug("consumed \(gasCost(state: state)) gas, \(state.getGas()) left")
 
         guard state.getGas() >= GasInt(0) else {
-            logger.debug("not enough gas")
+            logger.trace("not enough gas")
             return .exit(.outOfGas)
         }
 
@@ -26,16 +26,16 @@ extension HostCall {
             try await _callImpl(config: config, state: state)
             return .continued
         } catch let e as MemoryError {
-            logger.error("memory error: \(e)")
+            logger.trace("memory error: \(e)")
             return .exit(.pageFault(e.address))
         } catch VMInvocationsError.forceHalt {
-            logger.debug("force halt")
+            logger.trace("force halt")
             return .exit(.halt)
         } catch let e as VMInvocationsError {
-            logger.error("invocation error: \(e)")
+            logger.trace("invocation error: \(e)")
             return .exit(.panic(.trap))
         } catch let e {
-            logger.error("unknown error: \(e)")
+            logger.trace("unknown error: \(e)")
             return .exit(.panic(.trap))
         }
     }
