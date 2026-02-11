@@ -23,6 +23,21 @@ actor ChildProcessManager {
         self.defaultTimeout = defaultTimeout
     }
 
+    /// Mark an FD close-on-exec to prevent descriptor leakage into spawned children.
+    /// Leaked parent IPC FDs can keep peer sockets alive and delay EOF detection.
+    private func setCloseOnExec(fd: Int32) {
+        let currentFlags = fcntl(fd, F_GETFD)
+        guard currentFlags >= 0 else {
+            logger.warning("Failed to read FD flags for \(fd): \(errno)")
+            return
+        }
+
+        let result = fcntl(fd, F_SETFD, currentFlags | FD_CLOEXEC)
+        if result != 0 {
+            logger.warning("Failed to set FD_CLOEXEC for \(fd): \(errno)")
+        }
+    }
+
     /// Spawn a new child process with socketpair for IPC
     ///
     /// - Parameter executablePath: Absolute or relative path to the executable to spawn.
@@ -50,6 +65,9 @@ actor ChildProcessManager {
 
             let parentFD = sockets[0]
             let childFD = sockets[1]
+
+            setCloseOnExec(fd: parentFD)
+            setCloseOnExec(fd: childFD)
 
             logger.debug("Created socketpair: parentFD=\(parentFD), childFD=\(childFD)")
 
@@ -151,6 +169,9 @@ actor ChildProcessManager {
 
             let parentFD = sockets[0]
             let childFD = sockets[1]
+
+            setCloseOnExec(fd: parentFD)
+            setCloseOnExec(fd: childFD)
 
             logger.debug("Created socketpair: parentFD=\(parentFD), childFD=\(childFD)")
 

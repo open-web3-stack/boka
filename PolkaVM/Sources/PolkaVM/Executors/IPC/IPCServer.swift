@@ -87,12 +87,18 @@ public class IPCServer {
                 }
 
             } catch {
-                logger.error("[IPC-SERVER] IPC server error on iteration \(iterationCount): \(error)")
+                if case IPCError.unexpectedEOF = error {
+                    // Host closed its IPC endpoint; this is the normal shutdown path for
+                    // one-shot sandbox executions.
+                    logger.trace("[IPC-SERVER] Host closed IPC connection (EOF), stopping server loop")
+                } else {
+                    logger.error("[IPC-SERVER] IPC server error on iteration \(iterationCount): \(error)")
 
-                // Check if FD is still valid
-                let fdFlags = fcntl(fd, F_GETFL)
-                if fdFlags == -1 {
-                    logger.error("[IPC-SERVER] FD \(fd) became INVALID after error: \(errnoToString(errno))")
+                    // Check if FD is still valid for debugging only on true errors.
+                    let fdFlags = fcntl(fd, F_GETFL)
+                    if fdFlags == -1 {
+                        logger.error("[IPC-SERVER] FD \(fd) became INVALID after error: \(errnoToString(errno))")
+                    }
                 }
 
                 isRunning = false
@@ -272,7 +278,9 @@ public class IPCServer {
                 }
 
                 if result == 0 {
-                    logger.error("[IPC-SERVER] readExactBytes: Got EOF (read returned 0) - expected \(count) bytes but got \(bytesRead)")
+                    logger.trace(
+                        "[IPC-SERVER] readExactBytes: EOF (read returned 0) while expecting \(count) bytes; read \(bytesRead)",
+                    )
                     throw IPCError.unexpectedEOF
                 }
 

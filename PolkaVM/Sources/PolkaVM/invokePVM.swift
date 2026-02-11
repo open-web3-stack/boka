@@ -26,7 +26,12 @@ public func invokePVM(
                 ctx: ctx,
             )
 
-            return (result.exitReason, result.gasUsed, result.outputData)
+            switch result.exitReason {
+            case .pageFault:
+                return (.panic(.trap), result.gasUsed, nil)
+            default:
+                return (result.exitReason, result.gasUsed, result.outputData)
+            }
         } else {
             let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gas, argumentData: argumentData)
             let engine = Engine(config: config, invocationContext: ctx)

@@ -12,9 +12,24 @@ import Utils
 #endif
 
 private let logger = Logger(label: "Boka-Sandbox")
+private let sandboxDebugEnabled: Bool = {
+    guard let value = ProcessInfo.processInfo.environment["BOKA_SANDBOX_DEBUG"]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased(),
+        !value.isEmpty
+    else {
+        return false
+    }
+
+    return value == "1" || value == "true" || value == "yes" || value == "on"
+}()
 
 /// Helper function to write debug messages to stderr
 private func debugWrite(_ message: String) {
+    guard sandboxDebugEnabled else {
+        return
+    }
+
     _ = message.withCString { ptr in
         #if canImport(Glibc)
             Glibc.write(STDERR_FILENO, ptr, message.count)

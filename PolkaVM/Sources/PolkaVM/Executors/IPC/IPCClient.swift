@@ -59,18 +59,14 @@ final class IPCClient: @unchecked Sendable {
         argumentData: Data?,
         executionMode: ExecutionMode,
     ) async throws -> (exitReason: ExitReason, gasUsed: UInt64, outputData: Data?) {
-        print("[IPC-ASYNC] sendExecuteRequest called, about to offload to DispatchQueue")
         // ⚠️ Offload blocking I/O to DispatchQueue to avoid blocking Swift concurrency pool
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                print("[IPC-DISPATCH] DispatchQueue block executing")
                 guard let self else {
-                    print("[IPC-DISPATCH] Self is nil, returning error")
                     continuation.resume(throwing: IPCError.malformedMessage)
                     return
                 }
                 do {
-                    print("[IPC-DISPATCH] About to call sendExecuteRequestBlocking")
                     let result = try sendExecuteRequestBlocking(
                         blob: blob,
                         pc: pc,
@@ -78,10 +74,8 @@ final class IPCClient: @unchecked Sendable {
                         argumentData: argumentData,
                         executionMode: executionMode,
                     )
-                    print("[IPC-DISPATCH] sendExecuteRequestBlocking succeeded, resuming")
                     continuation.resume(returning: result)
                 } catch {
-                    print("[IPC-DISPATCH] sendExecuteRequestBlocking failed: \(error)")
                     continuation.resume(throwing: error)
                 }
             }
