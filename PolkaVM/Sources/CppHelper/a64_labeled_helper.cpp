@@ -712,8 +712,8 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.mov(a64::x0, static_cast<uint64_t>(value));
             a.str(a64::x0, a64::ptr(a64::x19, dest_reg * 8));
 
-            // Load base register value
-            a.ldr(a64::w0, a64::ptr(a64::x19, base_reg * 8));
+            // Load base register value (64-bit, not 32-bit, for halt address check)
+            a.ldr(a64::x0, a64::ptr(a64::x19, base_reg * 8));
 
             // Calculate target = base + offset
             a.mov(a64::w8, static_cast<uint32_t>(offset));
@@ -721,8 +721,10 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
 
             // Check for halt address (0xFFFF0000)
             // This is the djumpHaltAddress constant from Instructions+Helpers.swift
-            a.mov(a64::w1, 0xFFFF0000);
-            a.cmp(a64::w0, a64::w1);
+            // IMPORTANT: Must compare full 64-bit value to match halt address
+            // Load into register to ensure 64-bit comparison (not sign-extended)
+            a.mov(a64::x1, uint64_t(0xFFFF0000));
+            a.cmp(a64::x0, a64::x1);
             a.b_eq(exitLabel);  // Jump to halt exit
 
             // Check if jump table is available
@@ -734,10 +736,10 @@ extern "C" int32_t compilePolkaVMCode_a64_labeled(
             a.ldr(a64::w3, a64::ptr(a64::x24, offsetof(JITHostFunctionTable, jumpTableEntrySize)));
             a.ldr(a64::w4, a64::ptr(a64::x24, offsetof(JITHostFunctionTable, jumpTableEntriesCount)));
 
-            // Validate target != 0
-            a.cbz(a64::w0, pagefaultLabel);  // Invalid target (0)
+            // Validate target != 0 (check full 64-bit x0, not just w0)
+            a.cbz(a64::x0, pagefaultLabel);  // Invalid target (0)
 
-            // Validate target alignment
+            // Validate target alignment (using lower 32 bits w0 for calculation)
             // Calculate entry index: (target / alignmentFactor) - 1
             a.udiv(a64::w5, a64::w0, a64::w2);  // w5 = target / alignmentFactor
             a.msub(a64::w6, a64::w5, a64::w2, a64::w0);  // w6 = remainder = target - (w5 * w2)

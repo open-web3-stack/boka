@@ -845,7 +845,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
             // Special case: check for halt address (0xFFFF0000)
             // This is the djumpHaltAddress constant from Instructions+Helpers.swift
-            a.cmp(x86::rax, 0xFFFF0000);
+            // IMPORTANT: Must compare full 64-bit value to match halt address
+            a.mov(x86::rdx, 0xFFFF0000ull);  // Load 64-bit immediate
+            a.cmp(x86::rax, x86::rdx);  // Compare 64-bit registers
             a.je(exitLabel);
 
             // Check if jump table is available
@@ -863,7 +865,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             a.jz(dispatcherLoopNoJumpTable2);
 
             // Validate target != 0
-            a.test(x86::eax, x86::eax);
+            a.test(x86::rax, x86::rax);
             a.jz(pagefaultLabel);
 
             // Validate target alignment

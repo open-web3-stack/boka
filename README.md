@@ -52,7 +52,10 @@ The Boka CLI supports the following arguments:
 
 ## Testing
 
-- Run Swift tests: `make test`
+- Run all Swift tests: `make test`
+- Run specific package: `cd <package> && swift test`
+- Run with filter: `cd <package> && swift test --filter <test-name>`
+- Verbose output: `swift test --verbose`
 - Run Rust tests: `make test-cargo`
 - Run tests with coverage: `make test-coverage`
 

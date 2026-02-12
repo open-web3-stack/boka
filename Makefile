@@ -25,9 +25,51 @@ deps: .lib/libbls.a .lib/libbandersnatch_vrfs.a .lib/libec.a .lib/libed25519_zeb
 .lib/libmsquic.a:
 	./scripts/external-libs.sh
 
+# Test packages with improved error handling and no SIGPIPE issues
+TEST_PACKAGES := Blockchain Boka Codec Database Fuzzing JAMTests Networking Node PolkaVM RPC Utils
+TEST_FILTER ?=
+
 .PHONY: test
 test: githooks deps
-	./scripts/runTests.sh test
+	@echo "=== Running tests ==="
+	@failed=""; \
+	total_passed=0; \
+	total_failed=0; \
+	for pkg in $(TEST_PACKAGES); do \
+		if [ -n "$$TEST_FILTER" ] && [ "$$pkg" != "$$TEST_FILTER" ]; then \
+			continue; \
+		fi; \
+		printf "Testing %-12s ... " "$$pkg"; \
+		if swift test --package-path "$$pkg" 2>&1 | while IFS= read -r line; do \
+			echo "$$line"; \
+			case "$$line" in \
+				*"Test suite passed"*) \
+					suite_passed="$${line#* }"; \
+					suite_passed="$${suite_passed//[^0-9]/}"; \
+					total_passed=$$((total_passed + suite_passed)); \
+					;; \
+				*"Test suite failed"*) \
+					total_failed=$$((total_failed + 1)); \
+					failed="$$failed $$pkg"; \
+					;; \
+			esac; \
+		done; then \
+			echo "  ✓ PASS"; \
+		else \
+			echo "  ✗ FAIL (exit code $$?)"; \
+			total_failed=$$((total_failed + 1)); \
+			failed="$$failed $$pkg"; \
+		fi; \
+	done; \
+	echo ""; \
+	echo "=== Test Summary ==="; \
+	echo "Passed: $$total_passed tests"; \
+	if [ -n "$$failed" ]; then \
+		echo "Failed packages:$$failed"; \
+		exit 1; \
+	else \
+		echo "All packages passed!"; \
+	fi
 
 .PHONY: test-cargo
 test-cargo:
