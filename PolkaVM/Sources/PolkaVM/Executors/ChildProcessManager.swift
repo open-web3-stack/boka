@@ -48,6 +48,19 @@ actor ChildProcessManager {
     func spawnChildProcess(executablePath: String) async throws -> (handle: ProcessHandle, clientFD: Int32) {
         #if os(Linux)
             logger.debug("Spawning child process: \(executablePath)")
+
+            // Block SIGPIPE during fork/child spawn to prevent termination
+            // SIGPIPE will be handled as EPIPE error on write() instead
+            var blockSet = sigset_t()
+            sigemptyset(&blockSet)
+            sigaddset(&blockSet, SIGPIPE)
+            var oldSet = sigset_t()
+            pthread_sigmask(SIG_BLOCK, &blockSet, &oldSet)
+            defer {
+                // Restore original signal mask
+                _ = pthread_sigmask(SIG_SETMASK, &oldSet, nil)
+            }
+
             // Create socket pair for IPC
             var sockets: [Int32] = [0, 0]
 
@@ -146,10 +159,23 @@ actor ChildProcessManager {
 
                 logger.debug("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
 
-                // Wait a moment for child to start
-                try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                // Wait for child to initialize and become ready
+                // In release mode, processes start faster so we need longer wait
+                // Also validate FD is still valid before returning
+                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
 
-                logger.debug("Parent: Returning handle and parentFD \(parentFD) to caller")
+                // Validate parentFD is still valid after wait
+                let fdFlagsAfterWait = fcntl(parentFD, F_GETFL)
+                if fdFlagsAfterWait == -1 {
+                    let err = errno
+                    logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
+                    // Try to reap the child process
+                    var status: Int32 = 0
+                    _ = Glibc.waitpid(pid, &status, WNOHANG)
+                    throw IPCError.writeFailed(Int(err))
+                }
+
+                logger.debug("Parent: Child ready, returning handle and parentFD \(parentFD) to caller")
                 return (handle, parentFD)
             }
         #elseif os(macOS)
@@ -245,9 +271,20 @@ actor ChildProcessManager {
 
             logger.debug("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
 
-            // Wait a moment for child to start
-            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            // Wait for child to initialize and become ready
+            // In release mode, processes start faster so we need longer wait
+            // Also validate FD is still valid before returning
+            try await Task.sleep(nanoseconds: 500_000_000) // 500ms
 
+            // Validate parentFD is still valid after wait
+            let fdFlagsAfterWait = fcntl(parentFD, F_GETFL)
+            if fdFlagsAfterWait == -1 {
+                let err = errno
+                logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
+                throw IPCError.writeFailed(Int(err))
+            }
+
+            logger.debug("Parent: Child ready, returning handle and parentFD \(parentFD) to caller")
             return (handle, parentFD)
         #else
             throw IPCError.childProcessError("Sandboxed execution is not supported on this platform")

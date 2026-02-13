@@ -172,6 +172,12 @@ final class IPCClient: @unchecked Sendable {
                     if err == EINTR {
                         continue
                     }
+                    // EPIPE: Broken pipe - child has closed its end
+                    // This is expected when worker process terminates
+                    if err == EPIPE {
+                        logger.warning("IPC write failed: Broken pipe (EPIPE) - worker process may have terminated")
+                        throw IPCError.brokenPipe
+                    }
                     logger.error("Failed to write to IPC: \(errnoToString(err))")
                     throw IPCError.writeFailed(Int(err))
                 }
