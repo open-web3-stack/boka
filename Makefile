@@ -80,7 +80,10 @@ test-all: test test-cargo
 
 .PHONY: test-coverage
 test-coverage:
-	./scripts/runTests.sh test --enable-code-coverage
+	@for pkg in $(TEST_PACKAGES); do \
+		echo "Running coverage for $$pkg..."; \
+		swift test --enable-code-coverage --package-path "$$pkg"; \
+	done
 
 .PHONY: build
 build: githooks deps
