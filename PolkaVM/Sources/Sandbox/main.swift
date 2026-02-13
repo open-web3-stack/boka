@@ -11,6 +11,18 @@ import Utils
     import MacOSSandboxSupport
 #endif
 
+#if os(Linux)
+    // Block SIGPIPE at module initialization to prevent termination on broken pipe
+    // When parent closes IPC socket, write() returns EPIPE instead of SIGPIPE signal
+    func blockSIGPIPE() {
+        var blockSet = sigset_t()
+        sigemptyset(&blockSet)
+        sigaddset(&blockSet, SIGPIPE)
+        var oldSet = sigset_t()
+        pthread_sigmask(SIG_BLOCK, &blockSet, &oldSet)
+    }
+#endif
+
 private let logger = Logger(label: "Boka-Sandbox")
 private let sandboxDebugEnabled: Bool = {
     guard let value = ProcessInfo.processInfo.environment["BOKA_SANDBOX_DEBUG"]?
@@ -43,6 +55,11 @@ private func debugWrite(_ message: String) {
 enum SandboxMain {
     static func main() async {
         logger.debug("Boka VM Sandbox starting...")
+        
+        // Block SIGPIPE before any async operations
+        #if os(Linux)
+        blockSIGPIPE()
+        #endif
 
         // DEBUG: Track initialization
         debugWrite("Sandbox: main() started\n")
@@ -100,8 +117,7 @@ enum SandboxMain {
         // When parent closes the IPC socket, writes to stdin will trigger SIGPIPE
         // We ignore SIGPIPE so that write() calls return EPIPE instead of terminating
         signal(SIGPIPE) { _ in
-            // Do nothing - just ignore the signal
-            // This allows write() to return EPIPE instead of terminating
+            // Do nothing - just ignore the signal (will be called synchronously)
         }
 
         debugWrite("Sandbox: Signal handlers set up complete\n")
