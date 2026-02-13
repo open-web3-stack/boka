@@ -96,6 +96,14 @@ enum SandboxMain {
             _exit(5) // Exit code for out of gas
         }
 
+        // Handle SIGPIPE (broken pipe) - ignore it and handle via EPIPE errors
+        // When parent closes the IPC socket, writes to stdin will trigger SIGPIPE
+        // We ignore SIGPIPE so that write() calls return EPIPE instead of terminating
+        signal(SIGPIPE) { _ in
+            // Do nothing - just ignore the signal
+            // This allows write() to return EPIPE instead of terminating
+        }
+
         debugWrite("Sandbox: Signal handlers set up complete\n")
     }
 
