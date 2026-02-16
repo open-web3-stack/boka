@@ -63,15 +63,8 @@ jobs:
         SWIFT_VERSION=$(swift --version 2>&1 | head -n1 | sed -E 's/.*Swift version ([0-9.]+).*/\1/')
         echo "Detected Swift version: $SWIFT_VERSION"
         echo "version=$SWIFT_VERSION" >> $GITHUB_OUTPUT
-    - name: Cache SPM
-      uses: runs-on/cache@v4
-      with:
-        path: '**/.build'
-        key: ${{ runner.os }}-spm-${{ matrix.config }}-swift-${{ steps.swift-version.outputs.version }}-${{ hashFiles('**/Package.resolved', 'PolkaVM/Sources/Sandbox/main.swift') }}
-        restore-keys: |
-          ${{ runner.os }}-spm-${{ matrix.config }}-swift-${{ steps.swift-version.outputs.version }}-
-      env:
-        RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
+    # SPM caching disabled due to 5.7 GB size causing 7+ minute upload delays
+    # The cache save/upload time exceeds the build time, making caching counterproductive
     - name: Cache Cargo
       uses: actions/cache@v4
       with:
