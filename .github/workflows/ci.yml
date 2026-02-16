@@ -67,7 +67,7 @@ jobs:
       uses: runs-on/cache@v4
       with:
         path: '**/.build'
-        key: ${{ runner.os }}-spm-${{ matrix.config }}-swift-${{ steps.swift-version.outputs.version }}-${{ hashFiles('**/Package.resolved') }}
+        key: ${{ runner.os }}-spm-${{ matrix.config }}-swift-${{ steps.swift-version.outputs.version }}-${{ hashFiles('**/Package.resolved', 'PolkaVM/Sources/Sandbox/main.swift') }}
         restore-keys: |
           ${{ runner.os }}-spm-${{ matrix.config }}-swift-${{ steps.swift-version.outputs.version }}-
       env:
