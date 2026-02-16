@@ -15,18 +15,19 @@ import Utils
     // Block SIGPIPE at module initialization to prevent termination on broken pipe
     // When parent closes IPC socket, write() returns EPIPE instead of SIGPIPE signal
     // This MUST be called before any async operations or Swift runtime setup
-    func blockSIGPIPE() {
+    private func blockSIGPIPE() {
         var blockSet = sigset_t()
         sigemptyset(&blockSet)
         sigaddset(&blockSet, SIGPIPE)
         var oldSet = sigset_t()
         pthread_sigmask(SIG_BLOCK, &blockSet, &oldSet)
     }
-#endif
 
-// Block SIGPIPE immediately when module loads
-#if os(Linux)
-private let _blockSIGPIPE = blockSIGPIPE()
+    // Execute at module load time
+    private let _blockSIGPIPE: Void = {
+        blockSIGPIPE()
+        return ()
+    }()
 #endif
 
 private let logger = Logger(label: "Boka-Sandbox")
