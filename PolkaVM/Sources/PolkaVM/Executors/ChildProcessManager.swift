@@ -107,6 +107,14 @@ actor ChildProcessManager {
                 // Child process - DO NOT use logging, locks, or any async-unsafe functions
                 Glibc.close(parentFD)
 
+                // Block SIGPIPE in child to prevent termination on broken pipe
+                // This must be done before execvp to persist after process image replacement
+                var childBlockSet = sigset_t()
+                sigemptyset(&childBlockSet)
+                sigaddset(&childBlockSet, SIGPIPE)
+                var childOldSet = sigset_t()
+                pthread_sigmask(SIG_BLOCK, &childBlockSet, &childOldSet)
+
                 // Redirect stdin/stdout to /dev/null, keep stderr for debugging
                 let devNull = Glibc.open("/dev/null", O_RDWR)
                 if devNull >= 0 {
