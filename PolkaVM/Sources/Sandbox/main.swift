@@ -61,7 +61,7 @@ private func debugWrite(_ message: String) {
 enum SandboxMain {
     static func main() async {
         logger.debug("Boka VM Sandbox starting...")
-        
+
         // DEBUG: Track initialization
         debugWrite("Sandbox: main() started\n")
 
