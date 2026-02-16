@@ -14,6 +14,7 @@ import Utils
 #if os(Linux)
     // Block SIGPIPE at module initialization to prevent termination on broken pipe
     // When parent closes IPC socket, write() returns EPIPE instead of SIGPIPE signal
+    // This MUST be called before any async operations or Swift runtime setup
     func blockSIGPIPE() {
         var blockSet = sigset_t()
         sigemptyset(&blockSet)
@@ -21,6 +22,11 @@ import Utils
         var oldSet = sigset_t()
         pthread_sigmask(SIG_BLOCK, &blockSet, &oldSet)
     }
+#endif
+
+// Block SIGPIPE immediately when module loads
+#if os(Linux)
+private let _blockSIGPIPE = blockSIGPIPE()
 #endif
 
 private let logger = Logger(label: "Boka-Sandbox")
@@ -56,11 +62,6 @@ enum SandboxMain {
     static func main() async {
         logger.debug("Boka VM Sandbox starting...")
         
-        // Block SIGPIPE before any async operations
-        #if os(Linux)
-        blockSIGPIPE()
-        #endif
-
         // DEBUG: Track initialization
         debugWrite("Sandbox: main() started\n")
 
