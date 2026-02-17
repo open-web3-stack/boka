@@ -21,17 +21,6 @@ final class IPCClient: @unchecked Sendable {
 
     init(timeout: TimeInterval = 30.0) {
         self.timeout = timeout
-
-        #if os(Linux)
-            // Block SIGPIPE for this thread to prevent termination on broken pipe
-            // When sandbox process terminates, write() will return EPIPE instead
-            // of delivering SIGPIPE signal that would crash the process.
-            var blockSet = sigset_t()
-            sigemptyset(&blockSet)
-            sigaddset(&blockSet, SIGPIPE)
-            var oldSet = sigset_t()
-            pthread_sigmask(SIG_BLOCK, &blockSet, &oldSet)
-        #endif
     }
 
     /// Set the file descriptor for communication
