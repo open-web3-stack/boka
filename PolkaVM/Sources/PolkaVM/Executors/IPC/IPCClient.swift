@@ -160,7 +160,12 @@ final class IPCClient: @unchecked Sendable {
                 let ptr = baseAddr.advanced(by: bytesWritten)
                 let result = ptr.withMemoryRebound(to: UInt8.self, capacity: totalBytes - bytesWritten) {
                     #if canImport(Glibc)
-                        Glibc.write(fd, $0, totalBytes - bytesWritten)
+                        #if os(Linux)
+                            // Avoid process-level SIGPIPE on closed socket FDs. We want EPIPE instead.
+                            Glibc.send(fd, $0, totalBytes - bytesWritten, Int32(MSG_NOSIGNAL))
+                        #else
+                            Glibc.write(fd, $0, totalBytes - bytesWritten)
+                        #endif
                     #elseif canImport(Darwin)
                         Darwin.write(fd, $0, totalBytes - bytesWritten)
                     #endif
