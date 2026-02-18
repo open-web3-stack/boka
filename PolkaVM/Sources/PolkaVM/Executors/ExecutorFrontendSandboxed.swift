@@ -34,9 +34,23 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         // Fall back to in-process execution when context is provided
         if ctx != nil {
             logger.warning("Sandboxed mode does not support InvocationContext yet - falling back to in-process execution")
-            // Use in-process executor as fallback
-            let inProcessFrontend = ExecutorFrontendInProcess(mode: mode)
-            return await inProcessFrontend.execute(
+            return await executeInProcess(
+                config: config,
+                blob: blob,
+                pc: pc,
+                gas: gas,
+                argumentData: argumentData,
+                ctx: ctx,
+            )
+        }
+
+        if shouldFallbackToInProcessWhenSandboxMissing,
+           !SandboxExecutableResolver.isExecutableAvailable(at: sandboxPath)
+        {
+            logger.warning(
+                "Sandbox executable not found at \(sandboxPath); falling back to in-process execution",
+            )
+            return await executeInProcess(
                 config: config,
                 blob: blob,
                 pc: pc,
@@ -95,13 +109,12 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
             logger.error("Sandboxed execution failed: \(error)")
 
             if shouldFallbackToInProcessWhenSandboxMissing,
-               isMissingSandboxExecutableError(error)
+               shouldFallbackForMissingSandbox(error)
             {
                 logger.warning(
                     "Sandbox executable not found at \(sandboxPath); falling back to in-process execution",
                 )
-                let inProcessFrontend = ExecutorFrontendInProcess(mode: mode)
-                return await inProcessFrontend.execute(
+                return await executeInProcess(
                     config: config,
                     blob: blob,
                     pc: pc,
@@ -134,11 +147,38 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         }
     }
 
-    private func isMissingSandboxExecutableError(_ error: Error) -> Bool {
-        guard case let IPCError.writeFailed(errorCode) = error else {
+    private func shouldFallbackForMissingSandbox(_ error: Error) -> Bool {
+        if SandboxExecutableResolver.isExecutableAvailable(at: sandboxPath) {
             return false
         }
 
-        return errorCode == Int(ENOENT)
+        switch error {
+        case let IPCError.writeFailed(errorCode):
+            return errorCode == Int(ENOENT)
+        case IPCError.brokenPipe:
+            // execvp failure in the child can surface as EPIPE in parent writes.
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func executeInProcess(
+        config: PvmConfig,
+        blob: Data,
+        pc: UInt32,
+        gas: Gas,
+        argumentData: Data?,
+        ctx: (any InvocationContext)?,
+    ) async -> VMExecutionResult {
+        let inProcessFrontend = ExecutorFrontendInProcess(mode: mode)
+        return await inProcessFrontend.execute(
+            config: config,
+            blob: blob,
+            pc: pc,
+            gas: gas,
+            argumentData: argumentData,
+            ctx: ctx,
+        )
     }
 }

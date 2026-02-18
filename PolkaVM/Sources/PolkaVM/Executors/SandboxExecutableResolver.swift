@@ -7,14 +7,6 @@ struct SandboxExecutableResolution {
 
 enum SandboxExecutableResolver {
     private static let executableName = "boka-sandbox"
-    private static let buildSubpaths = [
-        ".build/debug/boka-sandbox",
-        ".build/release/boka-sandbox",
-        ".build/arm64-apple-macosx/debug/boka-sandbox",
-        ".build/arm64-apple-macosx/release/boka-sandbox",
-        ".build/x86_64-apple-macosx/debug/boka-sandbox",
-        ".build/x86_64-apple-macosx/release/boka-sandbox",
-    ]
     private static let resolvedDefaultPath: String = resolveDefaultPath()
 
     static func resolve() -> SandboxExecutableResolution {
@@ -28,6 +20,26 @@ enum SandboxExecutableResolver {
         return SandboxExecutableResolution(path: resolvedDefaultPath, isExplicit: false)
     }
 
+    static func isExecutableAvailable(at path: String) -> Bool {
+        let fileManager = FileManager.default
+        if path.contains("/") {
+            return fileManager.isExecutableFile(atPath: path)
+        }
+
+        let pathValue = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        for entry in pathValue.split(separator: ":") where !entry.isEmpty {
+            let candidate = URL(fileURLWithPath: String(entry), isDirectory: true)
+                .appendingPathComponent(path)
+                .standardizedFileURL
+                .path
+            if fileManager.isExecutableFile(atPath: candidate) {
+                return true
+            }
+        }
+
+        return false
+    }
+
     private static func resolveDefaultPath() -> String {
         if let pathFromPATH = lookupInPath() {
             return pathFromPATH
@@ -38,13 +50,6 @@ enum SandboxExecutableResolver {
             let directCandidate = root.appendingPathComponent(executableName).standardizedFileURL.path
             if fileManager.isExecutableFile(atPath: directCandidate) {
                 return directCandidate
-            }
-
-            for subpath in buildSubpaths {
-                let candidate = root.appendingPathComponent(subpath).standardizedFileURL.path
-                if fileManager.isExecutableFile(atPath: candidate) {
-                    return candidate
-                }
             }
         }
 
