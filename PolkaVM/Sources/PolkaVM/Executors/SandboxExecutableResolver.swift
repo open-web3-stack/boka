@@ -14,7 +14,8 @@ enum SandboxExecutableResolver {
             .trimmingCharacters(in: .whitespacesAndNewlines),
             !explicitPath.isEmpty
         {
-            return SandboxExecutableResolution(path: explicitPath, isExplicit: true)
+            let available = isExecutableAvailable(at: explicitPath)
+            return SandboxExecutableResolution(path: explicitPath, isExplicit: available)
         }
 
         return SandboxExecutableResolution(path: resolvedDefaultPath, isExplicit: false)
