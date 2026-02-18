@@ -21,20 +21,16 @@ typealias CppHelperInstructions = CppHelper.Instructions
 
 private let logger = Logger(label: "JITInstructionTestHelpers")
 
-private func locateSandboxExecutablePath() -> String? {
-    let fileManager = FileManager.default
-    let currentDirectory = fileManager.currentDirectoryPath
+private func sandboxExecutableSiblingToTestBinary() -> String? {
+    guard let testExecutablePath = CommandLine.arguments.first, !testExecutablePath.isEmpty else {
+        return nil
+    }
 
-    let candidates = [
-        "\(currentDirectory)/.build/debug/boka-sandbox",
-        "\(currentDirectory)/.build/release/boka-sandbox",
-        "\(currentDirectory)/.build/arm64-apple-macosx/debug/boka-sandbox",
-        "\(currentDirectory)/.build/arm64-apple-macosx/release/boka-sandbox",
-        "\(currentDirectory)/.build/x86_64-apple-macosx/debug/boka-sandbox",
-        "\(currentDirectory)/.build/x86_64-apple-macosx/release/boka-sandbox",
-    ]
-
-    return candidates.first { fileManager.isExecutableFile(atPath: $0) }
+    let siblingSandboxPath = URL(fileURLWithPath: testExecutablePath)
+        .deletingLastPathComponent()
+        .appendingPathComponent("boka-sandbox")
+        .path
+    return FileManager.default.isExecutableFile(atPath: siblingSandboxPath) ? siblingSandboxPath : nil
 }
 
 private func ensureSandboxPathConfigured() {
@@ -43,10 +39,16 @@ private func ensureSandboxPathConfigured() {
         return
     }
 
-    guard let sandboxPath = locateSandboxExecutablePath() else {
+    if let siblingSandboxPath = sandboxExecutableSiblingToTestBinary() {
+        _ = setenv(key, siblingSandboxPath, 1)
         return
     }
-    _ = setenv(key, sandboxPath, 1)
+
+    let resolution = SandboxExecutableResolver.resolve()
+    guard SandboxExecutableResolver.isExecutableAvailable(at: resolution.path) else {
+        return
+    }
+    _ = setenv(key, resolution.path, 1)
 }
 
 // MARK: - JIT Test Result

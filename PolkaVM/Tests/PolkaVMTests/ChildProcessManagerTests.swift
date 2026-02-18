@@ -84,8 +84,8 @@ struct ChildProcessManagerTests {
                 }
             }
 
-            guard let sandboxPath = locateSandboxExecutablePath() else {
-                Issue.record("Unable to locate built boka-sandbox executable for integration test")
+            guard let sandboxPath = resolveSandboxExecutablePathForTests() else {
+                Issue.record("Unable to resolve sandbox executable. Set BOKA_SANDBOX_PATH for tests.")
                 return
             }
 
@@ -118,24 +118,30 @@ struct ChildProcessManagerTests {
     }
 }
 
-private func locateSandboxExecutablePath() -> String? {
+private func resolveSandboxExecutablePathForTests() -> String? {
     let fileManager = FileManager.default
-    let currentDirectory = fileManager.currentDirectoryPath
-    let testExecutableDirectory = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().path
-
-    let candidates = [
-        "\(currentDirectory)/.build/debug/boka-sandbox",
-        "\(currentDirectory)/.build/release/boka-sandbox",
-        "\(currentDirectory)/.build/arm64-apple-macosx/debug/boka-sandbox",
-        "\(currentDirectory)/.build/arm64-apple-macosx/release/boka-sandbox",
-        "\(currentDirectory)/.build/x86_64-apple-macosx/debug/boka-sandbox",
-        "\(currentDirectory)/.build/x86_64-apple-macosx/release/boka-sandbox",
-        "\(testExecutableDirectory)/boka-sandbox",
-    ]
-
-    for path in candidates where fileManager.isExecutableFile(atPath: path) {
-        return path
+    let key = "BOKA_SANDBOX_PATH"
+    if let explicitPath = ProcessInfo.processInfo.environment[key]?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+        !explicitPath.isEmpty
+    {
+        return SandboxExecutableResolver.isExecutableAvailable(at: explicitPath) ? explicitPath : nil
     }
 
-    return nil
+    if let testExecutablePath = CommandLine.arguments.first, !testExecutablePath.isEmpty {
+        let siblingSandboxPath = URL(fileURLWithPath: testExecutablePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("boka-sandbox")
+            .path
+        if fileManager.isExecutableFile(atPath: siblingSandboxPath) {
+            return siblingSandboxPath
+        }
+    }
+
+    let resolution = SandboxExecutableResolver.resolve()
+    guard SandboxExecutableResolver.isExecutableAvailable(at: resolution.path) else {
+        return nil
+    }
+
+    return resolution.path
 }
