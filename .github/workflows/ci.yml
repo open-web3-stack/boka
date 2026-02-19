@@ -109,7 +109,12 @@ jobs:
         components: rustfmt
     - name: Configure Sandbox Executable Path
       run: |
+        swift build -c ${{ matrix.config }} --package-path PolkaVM --product boka-sandbox
         SANDBOX_BIN="$(swift build -c ${{ matrix.config }} --package-path PolkaVM --show-bin-path)/boka-sandbox"
+        if [ ! -x "$SANDBOX_BIN" ]; then
+          echo "boka-sandbox executable not found at: $SANDBOX_BIN"
+          exit 1
+        fi
         echo "BOKA_SANDBOX_PATH=$SANDBOX_BIN" >> "$GITHUB_ENV"
     - name: Build (Debug)
       if: matrix.config == 'debug'

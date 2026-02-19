@@ -94,6 +94,7 @@ final class IPCClient: @unchecked Sendable {
             logger.error("[IPC] No file descriptor set")
             throw IPCError.malformedMessage
         }
+        let deadline = DispatchTime.now() + timeout
 
         let timestamp = Date().timeIntervalSince1970
         logger.trace("[IPC][\(timestamp)] Using file descriptor: \(fd)")
@@ -124,11 +125,11 @@ final class IPCClient: @unchecked Sendable {
         )
 
         logger.trace("[IPC][\(timestamp)] Writing \(requestData.count) bytes to FD \(fd)")
-        try writeData(requestData, to: fd)
+        try writeData(requestData, to: fd, deadline: deadline)
         logger.trace("[IPC][\(timestamp)] Write completed successfully")
 
         // Wait for response (blocking)
-        let responseMessage = try readMessageBlocking(requestId: requestId, from: fd)
+        let responseMessage = try readMessageBlocking(requestId: requestId, from: fd, deadline: deadline)
 
         // Parse response
         let response = try IPCProtocol.parseExecuteResponse(responseMessage)
@@ -147,7 +148,7 @@ final class IPCClient: @unchecked Sendable {
     }
 
     /// Write data to file descriptor
-    private func writeData(_ data: Data, to fd: Int32) throws {
+    private func writeData(_ data: Data, to fd: Int32, deadline: DispatchTime) throws {
         _ = try data.withUnsafeBytes { rawBuffer in
             guard let baseAddr = rawBuffer.baseAddress else {
                 throw IPCError.writeFailed(Int(EINVAL))
@@ -157,6 +158,12 @@ final class IPCClient: @unchecked Sendable {
             let totalBytes = rawBuffer.count
 
             while bytesWritten < totalBytes {
+                do {
+                    try waitForFileDescriptor(fd, events: Int16(POLLOUT), deadline: deadline)
+                } catch IPCError.unexpectedEOF {
+                    throw IPCError.brokenPipe
+                }
+
                 let ptr = baseAddr.advanced(by: bytesWritten)
                 let result = ptr.withMemoryRebound(to: UInt8.self, capacity: totalBytes - bytesWritten) {
                     #if canImport(Glibc)
@@ -175,6 +182,10 @@ final class IPCClient: @unchecked Sendable {
                     let err = errno
                     // EINTR: Interrupted system call - retry the write
                     if err == EINTR {
+                        continue
+                    }
+                    // Retry if socket temporarily can't accept writes.
+                    if err == EAGAIN || err == EWOULDBLOCK {
                         continue
                     }
                     // EPIPE: Broken pipe - child has closed its end
@@ -200,13 +211,14 @@ final class IPCClient: @unchecked Sendable {
     /// Use readMessageBlocking which is called via DispatchQueue offloading instead.
     private func readMessage(requestId: UInt32, from fd: Int32) async throws -> IPCMessage {
         // Delegate to the blocking version
-        try readMessageBlocking(requestId: requestId, from: fd)
+        let deadline = DispatchTime.now() + timeout
+        return try readMessageBlocking(requestId: requestId, from: fd, deadline: deadline)
     }
 
     /// Read message from file descriptor (blocking version for DispatchQueue offloading)
-    private func readMessageBlocking(requestId: UInt32, from fd: Int32) throws -> IPCMessage {
+    private func readMessageBlocking(requestId: UInt32, from fd: Int32, deadline: DispatchTime) throws -> IPCMessage {
         // Read length prefix (4 bytes)
-        let lengthData = try readExactBytes(IPCProtocol.lengthPrefixSize, from: fd)
+        let lengthData = try readExactBytes(IPCProtocol.lengthPrefixSize, from: fd, deadline: deadline)
 
         let length = lengthData.withUnsafeBytes {
             $0.load(as: UInt32.self).littleEndian
@@ -217,7 +229,7 @@ final class IPCClient: @unchecked Sendable {
         }
 
         // Read message payload
-        let messageData = try readExactBytes(Int(length), from: fd)
+        let messageData = try readExactBytes(Int(length), from: fd, deadline: deadline)
 
         // Decode message
         let decodeResult = try? IPCProtocol.decodeMessage(lengthData + messageData)
@@ -235,11 +247,13 @@ final class IPCClient: @unchecked Sendable {
     }
 
     /// Read exact number of bytes from file descriptor
-    private func readExactBytes(_ count: Int, from fd: Int32) throws -> Data {
+    private func readExactBytes(_ count: Int, from fd: Int32, deadline: DispatchTime) throws -> Data {
         var buffer = Data(count: count)
         var bytesRead = 0
 
         while bytesRead < count {
+            try waitForFileDescriptor(fd, events: Int16(POLLIN), deadline: deadline)
+
             try buffer.withUnsafeMutableBytes { rawBuffer in
                 guard let baseAddr = rawBuffer.baseAddress else {
                     throw IPCError.readFailed(Int(EINVAL))
@@ -260,6 +274,10 @@ final class IPCClient: @unchecked Sendable {
                     if err == EINTR {
                         return
                     }
+                    // Retry if socket temporarily has no bytes available.
+                    if err == EAGAIN || err == EWOULDBLOCK {
+                        return
+                    }
                     logger.error("Failed to read from IPC: \(errnoToString(err))")
                     throw IPCError.readFailed(Int(err))
                 }
@@ -273,6 +291,68 @@ final class IPCClient: @unchecked Sendable {
         }
 
         return buffer
+    }
+
+    private func waitForFileDescriptor(_ fd: Int32, events: Int16, deadline: DispatchTime) throws {
+        var pollDescriptor = pollfd(fd: fd, events: events, revents: 0)
+
+        while true {
+            guard let timeoutMilliseconds = remainingPollTimeoutMilliseconds(until: deadline) else {
+                throw IPCError.timeout
+            }
+
+            #if canImport(Glibc)
+                let result = Glibc.poll(&pollDescriptor, 1, timeoutMilliseconds)
+            #elseif canImport(Darwin)
+                let result = Darwin.poll(&pollDescriptor, 1, timeoutMilliseconds)
+            #endif
+
+            if result == 0 {
+                throw IPCError.timeout
+            }
+
+            if result < 0 {
+                let err = errno
+                if err == EINTR {
+                    continue
+                }
+                throw IPCError.readFailed(Int(err))
+            }
+
+            if pollDescriptor.revents & Int16(POLLNVAL) != 0 {
+                throw IPCError.readFailed(Int(EBADF))
+            }
+
+            if pollDescriptor.revents & Int16(POLLERR) != 0 {
+                throw IPCError.readFailed(Int(EIO))
+            }
+
+            if pollDescriptor.revents & Int16(POLLHUP) != 0,
+               pollDescriptor.revents & events == 0
+            {
+                throw IPCError.unexpectedEOF
+            }
+
+            if pollDescriptor.revents & events != 0 {
+                return
+            }
+        }
+    }
+
+    private func remainingPollTimeoutMilliseconds(until deadline: DispatchTime) -> Int32? {
+        let now = DispatchTime.now().uptimeNanoseconds
+        let deadlineNanos = deadline.uptimeNanoseconds
+        guard deadlineNanos > now else {
+            return nil
+        }
+
+        let remainingNanos = deadlineNanos - now
+        let milliseconds = remainingNanos / 1_000_000
+        if milliseconds == 0 {
+            return 1
+        }
+
+        return Int32(min(milliseconds, UInt64(Int32.max)))
     }
 
     /// Convert errno to string (thread-safe)
