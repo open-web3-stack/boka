@@ -163,4 +163,5 @@ enum IPCError: Error {
     case readFailed(Int) // errno
     case timeout
     case unexpectedEOF
+    case brokenPipe // EPIPE - child process closed its end
 }

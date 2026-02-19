@@ -17,7 +17,7 @@ public func accumulate(
     logger.debug("accumulating service index: \(serviceIndex), gas: \(gas)")
 
     guard var accumulatingAccountDetails = try await state.accounts.value.get(serviceAccount: serviceIndex) else {
-        logger.error("service account not found for service index: \(serviceIndex)")
+        logger.debug("service account not found for service index: \(serviceIndex)")
         return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), provide: [])
     }
 
@@ -33,7 +33,7 @@ public func accumulate(
         serviceAccount: serviceIndex,
         preimageHash: accumulatingAccountDetails.codeHash,
     ) else {
-        logger.error("code preimage not found for service index: \(serviceIndex)")
+        logger.debug("code preimage not found for service index: \(serviceIndex)")
         return .init(state: state, transfers: [], commitment: nil, gasUsed: Gas(0), provide: [])
     }
 

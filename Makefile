@@ -25,9 +25,34 @@ deps: .lib/libbls.a .lib/libbandersnatch_vrfs.a .lib/libec.a .lib/libed25519_zeb
 .lib/libmsquic.a:
 	./scripts/external-libs.sh
 
+# Test packages
+TEST_PACKAGES := Blockchain Boka Codec Database Fuzzing JAMTests Networking Node PolkaVM RPC Utils
+TEST_FILTER ?=
+
 .PHONY: test
 test: githooks deps
-	./scripts/runTests.sh test
+	@echo "=== Running tests ==="
+	@failed=""; \
+	for pkg in $(TEST_PACKAGES); do \
+		if [ -n "$$TEST_FILTER" ] && [ "$$pkg" != "$$TEST_FILTER" ]; then \
+			continue; \
+		fi; \
+		printf "Testing %-12s ...\n" "$$pkg"; \
+		if swift test --package-path "$$pkg"; then \
+			echo "  ✓ PASS"; \
+		else \
+			echo "  ✗ FAIL (exit code $$?)"; \
+			failed="$$failed $$pkg"; \
+		fi; \
+	done; \
+	echo ""; \
+	echo "=== Test Summary ==="; \
+	if [ -n "$$failed" ]; then \
+		echo "Failed packages:$$failed"; \
+		exit 1; \
+	else \
+		echo "All packages passed!"; \
+	fi
 
 .PHONY: test-cargo
 test-cargo:
@@ -38,7 +63,10 @@ test-all: test test-cargo
 
 .PHONY: test-coverage
 test-coverage:
-	./scripts/runTests.sh test --enable-code-coverage
+	@for pkg in $(TEST_PACKAGES); do \
+		echo "Running coverage for $$pkg..."; \
+		swift test --enable-code-coverage --package-path "$$pkg"; \
+	done
 
 .PHONY: build
 build: githooks deps

@@ -12,12 +12,13 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
     private let mode: ExecutionMode
     private let childProcessManager: ChildProcessManager
     private let sandboxPath: String
+    private let shouldFallbackToInProcessWhenSandboxMissing: Bool
 
     init(mode: ExecutionMode) {
         self.mode = mode
-        // Default to "boka-sandbox", can be overridden by setting the environment variable
-        // or by creating the Executor with a custom sandbox path
-        sandboxPath = ProcessInfo.processInfo.environment["BOKA_SANDBOX_PATH"] ?? "boka-sandbox"
+        let resolution = SandboxExecutableResolver.resolve()
+        sandboxPath = resolution.path
+        shouldFallbackToInProcessWhenSandboxMissing = !resolution.isExplicit
         childProcessManager = ChildProcessManager()
     }
 
@@ -33,9 +34,23 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         // Fall back to in-process execution when context is provided
         if ctx != nil {
             logger.warning("Sandboxed mode does not support InvocationContext yet - falling back to in-process execution")
-            // Use in-process executor as fallback
-            let inProcessFrontend = ExecutorFrontendInProcess(mode: mode)
-            return await inProcessFrontend.execute(
+            return await executeInProcess(
+                config: config,
+                blob: blob,
+                pc: pc,
+                gas: gas,
+                argumentData: argumentData,
+                ctx: ctx,
+            )
+        }
+
+        if shouldFallbackToInProcessWhenSandboxMissing,
+           !SandboxExecutableResolver.isExecutableAvailable(at: sandboxPath)
+        {
+            logger.warning(
+                "Sandbox executable not found at \(sandboxPath); falling back to in-process execution",
+            )
+            return await executeInProcess(
                 config: config,
                 blob: blob,
                 pc: pc,
@@ -93,6 +108,22 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
         } catch {
             logger.error("Sandboxed execution failed: \(error)")
 
+            if shouldFallbackToInProcessWhenSandboxMissing,
+               shouldFallbackForMissingSandbox(error)
+            {
+                logger.warning(
+                    "Sandbox executable not found at \(sandboxPath); falling back to in-process execution",
+                )
+                return await executeInProcess(
+                    config: config,
+                    blob: blob,
+                    pc: pc,
+                    gas: gas,
+                    argumentData: argumentData,
+                    ctx: ctx,
+                )
+            }
+
             // Clean up child process if it was spawned
             if let handle {
                 // Try to kill the process and reap it to avoid zombies
@@ -114,5 +145,40 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 outputData: nil,
             )
         }
+    }
+
+    private func shouldFallbackForMissingSandbox(_ error: Error) -> Bool {
+        if SandboxExecutableResolver.isExecutableAvailable(at: sandboxPath) {
+            return false
+        }
+
+        switch error {
+        case let IPCError.writeFailed(errorCode):
+            return errorCode == Int(ENOENT)
+        case IPCError.brokenPipe:
+            // execvp failure in the child can surface as EPIPE in parent writes.
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func executeInProcess(
+        config: PvmConfig,
+        blob: Data,
+        pc: UInt32,
+        gas: Gas,
+        argumentData: Data?,
+        ctx: (any InvocationContext)?,
+    ) async -> VMExecutionResult {
+        let inProcessFrontend = ExecutorFrontendInProcess(mode: mode)
+        return await inProcessFrontend.execute(
+            config: config,
+            blob: blob,
+            pc: pc,
+            gas: gas,
+            argumentData: argumentData,
+            ctx: ctx,
+        )
     }
 }

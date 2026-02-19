@@ -68,7 +68,9 @@ public struct SandboxPoolConfiguration: Sendable {
         self.allowOverflowWorkers = allowOverflowWorkers
         self.maxOverflowWorkers = maxOverflowWorkers
         self.exhaustionPolicy = exhaustionPolicy
-        self.sandboxPath = sandboxPath
+        self.sandboxPath = sandboxPath == "boka-sandbox"
+            ? SandboxExecutableResolver.resolve().path
+            : sandboxPath
     }
 
     /// Default configuration optimized for throughput

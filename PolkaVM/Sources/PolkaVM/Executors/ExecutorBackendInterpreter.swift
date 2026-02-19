@@ -18,10 +18,20 @@ final class ExecutorBackendInterpreter: ExecutorBackend {
             let engine = Engine(config: config, invocationContext: ctx)
             let exitReason = await engine.execute(state: state)
             let gasUsed = gas - Gas(state.getGas())
+
+            let outputData: Data?
+            switch exitReason {
+            case .halt:
+                let (addr, len): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+                outputData = (try? state.readMemory(address: addr, length: Int(len))) ?? Data()
+            default:
+                outputData = nil
+            }
+
             return VMExecutionResult(
                 exitReason: exitReason,
                 gasUsed: gasUsed,
-                outputData: nil,
+                outputData: outputData,
                 finalRegisters: state.getRegisters(),
                 finalPC: state.pc,
             )

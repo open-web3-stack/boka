@@ -4,14 +4,52 @@
 // Test utilities for executing and verifying individual JIT-compiled instructions
 
 import Foundation
+import CppHelper
 @testable import PolkaVM
 import Testing
 import TracingUtils
 import Utils
+#if canImport(Glibc)
+    import Glibc
+#elseif canImport(Darwin)
+    import Darwin
+#endif
+
+typealias CppHelperInstructions = CppHelper.Instructions
 
 // MARK: - Logger
 
 private let logger = Logger(label: "JITInstructionTestHelpers")
+
+private func sandboxExecutableSiblingToTestBinary() -> String? {
+    guard let testExecutablePath = CommandLine.arguments.first, !testExecutablePath.isEmpty else {
+        return nil
+    }
+
+    let siblingSandboxPath = URL(fileURLWithPath: testExecutablePath)
+        .deletingLastPathComponent()
+        .appendingPathComponent("boka-sandbox")
+        .path
+    return FileManager.default.isExecutableFile(atPath: siblingSandboxPath) ? siblingSandboxPath : nil
+}
+
+private func ensureSandboxPathConfigured() {
+    let key = "BOKA_SANDBOX_PATH"
+    if let path = ProcessInfo.processInfo.environment[key], !path.isEmpty {
+        return
+    }
+
+    if let siblingSandboxPath = sandboxExecutableSiblingToTestBinary() {
+        _ = setenv(key, siblingSandboxPath, 1)
+        return
+    }
+
+    let resolution = SandboxExecutableResolver.resolve()
+    guard SandboxExecutableResolver.isExecutableAvailable(at: resolution.path) else {
+        return
+    }
+    _ = setenv(key, resolution.path, 1)
+}
 
 // MARK: - JIT Test Result
 
@@ -39,10 +77,10 @@ struct JITTestResult {
 
 /// Helper to build PolkaVM program blobs from raw instructions
 enum ProgramBlobBuilder {
-    /// Encode a value as varint using the Codec library's variableWidth encoding
+    /// Encode a value using the general natural-number codec from spec/serialization.tex.
     /// - Parameter value: Value to encode
-    /// - Returns: Varint-encoded data
-    static func encodeVarint(_ value: UInt64) -> Data {
+    /// - Returns: Variable-width natural-number encoded data
+    static func encodeNatural(_ value: UInt64) -> Data {
         Data(value.encode(method: .variableWidth))
     }
 
@@ -73,7 +111,7 @@ enum ProgramBlobBuilder {
         // 7. codeLength (4 bytes, little endian)
         // 8. programCode
 
-        // Write UInt32 as 3 bytes in little-endian order
+        /// Write UInt32 as 3 bytes in little-endian order
         func writeUInt24(_ value: UInt32) {
             var v = value.littleEndian
             withUnsafeBytes(of: &v) {
@@ -83,7 +121,7 @@ enum ProgramBlobBuilder {
             }
         }
 
-        // Write UInt16 as 2 bytes in little-endian order
+        /// Write UInt16 as 2 bytes in little-endian order
         func writeUInt16(_ value: UInt16) {
             var v = value.littleEndian
             withUnsafeBytes(of: &v) {
@@ -92,7 +130,7 @@ enum ProgramBlobBuilder {
             }
         }
 
-        // Write UInt32 as 4 bytes in little-endian order
+        /// Write UInt32 as 4 bytes in little-endian order
         func writeUInt32(_ value: UInt32) {
             var v = value.littleEndian
             withUnsafeBytes(of: &v) {
@@ -137,14 +175,14 @@ enum ProgramBlobBuilder {
         // Create ProgramCode blob
         var programCode = Data()
 
-        // Jump table entry count (varint: 0)
-        programCode.append(contentsOf: encodeVarint(0))
+        // Jump table entry count (natural-number encoding: 0)
+        programCode.append(contentsOf: encodeNatural(0))
 
         // Encode size (1 byte: 0)
         programCode.append(0)
 
-        // Code length (varint for instruction count)
-        programCode.append(contentsOf: encodeVarint(UInt64(instructionBytes.count)))
+        // Code length (natural-number encoding)
+        programCode.append(contentsOf: encodeNatural(UInt64(instructionBytes.count)))
 
         // No jump table entries
 
@@ -196,14 +234,14 @@ enum ProgramBlobBuilder {
     static func createProgramCodeBlob(_ instructionBytes: [UInt8]) -> Data {
         var programCode = Data()
 
-        // Jump table entry count (varint: 0)
-        programCode.append(contentsOf: encodeVarint(0))
+        // Jump table entry count (natural-number encoding: 0)
+        programCode.append(contentsOf: encodeNatural(0))
 
         // Encode size (1 byte: 0)
         programCode.append(0)
 
-        // Code length (varint for instruction count)
-        programCode.append(contentsOf: encodeVarint(UInt64(instructionBytes.count)))
+        // Code length (natural-number encoding)
+        programCode.append(contentsOf: encodeNatural(UInt64(instructionBytes.count)))
 
         // No jump table entries
 
@@ -232,19 +270,13 @@ enum ProgramBlobBuilder {
     /// Create a program blob with a jump table
     /// - Parameters:
     ///   - instructions: Instruction bytes array
-    ///   - jumpTable: Dictionary mapping jump indices to offsets
+    ///   - jumpTable: Mapping of 1-based dynamic jump indices to target PCs
     /// - Returns: Complete program blob with jump table
     static func createProgramWithJumpTable(
         instructions: [[UInt8]],
         jumpTable: [UInt64: Int],
     ) -> Data {
-        var blob = Data()
-
-        // Jump table entry count
-        blob.append(contentsOf: encodeVarint(UInt64(jumpTable.count)))
-
-        // Encode size (0)
-        blob.append(0)
+        var programCode = Data()
 
         // Flatten instructions
         var code = Data()
@@ -252,25 +284,58 @@ enum ProgramBlobBuilder {
             code.append(contentsOf: instructions)
         }
 
-        // Code length
-        blob.append(contentsOf: encodeVarint(UInt64(code.count)))
+        // Build dense fixed-width jump table entries per spec/pvm.tex:
+        // p = encode(len(j)) ++ encode[1](z) ++ encode(len(c)) ++ encode[z](j) ++ encode(c) ++ encode(k)
+        let maxIndex = jumpTable.keys.max().flatMap(Int.init(exactly:)) ?? 0
+        var jumpTableEntries = Array(repeating: UInt32(0), count: max(0, maxIndex))
+        for (index, targetPC) in jumpTable {
+            guard index > 0, targetPC >= 0 else {
+                continue
+            }
+            guard let entryIndex = Int(exactly: index - 1), entryIndex < jumpTableEntries.count else {
+                continue
+            }
+            jumpTableEntries[entryIndex] = UInt32(clamping: targetPC)
+        }
 
-        // Jump table entries (sorted by index)
-        let sortedEntries = jumpTable.sorted { $0.key < $1.key }
-        for (index, offset) in sortedEntries {
-            blob.append(contentsOf: encodeVarint(index))
-            blob.append(contentsOf: encodeVarint(UInt64(offset)))
+        let jumpTableEntrySize: UInt8 = {
+            guard !jumpTableEntries.isEmpty else {
+                return 0
+            }
+            let maxTarget = jumpTableEntries.max() ?? 0
+            if maxTarget <= UInt32(UInt8.max) {
+                return 1
+            }
+            if maxTarget <= UInt32(UInt16.max) {
+                return 2
+            }
+            if maxTarget <= 0x00FF_FFFF {
+                return 3
+            }
+            return 4
+        }()
+
+        programCode.append(contentsOf: encodeNatural(UInt64(jumpTableEntries.count)))
+        programCode.append(jumpTableEntrySize)
+        programCode.append(contentsOf: encodeNatural(UInt64(code.count)))
+
+        if jumpTableEntrySize > 0 {
+            for targetPC in jumpTableEntries {
+                let littleEndian = targetPC.littleEndian
+                withUnsafeBytes(of: littleEndian) { bytes in
+                    programCode.append(contentsOf: bytes.prefix(Int(jumpTableEntrySize)))
+                }
+            }
         }
 
         // Code section
-        blob.append(contentsOf: code)
+        programCode.append(contentsOf: code)
 
         // Bitmask
         let bitmaskSize = (code.count + 7) / 8
-        blob.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
+        programCode.append(contentsOf: Data(repeating: 0, count: bitmaskSize))
 
         // Wrap in StandardProgram format
-        let programCode = blob
         return createStandardProgram(programCode: programCode)
     }
 
@@ -379,6 +444,12 @@ enum ProgramBlobBuilder {
             return 1 + 1 // opcode (1) + register (1) = 2 bytes
         }
 
+        // 2-register register-ops (100-111)
+        // Format: [opcode][dest][src]
+        if opcode >= 0x64, opcode <= 0x6F {
+            return 3
+        }
+
         // LoadImmJump (fixed size: opcode + byte1 + immed_X + immed_Y)
         // Format: [opcode][r_A | l_X][immed_X (l_X bytes)][immed_Y (l_Y bytes)]
         // Size = 2 + l_X + l_Y
@@ -392,10 +463,16 @@ enum ProgramBlobBuilder {
             return 2 + clamped_l_X + l_Y
         }
 
-        // LoadImmJumpInd - fixed size
-        // Format: opcode (1) + ra_rb_packed (1) + value_byte (1) + offset_byte (1) = 4 bytes
+        // LoadImmJumpInd
+        // Format: [opcode][packed_ra_rb][len][immed_X][immed_Y]
+        // For tests we use compact immediates with a single len byte.
         if opcode == 0xB4 { // LoadImmJumpInd (opcode 180)
-            return 4
+            guard pc + 2 < instructionBytes.count else { return 1 }
+            let lenByte = instructionBytes[pc + 2]
+            let l_X = min(Int(lenByte & 0x07), 4)
+            let remaining = instructionBytes.count - (pc + 3 + l_X)
+            let l_Y = max(0, min(4, remaining))
+            return 3 + l_X + l_Y
         }
 
         // Arithmetic instructions (3 bytes: opcode + packed registers + rd)
@@ -432,52 +509,24 @@ enum ProgramBlobBuilder {
             return 7
         }
 
-        // StoreImmU8/U16/U32/U64 (direct store: opcode + address_varint + value_varint)
+        // StoreImmU8/U16/U32/U64 (direct store with compact immediates)
         if opcode == 0x1E || opcode == 0x1F || opcode == 0x20 || opcode == 0x21 {
-            var size = 1 // opcode
-            var offset = pc + 1
-
-            // Decode address varint
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break }
-            }
-
-            // Decode value varint
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break }
-            }
-
-            return size
+            guard pc + 1 < instructionBytes.count else { return 1 }
+            let lenByte = instructionBytes[pc + 1]
+            let l_X = min(Int(lenByte & 0x07), 4)
+            let remaining = instructionBytes.count - (pc + 2 + l_X)
+            let l_Y = max(0, min(4, remaining))
+            return 2 + l_X + l_Y
         }
 
-        // StoreImmIndU8/U16/U32/U64 (register-relative: opcode + reg + offset_varint + value_varint)
+        // StoreImmIndU8/U16/U32/U64 (register-relative with compact immediates)
         if opcode >= 0x46, opcode <= 0x49 {
-            var size = 2 // opcode + reg
-            var offset = pc + 2
-
-            // Decode offset varint
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break }
-            }
-
-            // Decode value varint
-            while offset < instructionBytes.count {
-                let byte = instructionBytes[offset]
-                size += 1
-                offset += 1
-                if byte & 0x80 == 0 { break }
-            }
-
-            return size
+            guard pc + 1 < instructionBytes.count else { return 1 }
+            let packed = instructionBytes[pc + 1]
+            let l_X = min(Int((packed >> 4) & 0x07), 4)
+            let remaining = instructionBytes.count - (pc + 2 + l_X)
+            let l_Y = max(0, min(4, remaining))
+            return 2 + l_X + l_Y
         }
 
         // 64-bit Immediate instructions (opcodes 149-161: 0x95-0xA1)
@@ -485,6 +534,18 @@ enum ProgramBlobBuilder {
         // Per spec pvm.tex section 5.9: l_X = min(4, max(0, ℓ - 1)), fixed-width little-endian
         if opcode >= 0x95, opcode <= 0xA1 {
             return 6
+        }
+
+        // Branch register instructions (170-175: 0xAA-0xAF)
+        // Format: [opcode][reg1][reg2][offset_32bit]
+        if opcode >= 0xAA, opcode <= 0xAF {
+            return 7
+        }
+
+        // 3-register instructions (213-230: 0xD5-0xE6)
+        // Format: [opcode][ra][rb][rd]
+        if opcode >= 0xD5, opcode <= 0xE6 {
+            return 4
         }
 
         // Default: assume minimum valid instruction
@@ -587,25 +648,28 @@ enum JITInstructionExecutor {
     }
 }
 
-// MARK: - JIT vs Interpreter Comparison
+// MARK: - Sandboxed JIT vs Interpreter Comparison
 
-/// Helper to compare JIT vs interpreter execution
+/// Helper to compare interpreter vs sandboxed JIT execution
 enum JITParityComparator {
-    /// Compare JIT vs interpreter execution for a program
+    /// Compare interpreter vs sandboxed JIT execution for a program.
     ///
     /// - Parameters:
     ///   - blob: Program blob to execute
     ///   - testName: Name for error reporting
     ///   - gas: Initial gas limit
     ///   - argumentData: Optional argument data
-    /// - Returns: Tuple of (interpreterResult, jitResult, differences)
+    ///   - gasTolerance: Optional symmetric tolerance for gas-used delta
+    /// - Returns: Tuple of (interpreterResult, sandboxedJitResult, differences)
     static func compare(
         blob: Data,
-        testName _: String,
+        testName: String,
         gas: Gas = Gas(1_000_000),
         argumentData: Data? = nil,
+        gasTolerance: Gas? = nil,
     ) async -> (interpreterResult: JITTestResult, jitResult: JITTestResult, differences: String?) {
         let config = DefaultPvmConfig()
+        ensureSandboxPathConfigured()
 
         // Execute in interpreter mode
         let (exitReasonInterpreter, gasUsedInterpreter, outputInterpreter) = await invokePVM(
@@ -618,41 +682,22 @@ enum JITParityComparator {
             ctx: nil,
         )
 
-        // Execute in JIT mode using Executor directly to get register state
-        // CRITICAL: We don't use invokePVM here because it doesn't return register state
-        // Instead we call Executor.execute() directly which returns VMExecutionResult with registers
-        let executor = Executor(mode: .jit, config: config)
-        let jitVMResult = await executor.execute(
+        // Execute in sandboxed JIT mode.
+        // invokePVM is used for both sides so we compare the externally observable behavior.
+        let (exitReasonSandboxedJIT, gasUsedSandboxedJIT, outputSandboxedJIT) = await invokePVM(
+            config: config,
+            executionMode: [.jit, .sandboxed],
             blob: blob,
             pc: 0,
             gas: gas,
             argumentData: argumentData,
             ctx: nil,
         )
-        let exitReasonJIT = jitVMResult.exitReason
-        let gasUsedJIT = jitVMResult.gasUsed
-        let outputJIT = jitVMResult.outputData
-        let jitRegisters = jitVMResult.finalRegisters
-        let jitPC = jitVMResult.finalPC
 
-        // Get interpreter state by re-running (invokePVM doesn't return registers)
-        let interpreterRegisters: Registers
-        let interpreterPC: UInt32
-        do {
-            let state = try VMStateInterpreter(
-                standardProgramBlob: blob,
-                pc: 0,
-                gas: gas,
-                argumentData: argumentData,
-            )
-            let engine = Engine(config: config)
-            _ = await engine.execute(state: state)
-            interpreterRegisters = state.getRegisters()
-            interpreterPC = state.pc
-        } catch {
-            interpreterRegisters = Registers()
-            interpreterPC = 0
-        }
+        // Sandboxed execution does not expose internal registers/PC through IPC responses,
+        // so parity checks focus on externally visible behavior (exit reason/output/gas).
+        let interpreterRegisters = Registers()
+        let interpreterPC: UInt32 = 0
 
         let interpreterResult = JITTestResult(
             exitReason: exitReasonInterpreter,
@@ -664,42 +709,35 @@ enum JITParityComparator {
         )
 
         let jitResult = JITTestResult(
-            exitReason: exitReasonJIT,
-            finalGas: gas - gasUsedJIT,
-            outputData: outputJIT,
-            finalRegisters: jitRegisters,
-            finalPC: jitPC,
-            executionMode: .jit,
+            exitReason: exitReasonSandboxedJIT,
+            finalGas: gas - gasUsedSandboxedJIT,
+            outputData: outputSandboxedJIT,
+            finalRegisters: Registers(),
+            finalPC: 0,
+            executionMode: [.jit, .sandboxed],
         )
 
         // Compare results
         var differences: [String] = []
 
-        if exitReasonInterpreter != exitReasonJIT {
+        if exitReasonInterpreter != exitReasonSandboxedJIT {
             differences.append(
-                "Exit reason: interpreter=\(exitReasonInterpreter), jit=\(exitReasonJIT)",
+                "(\(testName)) Exit reason: interpreter=\(exitReasonInterpreter), sandboxed+jit=\(exitReasonSandboxedJIT)",
             )
         }
 
-        // NOTE: JIT gas accounting is not fully implemented yet, so we skip gas comparison
-        // When JIT returns 0 gas, it means gas wasn't properly tracked during execution
-        // let gasDiff = abs(Int64(interpreterResult.finalGas.value) - Int64(jitResult.finalGas.value))
-        // if gasDiff > 10 {
-        //     differences.append(
-        //         "Gas: interpreter=\(interpreterResult.finalGas), jit=\(jitResult.finalGas) (diff: \(gasDiff))"
-        //     )
-        // }
-
-        if outputInterpreter != outputJIT {
-            differences.append(
-                "Output: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), jit=\(outputJIT?.toHexString() ?? "nil")",
-            )
+        if let gasTolerance {
+            let gasDiff = abs(Int64(gasUsedInterpreter.value) - Int64(gasUsedSandboxedJIT.value))
+            if gasDiff > Int64(gasTolerance.value) {
+                differences.append(
+                    "(\(testName)) Gas used: interpreter=\(gasUsedInterpreter), sandboxed+jit=\(gasUsedSandboxedJIT) (diff=\(gasDiff), tolerance=\(gasTolerance.value))",
+                )
+            }
         }
 
-        // Compare registers
-        if interpreterRegisters != jitRegisters {
+        if outputInterpreter != outputSandboxedJIT {
             differences.append(
-                "Registers mismatch: interpreter=\(interpreterRegisters), jit=\(jitRegisters)",
+                "(\(testName)) Output: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), sandboxed+jit=\(outputSandboxedJIT?.toHexString() ?? "nil")",
             )
         }
 

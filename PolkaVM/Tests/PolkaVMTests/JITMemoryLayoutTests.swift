@@ -12,7 +12,7 @@ import Testing
 struct JITMemoryLayoutTests {
     // MARK: - Zone Extraction Tests
 
-    @Test("Extract zones from simple program")
+    @Test
     func extractZonesFromSimpleProgram() throws {
         // Create a simple program with minimal memory
         let code = ProgramBlobBuilder.createProgramCodeBlob([]) // Empty code
@@ -38,7 +38,7 @@ struct JITMemoryLayoutTests {
         }
     }
 
-    @Test("First zone starts at offset 0")
+    @Test
     func firstZoneStartsAtOffsetZero() throws {
         let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
@@ -57,7 +57,7 @@ struct JITMemoryLayoutTests {
 
     // MARK: - Address Translation Tests
 
-    @Test("Translate read-only zone address")
+    @Test
     func translateReadOnlyZoneAddress() throws {
         let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
@@ -82,7 +82,7 @@ struct JITMemoryLayoutTests {
         }
     }
 
-    @Test("Translate heap zone address")
+    @Test
     func translateHeapZoneAddress() throws {
         let readOnlyData = Data([0x01, 0x02, 0x03])
         let heapData = Data([0xAA, 0xBB, 0xCC])
@@ -112,7 +112,7 @@ struct JITMemoryLayoutTests {
         }
     }
 
-    @Test("Translate stack zone address")
+    @Test
     func translateStackZoneAddress() throws {
         let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
@@ -138,7 +138,7 @@ struct JITMemoryLayoutTests {
         }
     }
 
-    @Test("Return nil for invalid address")
+    @Test
     func returnNilForInvalidAddress() throws {
         let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
@@ -161,7 +161,7 @@ struct JITMemoryLayoutTests {
 
     // MARK: - Memory Size Tests
 
-    @Test("Total size is much less than 4GB")
+    @Test
     func totalSizeIsMuchLessThan4GB() throws {
         let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
@@ -183,7 +183,7 @@ struct JITMemoryLayoutTests {
         #expect(layout.totalSize < 1_048_576) // Less than 1MB
     }
 
-    @Test("Total size accounts for all zones")
+    @Test
     func totalSizeAccountsForAllZones() throws {
         let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
@@ -205,7 +205,7 @@ struct JITMemoryLayoutTests {
 
     // MARK: - Zone Lookup Tests
 
-    @Test("Find zone for valid address")
+    @Test
     func findZoneForValidAddress() throws {
         let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
@@ -229,7 +229,7 @@ struct JITMemoryLayoutTests {
         #expect(zone?.contains(readOnlyBase) == true)
     }
 
-    @Test("Return nil for address not in any zone")
+    @Test
     func returnNilForAddressNotInAnyZone() throws {
         let code = ProgramBlobBuilder.createProgramCodeBlob([])
         let program = ProgramBlobBuilder.createStandardProgram(
@@ -251,7 +251,7 @@ struct JITMemoryLayoutTests {
 
     // MARK: - Data Preservation Tests
 
-    @Test("Zone data is preserved during extraction")
+    @Test
     func zoneDataIsPreservedDuringExtraction() throws {
         let readOnlyData = Data([0xAA, 0xBB, 0xCC, 0xDD])
         let heapData = Data([0x11, 0x22, 0x33])

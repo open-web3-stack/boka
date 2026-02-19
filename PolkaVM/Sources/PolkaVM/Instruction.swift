@@ -37,11 +37,11 @@ extension Instruction {
             }
             return updatePC(context: context, skip: skip)
         } catch let e as MemoryError {
-            logger.debug("memory error: \(e)")
+            logger.trace("memory error: \(e)")
             return .exit(.pageFault(e.address))
         } catch let e {
             // other unknown errors
-            logger.error("execution failed!", metadata: ["error": "\(e)"])
+            logger.trace("execution failed!", metadata: ["error": "\(e)"])
             return .exit(.panic(.trap))
         }
     }

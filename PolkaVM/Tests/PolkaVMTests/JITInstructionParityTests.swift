@@ -13,7 +13,7 @@ import Utils
 private let logger = Logger(label: "JITInstructionParityTests")
 
 /// JIT vs Interpreter parity tests
-@Suite(.disabled("Temporarily disabled: JIT vs interpreter parity is unstable"))
+@Suite
 struct JITInstructionParityTests {
     /// Create a minimal test program with a single instruction
     private func createSingleInstructionProgram(_ instructionBytes: [UInt8]) -> Data {
@@ -74,7 +74,7 @@ struct JITInstructionParityTests {
 
     // MARK: - Load Immediate Instructions
 
-    @Test("JIT vs Interpreter: LoadImm64")
+    @Test
     func loadImm64() async throws {
         // LoadImm64 r1, 0x123456789ABCDEF0
         // Opcode 0x14 (20 = loadImmU64), dest_reg=0x01, immediate=0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12
@@ -87,12 +87,12 @@ struct JITInstructionParityTests {
         )
     }
 
-    @Test("JIT vs Interpreter: LoadImm32")
+    @Test
     func loadImm32() async throws {
         // LoadImm32 r1, 0x12345678 (sign-extended)
-        // Opcode 0x32, dest_reg=0x01, immediate=0x78, 0x56, 0x34, 0x12
+        // Opcode 0x33, dest_reg=0x01, immediate=0x78, 0x56, 0x34, 0x12
         let instruction: [UInt8] = [
-            0x32, 0x01, 0x78, 0x56, 0x34, 0x12,
+            0x33, 0x01, 0x78, 0x56, 0x34, 0x12,
         ]
         try await compareExecution(
             instructionBytes: instruction,
@@ -100,7 +100,7 @@ struct JITInstructionParityTests {
         )
     }
 
-    @Test("JIT vs Interpreter: LoadImmU32")
+    @Test
     func loadImmU32() async throws {
         // LoadImmU32 r1, 0x12345678 (zero-extended)
         // Opcode 0x31, dest_reg=0x01, immediate=0x78, 0x56, 0x34, 0x12
@@ -120,7 +120,7 @@ struct JITInstructionParityTests {
     // Use InvokePVMTests.testSumToN for interpreter testing instead.
     // JIT should be tested with properly constructed programs using ProgramBlobBuilder.
 
-    @Test("JIT vs Interpreter: Fallthrough program")
+    @Test
     func testHalt() async {
         let config = DefaultPvmConfig()
 

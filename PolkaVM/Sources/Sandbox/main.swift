@@ -7,11 +7,48 @@ import Utils
 #elseif canImport(Darwin)
     import Darwin
 #endif
+#if os(macOS)
+    import MacOSSandboxSupport
+#endif
+
+#if os(Linux)
+    // Block SIGPIPE at module initialization to prevent termination on broken pipe
+    // When parent closes IPC socket, write() returns EPIPE instead of SIGPIPE signal
+    // This MUST be called before any async operations or Swift runtime setup
+    private func blockSIGPIPE() {
+        var blockSet = sigset_t()
+        sigemptyset(&blockSet)
+        sigaddset(&blockSet, SIGPIPE)
+        var oldSet = sigset_t()
+        pthread_sigmask(SIG_BLOCK, &blockSet, &oldSet)
+    }
+
+    // Execute at module load time
+    private let _blockSIGPIPE: Void = {
+        blockSIGPIPE()
+        return ()
+    }()
+#endif
 
 private let logger = Logger(label: "Boka-Sandbox")
+private let sandboxDebugEnabled: Bool = {
+    guard let value = ProcessInfo.processInfo.environment["BOKA_SANDBOX_DEBUG"]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased(),
+        !value.isEmpty
+    else {
+        return false
+    }
+
+    return value == "1" || value == "true" || value == "yes" || value == "on"
+}()
 
 /// Helper function to write debug messages to stderr
 private func debugWrite(_ message: String) {
+    guard sandboxDebugEnabled else {
+        return
+    }
+
     _ = message.withCString { ptr in
         #if canImport(Glibc)
             Glibc.write(STDERR_FILENO, ptr, message.count)
@@ -78,6 +115,13 @@ enum SandboxMain {
             _exit(5) // Exit code for out of gas
         }
 
+        // Handle SIGPIPE (broken pipe) - ignore it and handle via EPIPE errors
+        // When parent closes the IPC socket, writes to stdin will trigger SIGPIPE
+        // We ignore SIGPIPE so that write() calls return EPIPE instead of terminating
+        signal(SIGPIPE) { _ in
+            // Do nothing - just ignore the signal (will be called synchronously)
+        }
+
         debugWrite("Sandbox: Signal handlers set up complete\n")
     }
 
@@ -103,39 +147,105 @@ enum SandboxMain {
             // - Landlock for fine-grained filesystem access control
 
             logger.debug("Basic sandbox security applied")
+        #elseif os(macOS)
+            // Constrain CPU/file descriptor usage before entering Seatbelt.
+            setResourceLimits()
+
+            guard applyMacOSSandboxProfile() else {
+                debugWrite("Sandbox: Failed to apply macOS sandbox profile\n")
+                logger.error("Failed to apply macOS sandbox profile")
+                _exit(1)
+            }
+
+            logger.debug("macOS sandbox security applied")
         #else
             logger.warning("Sandbox security restrictions not implemented for this platform")
         #endif
     }
 
-    #if os(Linux)
+    #if os(Linux) || os(macOS)
         /// Set resource limits to constrain the sandboxed process
         private static func setResourceLimits() {
-            var limit = rlimit()
+            #if os(Linux)
+                let cpuResource = Int32(RLIMIT_CPU.rawValue)
+                let memoryResource: Int32? = Int32(RLIMIT_AS.rawValue)
+                let fileResource = Int32(RLIMIT_NOFILE.rawValue)
+            #else
+                let cpuResource = RLIMIT_CPU
+                // Darwin commonly rejects finite memory rlimits (EINVAL), so we skip memory limit here.
+                let memoryResource: Int32? = nil
+                let fileResource = RLIMIT_NOFILE
+            #endif
 
             // Limit CPU time (5 seconds)
-            limit.rlim_cur = 5
-            limit.rlim_max = 10
-            if setrlimit(Int32(RLIMIT_CPU.rawValue), &limit) != 0 {
-                logger.warning("Failed to set CPU time limit: \(String(cString: strerror(errno)))")
-            }
+            setLimit(
+                resource: cpuResource,
+                soft: rlim_t(5),
+                hard: rlim_t(10),
+                name: "CPU time",
+            )
 
-            // Limit address space to 4GB (matches PVM memory size)
-            limit.rlim_cur = UInt(4) * 1024 * 1024 * 1024
-            limit.rlim_max = UInt(4) * 1024 * 1024 * 1024
-            if setrlimit(Int32(RLIMIT_AS.rawValue), &limit) != 0 {
-                logger.warning("Failed to set address space limit: \(String(cString: strerror(errno)))")
+            // Limit memory usage to 4GB (matches PVM memory size)
+            if let memoryResource {
+                let memoryLimit = rlim_t(4) * 1024 * 1024 * 1024
+                setLimit(
+                    resource: memoryResource,
+                    soft: memoryLimit,
+                    hard: memoryLimit,
+                    name: "memory",
+                )
             }
 
             // Limit number of file descriptors
-            limit.rlim_cur = 32
-            limit.rlim_max = 64
-            if setrlimit(Int32(RLIMIT_NOFILE.rawValue), &limit) != 0 {
-                logger.warning("Failed to set file descriptor limit: \(String(cString: strerror(errno)))")
-            }
+            setLimit(
+                resource: fileResource,
+                soft: rlim_t(32),
+                hard: rlim_t(64),
+                name: "file descriptor",
+            )
 
             // Note: RLIMIT_NPROC may not be available on all systems
             // Skip for portability
+        }
+
+        private static func setLimit(resource: Int32, soft: rlim_t, hard: rlim_t, name: String) {
+            var current = rlimit()
+            if getrlimit(resource, &current) != 0 {
+                logger.warning("Failed to read \(name) hard limit: \(String(cString: strerror(errno)))")
+                return
+            }
+
+            let effectiveHard = min(hard, current.rlim_max)
+            let effectiveSoft = min(soft, effectiveHard)
+
+            var requested = rlimit(rlim_cur: effectiveSoft, rlim_max: effectiveHard)
+            if setrlimit(resource, &requested) != 0 {
+                logger.warning("Failed to set \(name) limit: \(String(cString: strerror(errno)))")
+            }
+        }
+    #endif
+
+    #if os(macOS)
+        private static func applyMacOSSandboxProfile() -> Bool {
+            var errorBuffer: UnsafeMutablePointer<CChar>?
+            let result = boka_apply_macos_sandbox(&errorBuffer)
+
+            guard result == 0 else {
+                if let errorBuffer {
+                    let message = String(cString: errorBuffer)
+                    logger.error("macOS sandbox initialization failed: \(message)")
+                    boka_free_macos_sandbox_error(errorBuffer)
+                } else {
+                    logger.error("macOS sandbox initialization failed with errno: \(errno)")
+                }
+                return false
+            }
+
+            if let errorBuffer {
+                boka_free_macos_sandbox_error(errorBuffer)
+            }
+
+            return true
         }
     #endif
 

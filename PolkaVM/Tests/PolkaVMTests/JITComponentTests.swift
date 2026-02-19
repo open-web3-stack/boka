@@ -237,4 +237,34 @@ struct JITComponentTests {
         let totalInstructions = blocks.values.reduce(0) { $0 + $1.instructions.count }
         #expect(totalInstructions == instructionCount)
     }
+
+    @Test func basicBlockBuilderDecodesNewlyAddedFixedWidthOpcodes() throws {
+        // moveReg (100): 3-byte 2-register format
+        // divU64 (203): 3-byte packed 3-register format
+        // andInv (224): 4-byte 3-register format
+        // trap (0): terminator
+        let code = Data([
+            100, 1, 2,
+            203, 0x21, 3,
+            224, 1, 2, 3,
+            0,
+        ])
+        let blob = createBlob(code: code)
+
+        let program = try ProgramCode(blob)
+        let builder = BasicBlockBuilder(program: program)
+        let blocks = builder.build()
+
+        // All non-terminating instructions should be in the first block.
+        let block0 = try #require(blocks[0])
+        #expect(block0.instructions.count == 4)
+        #expect(block0.instructions[0].opcode == 100)
+        #expect(block0.instructions[0].data.count == 3)
+        #expect(block0.instructions[1].opcode == 203)
+        #expect(block0.instructions[1].data.count == 3)
+        #expect(block0.instructions[2].opcode == 224)
+        #expect(block0.instructions[2].data.count == 4)
+        #expect(block0.instructions[3].opcode == 0)
+        #expect(block0.instructions[3].data.count == 1)
+    }
 }

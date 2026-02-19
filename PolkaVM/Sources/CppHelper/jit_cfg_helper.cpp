@@ -6,6 +6,39 @@
 
 using namespace PVM;
 
+static inline uint32_t clamp_imm_len(uint32_t len) {
+    return (len > 4) ? 4 : len;
+}
+
+static inline uint32_t second_immediate_len(uint32_t instr_size, uint32_t prefix_len, uint32_t first_immediate_len) {
+    if (instr_size <= prefix_len + first_immediate_len) {
+        return 0;
+    }
+    return clamp_imm_len(instr_size - prefix_len - first_immediate_len);
+}
+
+static inline int32_t decode_immediate_signed32(
+    const uint8_t* bytecode,
+    uint32_t offset,
+    uint32_t len,
+    uint32_t code_size)
+{
+    if (len == 0 || offset >= code_size || offset + len > code_size) {
+        return 0;
+    }
+    uint32_t value = 0;
+    for (uint32_t i = 0; i < len; ++i) {
+        value |= uint32_t(bytecode[offset + i]) << (8 * i);
+    }
+    if (len < 4) {
+        uint32_t signBit = 1U << (len * 8 - 1);
+        if (value & signBit) {
+            value |= (~0U) << (len * 8);
+        }
+    }
+    return static_cast<int32_t>(value);
+}
+
 void ControlFlowGraph::build(
     const uint8_t* codeBuffer,
     uint32_t codeSize,
@@ -119,8 +152,8 @@ uint32_t ControlFlowGraph::getInstrSize(uint32_t pc) const {
         return 2;
     }
 
-    // Use bitmask to find the next instruction boundary
-    // This is more reliable than re-decoding varint instructions
+    // Use bitmask to find the next instruction boundary.
+    // This is more reliable than re-decoding compact immediates.
     if (!bitmask) {
         // Fall back to get_instruction_size if no bitmask available
         return get_instruction_size(codeBuffer, pc, codeSize);
@@ -164,20 +197,12 @@ uint32_t ControlFlowGraph::getJumpTarget(uint32_t pc, uint32_t instrSize) const 
             return pc + instrSize;
         }
 
-        // For LoadImmJump, the offset is UNSIGNED (relative to current PC)
-        // This is different from branches which use SIGNED offsets
-        uint64_t jumpOffset = 0;
-        if (l_Y > 0) {
-            for (uint32_t i = 0; i < l_Y; i++) {
-                jumpOffset |= uint64_t(codeBuffer[offsetPos + i]) << (i * 8);
-            }
-        }
-
+        int32_t jumpOffset = decode_immediate_signed32(codeBuffer, offsetPos, l_Y, codeSize);
         uint32_t targetPC = pc + uint32_t(jumpOffset);
         return targetPC;
     }
 
-    // LoadImmJumpInd: [opcode][ra | rb][immed (1 byte)][offset (1 byte)]
+    // LoadImmJumpInd: [opcode][packed_ra_rb][len][immed_X][immed_Y]
     if (opcode_is(opcode, Opcode::LoadImmJumpInd)) {
         // LoadImmJumpInd jumps through a register, not to a fixed PC
         // For CFG purposes, treat as fallthrough (we can't predict runtime register values)
@@ -204,14 +229,31 @@ uint32_t ControlFlowGraph::getJumpTarget(uint32_t pc, uint32_t instrSize) const 
         return pc + int32_t(offset);
     }
 
-    // Branch immediate instructions (14 bytes): [opcode][reg_index][value_64bit][offset_32bit]
-    if (instrSize == 14) {
-        if (pc + 14 > codeSize) {
+    // Branch immediate instructions:
+    // [opcode][packed_rA_lX][immed_X][immed_Y]
+    if (opcode_is(opcode, Opcode::BranchEqImm) ||
+        opcode_is(opcode, Opcode::BranchNeImm) ||
+        opcode_is(opcode, Opcode::BranchLtUImm) ||
+        opcode_is(opcode, Opcode::BranchLeUImm) ||
+        opcode_is(opcode, Opcode::BranchGeUImm) ||
+        opcode_is(opcode, Opcode::BranchGtUImm) ||
+        opcode_is(opcode, Opcode::BranchLtSImm) ||
+        opcode_is(opcode, Opcode::BranchLeSImm) ||
+        opcode_is(opcode, Opcode::BranchGeSImm) ||
+        opcode_is(opcode, Opcode::BranchGtSImm))
+    {
+        if (instrSize < 2 || pc + instrSize > codeSize) {
             return pc + instrSize;
         }
-        uint32_t offset;
-        memcpy(&offset, &codeBuffer[pc + 10], 4);
-        return pc + int32_t(offset);
+
+        uint8_t packed = codeBuffer[pc + 1];
+        uint32_t l_X = clamp_imm_len((packed >> 4) & 0x07);
+        if (instrSize < (2 + l_X)) {
+            return pc + instrSize;
+        }
+        uint32_t l_Y = second_immediate_len(instrSize, 2, l_X);
+        int32_t offset = decode_immediate_signed32(codeBuffer, pc + 2 + l_X, l_Y, codeSize);
+        return pc + uint32_t(offset);
     }
 
     return pc + instrSize; // Fallthrough

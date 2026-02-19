@@ -5,14 +5,14 @@ import Testing
 import Utils
 
 struct JavajamTests {
-    @Test(.disabled(), arguments: try JamTestnet.loadTests(path: "stf/state_transitions", src: .javajam))
+    @Test(.disabled("Known crash: Blockchain/State.swift nil unwrap in current STF fixtures"), arguments: try JamTestnet.loadTests(path: "stf/state_transitions", src: .javajam))
     func stfTests(_ input: Testcase) async throws {
         if input.description.starts(with: "3932781") { return } // problematic initial recent history
 
         try await TraceTest.test(input)
     }
 
-    @Test(.disabled(), arguments: try JamTestnet.loadTests(path: "erasure_coding", src: .javajam, ext: "json"))
+    @Test(arguments: try JamTestnet.loadTests(path: "erasure_coding", src: .javajam, ext: "json"))
     func erasureCodingTests(_ input: Testcase) throws {
         struct ECTestCase: Codable {
             let data: String

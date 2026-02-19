@@ -424,7 +424,9 @@ public actor SandboxPool {
     private func isWorkerFailure(_ error: Error) -> Bool {
         if let ipcError = error as? IPCError {
             switch ipcError {
-            case .unexpectedEOF, .readFailed, .writeFailed, .timeout:
+            case .unexpectedEOF, .readFailed, .writeFailed, .brokenPipe, .timeout:
+                // brokenPipe occurs when child process terminates unexpectedly
+                // This should trigger worker recycling
                 return true
             default:
                 return false

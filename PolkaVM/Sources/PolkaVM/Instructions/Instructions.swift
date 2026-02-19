@@ -1433,7 +1433,9 @@ extension CppHelper.Instructions.BranchGeS: BranchInstructionBase2 {
 extension CppHelper.Instructions.LoadImmJumpInd: Instruction {
     public init(data: Data) throws {
         let (ra, rb) = try Instructions.decodeRegisters(data)
-        let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, minus: 2, startIdx: 1)
+        // Format (spec A.5.12): [packed_ra_rb][len][immed_X][immed_Y]
+        // where len's low 3 bits encode immed_X byte length and immed_Y consumes the remainder.
+        let (value, offset): (UInt32, UInt32) = try Instructions.decodeImmediate2(data, startIdx: 1)
         self.init(ra: ra, rb: rb, value: value, offset: offset)
     }
 
