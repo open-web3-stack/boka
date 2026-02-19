@@ -63,7 +63,7 @@ let package = Package(
             linkerSettings: [
                 // Rust staticlibs can export duplicate runtime symbols (e.g. rust_eh_personality)
                 // across archives; GNU ld rejects these by default.
-                .unsafeFlags(["-Wl,--allow-multiple-definition"], .when(platforms: [.linux])),
+                .unsafeFlags(["-Xlinker", "--allow-multiple-definition"], .when(platforms: [.linux])),
             ],
         ),
         .testTarget(
