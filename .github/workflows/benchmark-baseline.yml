@@ -1,0 +1,130 @@
+name: Benchmark Baseline
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: benchmark-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BENCHMARK_DISABLE_JEMALLOC: true
+
+jobs:
+  benchmark-master-baseline:
+    name: Benchmark Baseline (master)
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - run: sudo apt-get update
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-2
+
+      - name: Setup Swift
+        uses: SwiftyLab/setup-swift@latest
+
+      - name: Get Swift Version
+        id: swift-version
+        run: |
+          SWIFT_VERSION=$(swift --version 2>&1 | head -n1 | sed -E 's/.*Swift version ([0-9.]+).*/\1/')
+          echo "Detected Swift version: $SWIFT_VERSION"
+          echo "version=$SWIFT_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SPM
+        uses: runs-on/cache@v4
+        with:
+          path: '**/.build'
+          key: ${{ runner.os }}-spm-release-swift-${{ steps.swift-version.outputs.version }}-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-release-swift-${{ steps.swift-version.outputs.version }}-
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache bandersnatch_vrfs static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libbandersnatch_vrfs.a
+          key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
+          restore-keys: |
+            ${{ runner.os }}-libs-libbandersnatch
+
+      - name: Cache bls static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libbls.a
+          key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
+          restore-keys: |
+            ${{ runner.os }}-libs-libbls
+
+      - name: Cache erasure-coding static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libec.a
+          key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
+          restore-keys: |
+            ${{ runner.os }}-libs-libec
+
+      - name: Cache ed25519-zebra static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libed25519_zebra_ffi.a
+          key: ${{ runner.os }}-libs-libed25519-${{ hashFiles('Utils/Sources/ed25519-zebra/**') }}
+          restore-keys: |
+            ${{ runner.os }}-libs-libed25519
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+
+      - name: Build dependencies
+        run: make deps
+
+      - name: Check if benchmarks exist
+        id: check-benchmarks
+        run: |
+          if [ -d "JAMTests/Benchmarks" ]; then
+            echo "has_benchmark=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_benchmark=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run benchmarks for master baseline
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        run: |
+          cd JAMTests
+          timeout 25m swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update master --no-progress
+
+      - name: Upload master benchmark results
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-master-results
+          path: JAMTests/.benchmarkBaselines/Benchmarks/master/results.json
+          if-no-files-found: error
+          retention-days: 90

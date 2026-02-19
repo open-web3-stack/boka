@@ -5,6 +5,10 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: read
+  actions: read
+
 env:
   BENCHMARK_DISABLE_JEMALLOC: true
 
@@ -171,6 +175,41 @@ jobs:
           name: benchmark-pr-results
           path: JAMTests/.benchmarkBaselines/Benchmarks/pull_request
 
+      - name: Find latest master baseline workflow run
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        id: find-master-baseline-run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'benchmark-baseline.yml',
+              branch: 'master',
+              status: 'completed',
+              per_page: 50
+            });
+            const successful = data.workflow_runs.find((run) => run.conclusion === 'success');
+            if (!successful) {
+              core.warning('No successful benchmark-baseline workflow run found on master.');
+              core.setOutput('run_id', '');
+              return;
+            }
+            core.info(`Using baseline workflow run ${successful.id} from ${successful.created_at}`);
+            core.setOutput('run_id', String(successful.id));
+
+      - name: Download master benchmark baseline results
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' && steps.find-master-baseline-run.outputs.run_id != '' }}
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.find-master-baseline-run.outputs.run_id }}
+          name: benchmark-master-results
+          path: JAMTests/.benchmarkBaselines/Benchmarks/master
+
       - name: Check thresholds against PR baseline
         run: |
           echo "# 📊 Benchmark Results" >> "$GITHUB_STEP_SUMMARY"
@@ -191,18 +230,43 @@ jobs:
             exit 0
           fi
 
+          FAILURE=0
+
+          echo "## 🔁 Relative Threshold Check (master vs PR)" >> "$GITHUB_STEP_SUMMARY"
+          if [ ! -f ".benchmarkBaselines/thresholds.json" ]; then
+            echo "⚠️ No .benchmarkBaselines/thresholds.json found - skipping master vs PR check" >> "$GITHUB_STEP_SUMMARY"
+          elif [ -f ".benchmarkBaselines/Benchmarks/master/results.json" ]; then
+            if ! swift package benchmark baseline check master pull_request --thresholds .benchmarkBaselines/thresholds.json --format markdown > /tmp/benchmark_check_master_vs_pr.txt 2>&1; then
+              cat /tmp/benchmark_check_master_vs_pr.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "❌ **PERFORMANCE REGRESSION DETECTED** - PR regressed against master baseline" >> "$GITHUB_STEP_SUMMARY"
+              FAILURE=1
+            else
+              cat /tmp/benchmark_check_master_vs_pr.txt >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "✅ No regressions versus master baseline" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "⚠️ Master baseline not found - skipping master vs PR check" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "## 🔍 Absolute Threshold Check (PR baseline)" >> "$GITHUB_STEP_SUMMARY"
           if [ -f ".benchmarkBaselines/thresholds.json" ]; then
-            if ! swift package benchmark baseline check pull_request --check-absolute --thresholds .benchmarkBaselines/thresholds.json --format markdown > /tmp/benchmark_check.txt 2>&1; then
-              cat /tmp/benchmark_check.txt >> "$GITHUB_STEP_SUMMARY"
+            if ! swift package benchmark baseline check pull_request --check-absolute --thresholds .benchmarkBaselines/thresholds.json --format markdown > /tmp/benchmark_check_absolute.txt 2>&1; then
+              cat /tmp/benchmark_check_absolute.txt >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "❌ **PERFORMANCE REGRESSION DETECTED** - Some benchmarks exceeded thresholds.json" >> "$GITHUB_STEP_SUMMARY"
-              exit 1
+              FAILURE=1
             else
-              cat /tmp/benchmark_check.txt >> "$GITHUB_STEP_SUMMARY"
+              cat /tmp/benchmark_check_absolute.txt >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "✅ All benchmarks within thresholds.json" >> "$GITHUB_STEP_SUMMARY"
             fi
           else
             echo "⚠️ No .benchmarkBaselines/thresholds.json found - skipping threshold check" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "$FAILURE" -ne 0 ]; then
+            exit 1
           fi
