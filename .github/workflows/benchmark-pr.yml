@@ -9,8 +9,8 @@ env:
   BENCHMARK_DISABLE_JEMALLOC: true
 
 jobs:
-  benchmark-delta:
-    name: Comparison
+  benchmark-master:
+    name: Benchmark (master)
     runs-on: [self-hosted, linux]
     continue-on-error: true
     timeout-minutes: 30
@@ -39,7 +39,7 @@ jobs:
         run: |
           SWIFT_VERSION=$(swift --version 2>&1 | head -n1 | sed -E 's/.*Swift version ([0-9.]+).*/\1/')
           echo "Detected Swift version: $SWIFT_VERSION"
-          echo "version=$SWIFT_VERSION" >> $GITHUB_OUTPUT
+          echo "version=$SWIFT_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Cache SPM
         uses: runs-on/cache@v4
@@ -106,79 +106,240 @@ jobs:
         id: check-benchmarks
         run: |
           if [ -d "JAMTests/Benchmarks" ]; then
-            echo "hasBenchmark=1" >> $GITHUB_ENV
+            echo "has_benchmark=true" >> "$GITHUB_OUTPUT"
           else
-            echo "hasBenchmark=0" >> $GITHUB_ENV
+            echo "has_benchmark=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Switch to branch 'master'
-        if: ${{ env.hasBenchmark == '1' }}
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
         run: |
           git fetch origin master
           git checkout -B master origin/master
 
       - name: Run benchmarks for branch 'master'
-        if: ${{ env.hasBenchmark == '1' }}
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
         run: |
           cd JAMTests
-          # Build and run benchmarks for master branch
-          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update master --no-progress 2>&1 || {
-            echo "⚠️ Warning: Master baseline benchmarks failed or incomplete"
+          if ! timeout 25m swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update master --no-progress 2>&1; then
+            echo "⚠️ Warning: Master baseline benchmarks failed, timed out, or incomplete"
             exit 0
-          }
+          fi
 
-      - name: Switch to PR branch
-        if: ${{ env.hasBenchmark == '1' }}
+      - name: Upload master benchmark results
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-master-results
+          path: JAMTests/.benchmarkBaselines/Benchmarks/master/results.json
+          if-no-files-found: warn
+
+  benchmark-pr:
+    name: Benchmark (pull_request)
+    runs-on: [self-hosted, linux]
+    continue-on-error: true
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - run: sudo apt-get update
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-2
+
+      - name: Setup Swift
+        uses: SwiftyLab/setup-swift@latest
+
+      - name: Get Swift Version
+        id: swift-version
         run: |
-          git checkout ${{ github.head_ref }}
+          SWIFT_VERSION=$(swift --version 2>&1 | head -n1 | sed -E 's/.*Swift version ([0-9.]+).*/\1/')
+          echo "Detected Swift version: $SWIFT_VERSION"
+          echo "version=$SWIFT_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SPM
+        uses: runs-on/cache@v4
+        with:
+          path: '**/.build'
+          key: ${{ runner.os }}-spm-release-swift-${{ steps.swift-version.outputs.version }}-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-release-swift-${{ steps.swift-version.outputs.version }}-
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache bandersnatch_vrfs static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libbandersnatch_vrfs.a
+          key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
+          restore-keys: |
+              ${{ runner.os }}-libs-libbandersnatch
+
+      - name: Cache bls static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libbls.a
+          key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
+          restore-keys: |
+              ${{ runner.os }}-libs-libbls
+
+      - name: Cache erasure-coding static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libec.a
+          key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
+          restore-keys: |
+              ${{ runner.os }}-libs-libec
+
+      - name: Cache ed25519-zebra static lib
+        uses: actions/cache@v4
+        with:
+          path: .lib/libed25519_zebra_ffi.a
+          key: ${{ runner.os }}-libs-libed25519-${{ hashFiles('Utils/Sources/ed25519-zebra/**') }}
+          restore-keys: |
+              ${{ runner.os }}-libs-libed25519
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+
+      - name: Build dependencies
+        run: make deps
+
+      - name: Check if benchmarks exist
+        id: check-benchmarks
+        run: |
+          if [ -d "JAMTests/Benchmarks" ]; then
+            echo "has_benchmark=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_benchmark=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure PR branch checkout
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        run: |
+          if [ -n "${{ github.head_ref }}" ]; then
+            git fetch origin "${{ github.head_ref }}" || true
+            git checkout "${{ github.head_ref }}" || true
+          fi
 
       - name: Run benchmarks for PR branch
-        if: ${{ env.hasBenchmark == '1' }}
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
         run: |
           cd JAMTests
-          # Build and run benchmarks for PR branch
-          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress 2>&1 || {
-            echo "⚠️ Warning: PR baseline benchmarks failed or incomplete"
+          if ! timeout 25m swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress 2>&1; then
+            echo "⚠️ Warning: PR baseline benchmarks failed, timed out, or incomplete"
             exit 0
-          }
+          fi
+
+      - name: Upload PR benchmark results
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-pr-results
+          path: JAMTests/.benchmarkBaselines/Benchmarks/pull_request/results.json
+          if-no-files-found: warn
+
+  benchmark-delta:
+    name: Comparison
+    needs: [benchmark-master, benchmark-pr]
+    if: ${{ always() }}
+    runs-on: [self-hosted, linux]
+    continue-on-error: true
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Swift
+        uses: SwiftyLab/setup-swift@latest
+
+      - name: Check if benchmarks exist
+        id: check-benchmarks
+        run: |
+          if [ -d "JAMTests/Benchmarks" ]; then
+            echo "has_benchmark=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_benchmark=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download master benchmark results
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-master-results
+          path: JAMTests/.benchmarkBaselines/Benchmarks/master
+
+      - name: Download PR benchmark results
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-pr-results
+          path: JAMTests/.benchmarkBaselines/Benchmarks/pull_request
 
       - name: Compare PR and master
-        if: ${{ env.hasBenchmark == '1' }}
         run: |
+          echo "# 📊 Benchmark Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "Generated on: $(date)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ steps.check-benchmarks.outputs.has_benchmark }}" != "true" ]; then
+            echo "⚠️ No JAMTests/Benchmarks directory found in this PR." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           cd JAMTests
-          echo "# 📊 Benchmark Results" >> $GITHUB_STEP_SUMMARY
-          echo "Generated on: $(date)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ -f ".benchmarkBaselines/Benchmarks/master/results.json" ] && [ -f ".benchmarkBaselines/Benchmarks/pull_request/results.json" ]; then
-            echo "## Performance Comparison" >> $GITHUB_STEP_SUMMARY
-            swift package benchmark baseline compare master pull_request --no-progress --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## 🔍 Regression Check" >> $GITHUB_STEP_SUMMARY
+            echo "## Performance Comparison" >> "$GITHUB_STEP_SUMMARY"
+            swift package benchmark baseline compare master pull_request --no-progress --format markdown >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "## 🔍 Regression Check" >> "$GITHUB_STEP_SUMMARY"
 
-            # Check for thresholds and perform regression check
             if [ -f ".benchmarkBaselines/thresholds.json" ]; then
               if ! swift package benchmark baseline check master pull_request --thresholds .benchmarkBaselines/thresholds.json --format markdown > /tmp/benchmark_check.txt 2>&1; then
-                cat /tmp/benchmark_check.txt >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "❌ **PERFORMANCE REGRESSION DETECTED** - Some benchmarks exceeded acceptable thresholds" >> $GITHUB_STEP_SUMMARY
+                cat /tmp/benchmark_check.txt >> "$GITHUB_STEP_SUMMARY"
+                echo "" >> "$GITHUB_STEP_SUMMARY"
+                echo "❌ **PERFORMANCE REGRESSION DETECTED** - Some benchmarks exceeded acceptable thresholds" >> "$GITHUB_STEP_SUMMARY"
                 exit 1
               else
-                cat /tmp/benchmark_check.txt >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "✅ All benchmarks within acceptable thresholds" >> $GITHUB_STEP_SUMMARY
+                cat /tmp/benchmark_check.txt >> "$GITHUB_STEP_SUMMARY"
+                echo "" >> "$GITHUB_STEP_SUMMARY"
+                echo "✅ All benchmarks within acceptable thresholds" >> "$GITHUB_STEP_SUMMARY"
               fi
             else
-              echo "⚠️ No thresholds.json found - skipping regression check" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ No thresholds.json found - skipping regression check" >> "$GITHUB_STEP_SUMMARY"
             fi
           else
             if [ ! -f ".benchmarkBaselines/Benchmarks/master/results.json" ]; then
-              echo "⚠️ Master baseline not found" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ Master baseline not found" >> "$GITHUB_STEP_SUMMARY"
             fi
             if [ ! -f ".benchmarkBaselines/Benchmarks/pull_request/results.json" ]; then
-              echo "⚠️ PR baseline not found" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ PR baseline not found" >> "$GITHUB_STEP_SUMMARY"
             fi
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Running current benchmarks:" >> $GITHUB_STEP_SUMMARY
-            swift package benchmark --format markdown >> $GITHUB_STEP_SUMMARY 2>&1 || true
           fi
