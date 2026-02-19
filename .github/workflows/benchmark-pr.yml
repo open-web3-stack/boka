@@ -13,7 +13,7 @@ jobs:
     name: Comparison
     runs-on: [self-hosted, linux]
     continue-on-error: true
-    timeout-minutes: 60
+    timeout-minutes: 30
 
     steps:
       - name: Checkout Code
@@ -122,7 +122,7 @@ jobs:
         run: |
           cd JAMTests
           # Build and run benchmarks for master branch
-          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update master --no-progress --quiet 2>&1 || {
+          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update master --no-progress 2>&1 || {
             echo "⚠️ Warning: Master baseline benchmarks failed or incomplete"
             exit 0
           }
@@ -137,7 +137,7 @@ jobs:
         run: |
           cd JAMTests
           # Build and run benchmarks for PR branch
-          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress --quiet 2>&1 || {
+          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress 2>&1 || {
             echo "⚠️ Warning: PR baseline benchmarks failed or incomplete"
             exit 0
           }
