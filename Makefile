@@ -125,6 +125,8 @@ SANDBOX_PATH := $(BUILD_DIR)/boka-sandbox
 
 # Benchmark targets
 # Build sandbox in release mode and use it for benchmarks
+BENCHMARK_ARGS ?=
+
 .PHONY: benchmark
 benchmark: githooks deps build-sandbox-release
 	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark
@@ -151,7 +153,7 @@ benchmark-baseline: githooks deps build-sandbox-release
 		echo "Error: BASELINE parameter is required"; \
 		exit 1; \
 	fi
-	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update $(BASELINE)
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update $(BASELINE) $(BENCHMARK_ARGS)
 
 .PHONY: benchmark-compare
 benchmark-compare: githooks deps build-sandbox-release

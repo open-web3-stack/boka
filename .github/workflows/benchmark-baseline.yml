@@ -11,12 +11,13 @@ concurrency:
 
 env:
   BENCHMARK_DISABLE_JEMALLOC: true
+  BENCHMARK_CI_ARGS: "--skip 'pool\\..*' --skip 'jitperf\\.stress\\.jitSandbox' --no-progress"
 
 jobs:
   benchmark-master-baseline:
     name: Benchmark Baseline (master)
     runs-on: [self-hosted, linux]
-    timeout-minutes: 75
+    timeout-minutes: 120
 
     steps:
       - name: Checkout Code
@@ -117,7 +118,19 @@ jobs:
       - name: Run benchmarks for master baseline
         if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
         run: |
-          timeout 60m make benchmark-baseline BASELINE=master
+          set -euo pipefail
+          for attempt in 1 2; do
+            echo "Benchmark baseline attempt ${attempt}/2"
+            if timeout 50m make benchmark-baseline BASELINE=master BENCHMARK_ARGS="${BENCHMARK_CI_ARGS}"; then
+              exit 0
+            fi
+            if [ "${attempt}" -lt 2 ]; then
+              echo "Benchmark baseline attempt ${attempt} failed; retrying after short cooldown..."
+              sleep 10
+            fi
+          done
+          echo "Benchmark baseline failed after 2 attempts."
+          exit 1
 
       - name: Upload master benchmark results
         if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}

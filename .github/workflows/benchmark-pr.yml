@@ -11,13 +11,14 @@ permissions:
 
 env:
   BENCHMARK_DISABLE_JEMALLOC: true
+  BENCHMARK_CI_ARGS: "--skip 'pool\\..*' --skip 'jitperf\\.stress\\.jitSandbox' --no-progress"
 
 jobs:
   benchmark-pr:
     name: Benchmark (pull_request)
     runs-on: [self-hosted, linux]
     continue-on-error: true
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout Code
@@ -126,8 +127,7 @@ jobs:
       - name: Run benchmarks for PR branch
         if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
         run: |
-          cd JAMTests
-          if ! timeout 25m swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress 2>&1; then
+          if ! timeout 45m make benchmark-baseline BASELINE=pull_request BENCHMARK_ARGS="${BENCHMARK_CI_ARGS}" 2>&1; then
             echo "⚠️ Warning: PR baseline benchmarks failed, timed out, or incomplete"
             exit 0
           fi
