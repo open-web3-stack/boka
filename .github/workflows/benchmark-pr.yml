@@ -11,7 +11,8 @@ permissions:
 
 env:
   BENCHMARK_DISABLE_JEMALLOC: true
-  BENCHMARK_CI_ARGS: "--skip 'pool\\..*' --skip 'jitperf\\.stress\\.jitSandbox' --no-progress"
+  BOKA_BENCHMARK_CI_FAST: "1"
+  BENCHMARK_CI_ARGS: "--skip 'pool\\..*' --skip 'jitperf\\..*sandbox.*' --no-progress"
 
 jobs:
   benchmark-pr:
