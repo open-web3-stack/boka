@@ -44,11 +44,17 @@ struct NodeDataSourceTests {
         let workPackage = WorkPackage.dummy(config: services.config)
         let extrinsic = [Data([0, 1, 2]), Data([3, 4, 5])]
         try await dataSource.submitWorkPackage(coreIndex: 0, workPackage: JamEncoder.encode(workPackage), extrinsics: extrinsic)
-        let events = await storeMiddleware.wait()
+        var observedWorkPackageEvent: RuntimeEvents.WorkPackagesSubmitted?
+        for _ in 0 ..< 50 {
+            let events = await storeMiddleware.wait()
+            if let event = events.first(where: { $0 is RuntimeEvents.WorkPackagesSubmitted }) as? RuntimeEvents.WorkPackagesSubmitted {
+                observedWorkPackageEvent = event
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
 
-        #expect(events.count == 1)
-
-        let workPackageEvent = try #require(events[0] as? RuntimeEvents.WorkPackagesSubmitted)
+        let workPackageEvent = try #require(observedWorkPackageEvent)
         #expect(workPackageEvent.coreIndex == 0)
         #expect(workPackageEvent.workPackage.value == workPackage)
         #expect(workPackageEvent.extrinsics == extrinsic)

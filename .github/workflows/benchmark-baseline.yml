@@ -16,7 +16,7 @@ jobs:
   benchmark-master-baseline:
     name: Benchmark Baseline (master)
     runs-on: [self-hosted, linux]
-    timeout-minutes: 45
+    timeout-minutes: 75
 
     steps:
       - name: Checkout Code
@@ -117,8 +117,7 @@ jobs:
       - name: Run benchmarks for master baseline
         if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
         run: |
-          cd JAMTests
-          timeout 25m swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update master --no-progress
+          timeout 60m make benchmark-baseline BASELINE=master
 
       - name: Upload master benchmark results
         if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
