@@ -16,10 +16,13 @@ private func configureCIBenchmarkDefaultsIfNeeded() {
         return
     }
 
+    print("CI benchmark mode enabled (maxDuration=100ms, maxIterations=8, warmupIterations=0)")
+
     var configuration = Benchmark.defaultConfiguration
-    configuration.maxDuration = .milliseconds(300)
-    configuration.maxIterations = min(configuration.maxIterations, 40)
-    configuration.warmupIterations = min(configuration.warmupIterations, 1)
+    // Keep CI baselines deterministic and bounded on slower self-hosted runners.
+    configuration.maxDuration = .milliseconds(100)
+    configuration.maxIterations = min(configuration.maxIterations, 8)
+    configuration.warmupIterations = 0
     Benchmark.defaultConfiguration = configuration
 }
 
