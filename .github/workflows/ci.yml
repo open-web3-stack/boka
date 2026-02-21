@@ -121,13 +121,138 @@ jobs:
       run: make build
     - name: Test (Debug)
       if: matrix.config == 'debug'
-      run: make test-all
+      run: |
+        # Run all tests except FuzzTests (they run in a separate parallel job)
+        for pkg in Blockchain Codec Database JAMTests Networking Node PolkaVM RPC Utils; do
+          echo "Testing $pkg (debug)..."
+          if [ "$pkg" = "JAMTests" ]; then
+            # Skip FuzzTests for JAMTests as they run in a separate parallel job
+            swift test --package-path "$pkg" --skip "FuzzTests"
+          else
+            swift test --package-path "$pkg"
+          fi
+        done
+        cargo test --manifest-path Utils/Sources/bandersnatch/Cargo.toml
     - name: Build and Test (Release)
       if: matrix.config == 'release'
       run: |
         make deps
         for pkg in Blockchain Codec Database JAMTests Networking Node PolkaVM RPC Utils; do
           echo "Testing $pkg (release)..."
-          swift test -c release --package-path "$pkg"
+          if [ "$pkg" = "JAMTests" ]; then
+            # Skip FuzzTests for JAMTests as they run in a separate parallel job
+            swift test -c release --package-path "$pkg" --skip "FuzzTests"
+          else
+            swift test -c release --package-path "$pkg"
+          fi
         done
         cargo test --manifest-path Utils/Sources/bandersnatch/Cargo.toml --release
+
+  fuzz-test:
+    name: Fuzz Test (${{ matrix.mode }})
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        mode:
+          - interpreter
+          - sandbox
+          - jit
+          - jit-sandbox
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - run: sudo apt-get update
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: us-east-2
+    - name: Setup Swift
+      uses: SwiftyLab/setup-swift@latest
+    - name: Get Swift Version
+      id: swift-version
+      run: |
+        SWIFT_VERSION=$(swift --version 2>&1 | head -n1 | sed -E 's/.*Swift version ([0-9.]+).*/\1/')
+        echo "Detected Swift version: $SWIFT_VERSION"
+        echo "version=$SWIFT_VERSION" >> $GITHUB_OUTPUT
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache bandersnatch_vrfs static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libbandersnatch_vrfs.a
+        key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libbandersnatch
+    - name: Cache bls static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libbls.a
+        key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libbls
+    - name: Cache erasure-coding static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libec.a
+        key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libec
+    - name: Cache ed25519-zebra static lib
+      uses: actions/cache@v4
+      with:
+        path: .lib/libed25519_zebra_ffi.a
+        key: ${{ runner.os }}-libs-libed25519-${{ hashFiles('Utils/Sources/ed25519-zebra/**') }}
+        restore-keys: |
+            ${{ runner.os }}-libs-libed25519
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: rustfmt
+    - name: Configure Sandbox Executable Path
+      run: |
+        swift build -c release --package-path PolkaVM --product boka-sandbox
+        SANDBOX_BIN="$(swift build -c release --package-path PolkaVM --show-bin-path)/boka-sandbox"
+        if [ ! -x "$SANDBOX_BIN" ]; then
+          echo "boka-sandbox executable not found at: $SANDBOX_BIN"
+          exit 1
+        fi
+        echo "BOKA_SANDBOX_PATH=$SANDBOX_BIN" >> "$GITHUB_ENV"
+    - name: Build dependencies
+      run: make deps
+    - name: Run Fuzz Tests (${{ matrix.mode }})
+      run: |
+        # Set test filter based on mode
+        case "${{ matrix.mode }}" in
+          interpreter)
+            TEST_FILTER="FuzzTests.v072_interpreter"
+            ;;
+          sandbox)
+            TEST_FILTER="FuzzTests.v072_sandbox"
+            ;;
+          jit)
+            TEST_FILTER="FuzzTests.v072_jit"
+            ;;
+          jit-sandbox)
+            TEST_FILTER="FuzzTests.v072_jit_sandbox"
+            ;;
+        esac
+
+        echo "Running fuzz tests for mode: ${{ matrix.mode }}"
+        echo "Test filter: $TEST_FILTER"
+
+        # Run only the fuzz tests for this specific mode
+        swift test -c release --package-path JAMTests --filter "$TEST_FILTER"
