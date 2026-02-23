@@ -136,21 +136,43 @@ public struct AccountChanges: Sendable {
     }
 
     public func apply(to accounts: ServiceAccountsMutRef) async throws {
+        let removedIndices = Set(updates.compactMap { update -> ServiceIndex? in
+            if case let .removeAccount(index) = update {
+                return index
+            }
+            return nil
+        })
+
+        var pendingRemovals: [ServiceIndex] = []
+        var seenRemovals: Set<ServiceIndex> = []
+
         for update in updates {
             switch update {
             case let .newAccount(index, account):
+                guard !removedIndices.contains(index) else { continue }
                 try await accounts.addNew(serviceAccount: index, account: account)
             case let .removeAccount(index):
-                try await accounts.remove(serviceAccount: index)
+                if seenRemovals.insert(index).inserted {
+                    pendingRemovals.append(index)
+                }
             case let .updateAccount(index, account):
+                guard !removedIndices.contains(index) else { continue }
                 accounts.set(serviceAccount: index, account: account)
             case let .updateStorage(index, key, value):
+                guard !removedIndices.contains(index) else { continue }
                 try await accounts.set(serviceAccount: index, storageKey: key, value: value)
             case let .updatePreimage(index, hash, value):
+                guard !removedIndices.contains(index) else { continue }
                 accounts.set(serviceAccount: index, preimageHash: hash, value: value)
             case let .updatePreimageInfo(index, hash, length, value):
+                guard !removedIndices.contains(index) else { continue }
                 try await accounts.set(serviceAccount: index, preimageHash: hash, length: length, value: value)
             }
+        }
+
+        // Remove accounts last so removal dominates mixed update/remove batches.
+        for index in pendingRemovals {
+            try await accounts.remove(serviceAccount: index)
         }
     }
 

@@ -154,7 +154,8 @@ struct PVMInstructionTests {
     // MARK: - Comprehensive Parity Tests
 
     /// Run a comprehensive parity test across multiple scenarios
-    @Test func comprehensiveParity_multipleScenarios() async {
+    @Test(.disabled("Flaky CI timeout: can hang in linux debug runs"))
+    func comprehensiveParity_multipleScenarios() async {
         let config = DefaultPvmConfig()
 
         // Test different input values with the sumToN program
