@@ -68,6 +68,23 @@ struct EventBusTests {
         }
     }
 
+    @Test func waitForContinuesAfterTimeout() async throws {
+        await #expect(throws: ContinuationError.timeout) {
+            _ = try await eventBus.waitFor(TestEvent.self, timeout: 0.05)
+            Issue.record()
+        }
+
+        let waitTask = Task {
+            try await eventBus.waitFor(TestEvent.self, timeout: 1.0)
+        }
+
+        try await Task.sleep(for: .milliseconds(100))
+        await eventBus.publish(TestEvent(id: 7, value: "after-timeout"))
+        let receivedEvent = try await waitTask.value
+        #expect(receivedEvent.id == 7)
+        #expect(receivedEvent.value == "after-timeout")
+    }
+
     @Test func multipleConcurrentWaits() async throws {
         // Start waiting for two different event types
         let waitTask1 = Task {
@@ -153,5 +170,23 @@ struct EventBusTests {
         let receivedEvent = try await waitTask.value
         #expect(receivedEvent.id == 42)
         #expect(receivedEvent.value == "test after unsubscribe")
+    }
+
+    @Test func waitForImmediatePublishStress() async throws {
+        for id in 0 ..< 200 {
+            let waitTask = Task {
+                try await eventBus.waitFor(TestEvent.self, check: { event in
+                    event.id == id
+                }, timeout: 0.2)
+            }
+
+            // Let the waiting task enter EventBus.waitFor before publishing.
+            await Task.yield()
+
+            await eventBus.publish(TestEvent(id: id, value: "event-\(id)"))
+
+            let receivedEvent = try await waitTask.value
+            #expect(receivedEvent.id == id)
+        }
     }
 }
