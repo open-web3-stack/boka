@@ -86,6 +86,10 @@ public actor EventBus: Subscribable {
         self.handlerMiddleware = handlerMiddleware
     }
 
+    func waitContinuationCount<T: Event>(for eventType: T.Type) -> Int {
+        waitContinuations[ObjectIdentifier(eventType)]?.count ?? 0
+    }
+
     public func subscribe<T: Event>(
         _ eventType: T.Type,
         id: UniqueId = "",

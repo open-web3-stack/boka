@@ -177,11 +177,13 @@ struct EventBusTests {
             let waitTask = Task {
                 try await eventBus.waitFor(TestEvent.self, check: { event in
                     event.id == id
-                }, timeout: 0.2)
+                }, timeout: 0.5)
             }
 
-            // Let the waiting task enter EventBus.waitFor before publishing.
-            await Task.yield()
+            // Wait until waitFor has registered its continuation to avoid scheduler races in CI.
+            while await eventBus.waitContinuationCount(for: TestEvent.self) == 0 {
+                await Task.yield()
+            }
 
             await eventBus.publish(TestEvent(id: id, value: "event-\(id)"))
 
