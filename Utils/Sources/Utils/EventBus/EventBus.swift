@@ -203,6 +203,7 @@ public actor EventBus: Subscribable {
     ) {
         let key = ObjectIdentifier(eventType)
         guard let continuations = waitContinuations[key], continuations.contains(where: { $0.id == id }) else {
+            // Continuation already resumed or removed, nothing to do
             return
         }
 
@@ -217,74 +218,69 @@ public actor EventBus: Subscribable {
     ) async throws -> T {
         let contId: Mutex<UniqueId?> = .init(nil)
         let timeoutTask: Mutex<Task<Void, Never>?> = .init(nil)
-        do {
-            let res = try await withCheckedThrowingContinuation { (originalContinuation: CheckedContinuation<T, Error>) in
-                let hasResumed = Atomic<Bool>(false)
+        let hasResumed = Atomic<Bool>(false)
 
-                @Sendable func resumeOnce(_ result: Result<T, Error>) {
-                    let resumed = hasResumed.exchange(true, ordering: .sequentiallyConsistent)
-                    if resumed {
-                        return
-                    }
-                    originalContinuation.resume(with: result)
-                }
-
-                let continuation = SafeContinuation<Event>(
-                    onSuccess: { event in
-                        guard let result = event as? T else {
-                            resumeOnce(.failure(ContinuationError.unreachable))
-                            return
-                        }
-                        resumeOnce(.success(result))
-                    },
-                    onFailure: { error in
-                        resumeOnce(.failure(error))
-                    },
-                )
-
-                // Register immediately to avoid missing events published right after waitFor starts.
-                let id = addWaitContinuation(eventType, check: check, continuation: continuation)
-                contId.withLock { value in
-                    value = id
-                }
-
-                let task = Task { [weak self] in
-                    do {
-                        try await Task.sleep(for: .seconds(timeout))
-                    } catch {
-                        return
-                    }
-                    await self?.timeoutWaitContinuation(eventType, id: id, continuation: continuation)
-                }
-                timeoutTask.withLock { value in
-                    value = task
-                }
-            }
-
+        defer {
+            // Cancel timeout task
             timeoutTask.withLock { value in
                 value?.cancel()
                 value = nil
             }
-            return res
-        } catch ContinuationError.timeout {
-            timeoutTask.withLock { value in
-                value?.cancel()
-                value = nil
-            }
-            if let id = contId.withLock({ $0 }) {
-                removeWaitContinuation(eventType, id: id)
-            }
 
-            throw ContinuationError.timeout
-        } catch {
-            timeoutTask.withLock { value in
-                value?.cancel()
-                value = nil
+            // If continuation wasn't resumed, remove it from registry
+            if !hasResumed.load(ordering: .sequentiallyConsistent) {
+                if let id = contId.withLock({ $0 }) {
+                    removeWaitContinuation(eventType, id: id)
+                }
             }
-            if let id = contId.withLock({ $0 }) {
-                removeWaitContinuation(eventType, id: id)
-            }
-            throw error
         }
+
+        let res = try await withCheckedThrowingContinuation { (originalContinuation: CheckedContinuation<T, Error>) in
+            let localHasResumed = Atomic<Bool>(false)
+
+            @Sendable func resumeOnce(_ result: Result<T, Error>) {
+                let resumed = localHasResumed.exchange(true, ordering: .sequentiallyConsistent)
+                if resumed {
+                    return
+                }
+                hasResumed.store(true, ordering: .sequentiallyConsistent)
+                originalContinuation.resume(with: result)
+            }
+
+            let continuation = SafeContinuation<Event>(
+                onSuccess: { event in
+                    guard let result = event as? T else {
+                        resumeOnce(.failure(ContinuationError.unreachable))
+                        return
+                    }
+                    resumeOnce(.success(result))
+                },
+                onFailure: { error in
+                    resumeOnce(.failure(error))
+                },
+            )
+
+            // Register synchronously to avoid missing events published right after waitFor starts.
+            // This must happen BEFORE the timeout task starts to avoid race conditions.
+            let id = addWaitContinuation(eventType, check: check, continuation: continuation)
+            contId.withLock { value in
+                value = id
+            }
+
+            // Start timeout task AFTER continuation is registered
+            let task = Task { [weak self] in
+                do {
+                    try await Task.sleep(for: .seconds(timeout))
+                } catch {
+                    return
+                }
+                await self?.timeoutWaitContinuation(eventType, id: id, continuation: continuation)
+            }
+            timeoutTask.withLock { value in
+                value = task
+            }
+        }
+
+        return res
     }
 }
