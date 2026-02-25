@@ -533,14 +533,10 @@ actor ChildProcessManager {
 
         if pid > 0 {
             logger.debug("Reaped zombie process: PID \(pid)")
-            // Close IPC FD if we have the handle
-            if let handle = activeProcesses.removeValue(forKey: pid) {
-                #if canImport(Glibc)
-                    Glibc.close(handle.ipcFD)
-                #elseif canImport(Darwin)
-                    Darwin.close(handle.ipcFD)
-                #endif
-            }
+            // Remove from active processes but DON'T close the FD
+            // The FD might still be in use by the caller
+            // It will be closed when waitForExit() or reap(handle:) is called
+            activeProcesses.removeValue(forKey: pid)
         }
     }
 
