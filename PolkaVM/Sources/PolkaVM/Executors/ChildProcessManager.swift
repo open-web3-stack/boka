@@ -132,7 +132,7 @@ actor ChildProcessManager {
             if pid < 0 {
                 // Fork failed
                 let err = errno
-                Glibc.close(parentFD)
+                closeFD(parentFD)
                 Glibc.close(childFD)
                 logger.error("Failed to fork: \(err)")
                 throw IPCError.writeFailed(Int(err))
@@ -210,6 +210,8 @@ actor ChildProcessManager {
                 if fdFlagsAfterWait == -1 {
                     let err = errno
                     logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
+                    // Clean up FD before throwing
+                    closeFD(parentFD)
                     // Try to reap the child process
                     var status: Int32 = 0
                     _ = Glibc.waitpid(pid, &status, WNOHANG)
@@ -253,7 +255,7 @@ actor ChildProcessManager {
             var fileActions: posix_spawn_file_actions_t?
             let initResult = posix_spawn_file_actions_init(&fileActions)
             guard initResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to initialize posix_spawn file actions: \(initResult)")
                 throw IPCError.writeFailed(Int(initResult))
@@ -265,7 +267,7 @@ actor ChildProcessManager {
 
             var actionResult = posix_spawn_file_actions_addclose(&fileActions, parentFD)
             guard actionResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to add close action for parentFD: \(actionResult)")
                 throw IPCError.writeFailed(Int(actionResult))
@@ -273,7 +275,7 @@ actor ChildProcessManager {
 
             actionResult = posix_spawn_file_actions_addopen(&fileActions, STDOUT_FILENO, "/dev/null", O_RDWR, 0)
             guard actionResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to add stdout redirection action: \(actionResult)")
                 throw IPCError.writeFailed(Int(actionResult))
@@ -281,7 +283,7 @@ actor ChildProcessManager {
 
             actionResult = posix_spawn_file_actions_adddup2(&fileActions, childFD, STDIN_FILENO)
             guard actionResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to add dup2 action for IPC stdin: \(actionResult)")
                 throw IPCError.writeFailed(Int(actionResult))
@@ -289,7 +291,7 @@ actor ChildProcessManager {
 
             actionResult = posix_spawn_file_actions_addclose(&fileActions, childFD)
             guard actionResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to add close action for childFD: \(actionResult)")
                 throw IPCError.writeFailed(Int(actionResult))
@@ -307,7 +309,7 @@ actor ChildProcessManager {
             }
 
             guard spawnResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to spawn child process: \(spawnResult)")
                 throw IPCError.writeFailed(Int(spawnResult))
@@ -327,6 +329,18 @@ actor ChildProcessManager {
 
             // Validate parentFD is still valid after wait
             let fdFlagsAfterWait = fcntl(parentFD, F_GETFL)
+            if fdFlagsAfterWait == -1 {
+                let err = errno
+                logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
+                // Clean up FD before throwing
+                closeFD(parentFD)
+                throw IPCError.writeFailed(Int(err))
+            }
+
+            logger.debug("Parent: Child ready, returning handle and parentFD \(parentFD) to caller")
+            // Transfer FD ownership to caller - they are responsible for closing it
+            transferFD(parentFD)
+            return (handle, parentFD)
             if fdFlagsAfterWait == -1 {
                 let err = errno
                 logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
