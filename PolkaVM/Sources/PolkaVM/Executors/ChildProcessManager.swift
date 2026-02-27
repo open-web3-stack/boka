@@ -18,9 +18,36 @@ struct ProcessHandle {
 actor ChildProcessManager {
     private var activeProcesses: [pid_t: ProcessHandle] = [:]
     private let defaultTimeout: TimeInterval
+    private var openFDs: Set<Int32> = []  // Track open FDs to prevent double-close
 
     init(defaultTimeout: TimeInterval = 30.0) {
         self.defaultTimeout = defaultTimeout
+    }
+
+    /// Close an FD and track it to prevent double-close
+    private func closeFD(_ fd: Int32) {
+        guard openFDs.remove(fd) != nil else {
+            logger.debug("FD \(fd) already closed, skipping")
+            return
+        }
+        #if canImport(Glibc)
+            Glibc.close(fd)
+        #elseif canImport(Darwin)
+            Darwin.close(fd)
+        #endif
+        logger.debug("Closed FD \(fd)")
+    }
+
+    /// Mark an FD as open for tracking
+    private func trackFD(_ fd: Int32) {
+        openFDs.insert(fd)
+    }
+
+    /// Transfer ownership of an FD to the caller (removes from tracking without closing)
+    /// This is used when the FD is returned to the caller who becomes responsible for closing it
+    private func transferFD(_ fd: Int32) {
+        openFDs.remove(fd)
+        logger.debug("Transferred FD \(fd) to caller ownership")
     }
 
     /// Mark an FD close-on-exec to prevent descriptor leakage into spawned children.
@@ -46,6 +73,9 @@ actor ChildProcessManager {
     /// - Returns: Tuple of process handle and client file descriptor for IPC
     /// - Throws: IPCError if spawning fails
     func spawnChildProcess(executablePath: String) async throws -> (handle: ProcessHandle, clientFD: Int32) {
+        // Clean up any zombie processes from previous runs before spawning new ones
+        reapZombies()
+
         #if os(Linux)
             logger.debug("Spawning child process: \(executablePath)")
 
@@ -79,6 +109,9 @@ actor ChildProcessManager {
             let parentFD = sockets[0]
             let childFD = sockets[1]
 
+            // Track the parentFD so we can safely close it later
+            trackFD(parentFD)
+
             setCloseOnExec(fd: parentFD)
             setCloseOnExec(fd: childFD)
 
@@ -99,7 +132,7 @@ actor ChildProcessManager {
             if pid < 0 {
                 // Fork failed
                 let err = errno
-                Glibc.close(parentFD)
+                closeFD(parentFD)
                 Glibc.close(childFD)
                 logger.error("Failed to fork: \(err)")
                 throw IPCError.writeFailed(Int(err))
@@ -170,20 +203,37 @@ actor ChildProcessManager {
                 // Wait for child to initialize and become ready
                 // In release mode, processes start faster so we need longer wait
                 // Also validate FD is still valid before returning
-                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                do {
+                    try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                } catch {
+                    // Task was cancelled - clean up before rethrowing
+                    logger.warning("Spawn cancelled for PID \(pid), cleaning up")
+                    closeFD(parentFD)
+                    activeProcesses.removeValue(forKey: pid)
+                    Glibc.kill(pid, SIGKILL)
+                    var status: Int32 = 0
+                    _ = Glibc.waitpid(pid, &status, WNOHANG)
+                    throw error
+                }
 
                 // Validate parentFD is still valid after wait
                 let fdFlagsAfterWait = fcntl(parentFD, F_GETFL)
                 if fdFlagsAfterWait == -1 {
                     let err = errno
                     logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
-                    // Try to reap the child process
+                    // Clean up FD and remove from activeProcesses before throwing
+                    closeFD(parentFD)
+                    activeProcesses.removeValue(forKey: pid)
+                    // Try to kill/reap the child process
+                    Glibc.kill(pid, SIGKILL)
                     var status: Int32 = 0
                     _ = Glibc.waitpid(pid, &status, WNOHANG)
                     throw IPCError.writeFailed(Int(err))
                 }
 
                 logger.debug("Parent: Child ready, returning handle and parentFD \(parentFD) to caller")
+                // Transfer FD ownership to caller - they are responsible for closing it
+                transferFD(parentFD)
                 return (handle, parentFD)
             }
         #elseif os(macOS)
@@ -204,6 +254,9 @@ actor ChildProcessManager {
             let parentFD = sockets[0]
             let childFD = sockets[1]
 
+            // Track the parentFD so we can safely close it later
+            trackFD(parentFD)
+
             setCloseOnExec(fd: parentFD)
             setCloseOnExec(fd: childFD)
 
@@ -212,7 +265,7 @@ actor ChildProcessManager {
             var fileActions: posix_spawn_file_actions_t?
             let initResult = posix_spawn_file_actions_init(&fileActions)
             guard initResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to initialize posix_spawn file actions: \(initResult)")
                 throw IPCError.writeFailed(Int(initResult))
@@ -224,7 +277,7 @@ actor ChildProcessManager {
 
             var actionResult = posix_spawn_file_actions_addclose(&fileActions, parentFD)
             guard actionResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to add close action for parentFD: \(actionResult)")
                 throw IPCError.writeFailed(Int(actionResult))
@@ -232,7 +285,7 @@ actor ChildProcessManager {
 
             actionResult = posix_spawn_file_actions_addopen(&fileActions, STDOUT_FILENO, "/dev/null", O_RDWR, 0)
             guard actionResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to add stdout redirection action: \(actionResult)")
                 throw IPCError.writeFailed(Int(actionResult))
@@ -240,7 +293,7 @@ actor ChildProcessManager {
 
             actionResult = posix_spawn_file_actions_adddup2(&fileActions, childFD, STDIN_FILENO)
             guard actionResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to add dup2 action for IPC stdin: \(actionResult)")
                 throw IPCError.writeFailed(Int(actionResult))
@@ -248,7 +301,7 @@ actor ChildProcessManager {
 
             actionResult = posix_spawn_file_actions_addclose(&fileActions, childFD)
             guard actionResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to add close action for childFD: \(actionResult)")
                 throw IPCError.writeFailed(Int(actionResult))
@@ -266,7 +319,7 @@ actor ChildProcessManager {
             }
 
             guard spawnResult == 0 else {
-                Darwin.close(parentFD)
+                closeFD(parentFD)
                 Darwin.close(childFD)
                 logger.error("Failed to spawn child process: \(spawnResult)")
                 throw IPCError.writeFailed(Int(spawnResult))
@@ -282,17 +335,37 @@ actor ChildProcessManager {
             // Wait for child to initialize and become ready
             // In release mode, processes start faster so we need longer wait
             // Also validate FD is still valid before returning
-            try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            } catch {
+                // Task was cancelled - clean up before rethrowing
+                logger.warning("Spawn cancelled for PID \(pid), cleaning up")
+                closeFD(parentFD)
+                activeProcesses.removeValue(forKey: pid)
+                Darwin.kill(pid, SIGKILL)
+                var status: Int32 = 0
+                _ = Darwin.waitpid(pid, &status, WNOHANG)
+                throw error
+            }
 
             // Validate parentFD is still valid after wait
             let fdFlagsAfterWait = fcntl(parentFD, F_GETFL)
             if fdFlagsAfterWait == -1 {
                 let err = errno
                 logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
+                // Clean up FD and remove from activeProcesses before throwing
+                closeFD(parentFD)
+                activeProcesses.removeValue(forKey: pid)
+                // Try to kill/reap the child process
+                Darwin.kill(pid, SIGKILL)
+                var status: Int32 = 0
+                _ = Darwin.waitpid(pid, &status, WNOHANG)
                 throw IPCError.writeFailed(Int(err))
             }
 
             logger.debug("Parent: Child ready, returning handle and parentFD \(parentFD) to caller")
+            // Transfer FD ownership to caller - they are responsible for closing it
+            transferFD(parentFD)
             return (handle, parentFD)
         #else
             throw IPCError.childProcessError("Sandboxed execution is not supported on this platform")
@@ -302,6 +375,7 @@ actor ChildProcessManager {
     /// Wait for child process to exit
     func waitForExit(handle: ProcessHandle, timeout: TimeInterval) async throws -> Int32 {
         let startTime = Date()
+        var lastCheckTime = startTime
 
         while Date().timeIntervalSince(startTime) < timeout {
             var status: Int32 = 0
@@ -314,53 +388,113 @@ actor ChildProcessManager {
             if result < 0 {
                 let err = errno
                 if err == ECHILD {
-                    // Child has already been reaped
+                    // Child has already been reaped (possibly by another thread/process)
+                    logger.warning("Child process \(handle.pid) already reaped (ECHILD)")
+                    activeProcesses.removeValue(forKey: handle.pid)
+                    // Don't close FD - caller owns it
                     return 0
                 }
-                logger.error("waitpid failed: \(err)")
+                logger.error("waitpid failed for PID \(handle.pid): \(err)")
+                activeProcesses.removeValue(forKey: handle.pid)
                 throw IPCError.readFailed(Int(err))
             }
 
             if result == handle.pid {
-                // Child has exited
-                let exitStatus = status & 0x7F // Extract exit status
-                if exitStatus == 0 {
-                    let exitCode = (status >> 8) & 0xFF // Extract exit code
+                // Child has exited - manually parse status (Swift can't use C macros directly)
+                // WIFEXITED: (status & 0x7F) == 0
+                // WEXITSTATUS: (status >> 8) & 0xFF
+                // WTERMSIG: status & 0x7F
+                let terminatedBySignal = (status & 0x7F) != 0
+
+                if !terminatedBySignal {
+                    // Process exited normally
+                    let exitCode = (status >> 8) & 0xFF
                     logger.debug("Child process \(handle.pid) exited with code: \(exitCode)")
                     activeProcesses.removeValue(forKey: handle.pid)
+                    // Don't close FD - caller owns it
                     return Int32(exitCode)
                 } else {
-                    let signal = exitStatus
+                    // Process terminated by signal
+                    let signal = status & 0x7F
                     logger.warning("Child process \(handle.pid) terminated by signal: \(signal)")
                     activeProcesses.removeValue(forKey: handle.pid)
+                    // Don't close FD - caller owns it
                     return -1
                 }
             }
 
             // Child still running, wait a bit
             try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+
+            // Log progress every 10 seconds for long-running processes
+            let now = Date()
+            if now.timeIntervalSince(lastCheckTime) >= 10.0 {
+                logger.debug("Still waiting for PID \(handle.pid) to exit... (\(now.timeIntervalSince(startTime))s / \(timeout)s)")
+                lastCheckTime = now
+            }
         }
 
-        // Timeout
-        logger.warning("Child process \(handle.pid) timed out, killing...")
+        // Timeout - force kill the child process
+        logger.error("Child process \(handle.pid) timed out after \(timeout)s, force killing...")
 
-        // Kill child process
+        // First try SIGTERM for graceful shutdown
         #if canImport(Glibc)
             Glibc.kill(handle.pid, SIGTERM)
         #elseif canImport(Darwin)
             Darwin.kill(handle.pid, SIGTERM)
         #endif
 
-        // Wait for it to actually exit
-        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        // Wait up to 2 seconds for graceful exit
+        var gracefulExit = false
+        for _ in 0 ..< 20 {
+            var status: Int32 = 0
+            #if canImport(Glibc)
+                let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
+            #elseif canImport(Darwin)
+                let result = Darwin.waitpid(handle.pid, &status, WNOHANG)
+            #endif
 
-        var status: Int32 = 0
-        #if canImport(Glibc)
-            _ = Glibc.waitpid(handle.pid, &status, WNOHANG)
-        #elseif canImport(Darwin)
-            _ = Darwin.waitpid(handle.pid, &status, WNOHANG)
-        #endif
+            if result == handle.pid {
+                logger.debug("Child process \(handle.pid) exited gracefully after SIGTERM")
+                gracefulExit = true
+                break
+            } else if result < 0 && errno == ECHILD {
+                // Already reaped
+                logger.debug("Child process \(handle.pid) reaped after SIGTERM")
+                gracefulExit = true
+                break
+            }
+
+            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        }
+
+        // If still running, use SIGKILL
+        if !gracefulExit {
+            logger.warning("Child process \(handle.pid) didn't exit after SIGTERM, using SIGKILL")
+            #if canImport(Glibc)
+                Glibc.kill(handle.pid, SIGKILL)
+            #elseif canImport(Darwin)
+                Darwin.kill(handle.pid, SIGKILL)
+            #endif
+
+            // Wait for it to actually exit (blocking this time)
+            var status: Int32 = 0
+            #if canImport(Glibc)
+                let result = Glibc.waitpid(handle.pid, &status, 0) // Blocking wait
+            #elseif canImport(Darwin)
+                let result = Darwin.waitpid(handle.pid, &status, 0) // Blocking wait
+            #endif
+
+            if result == handle.pid {
+                logger.debug("Child process \(handle.pid) killed via SIGKILL")
+            } else if result < 0 && errno == ECHILD {
+                logger.debug("Child process \(handle.pid) reaped (ECHILD) after SIGKILL")
+            }
+        }
+
+        // Clean up resources
         activeProcesses.removeValue(forKey: handle.pid)
+        // Don't close FD - caller owns it and will close it
 
         throw IPCError.timeout
     }
@@ -368,6 +502,7 @@ actor ChildProcessManager {
     /// Kill a child process and reap it to avoid zombies
     func kill(handle: ProcessHandle, signal: Int32 = SIGTERM) {
         logger.debug("Killing child process \(handle.pid) with signal \(signal)")
+
         #if canImport(Glibc)
             Glibc.kill(handle.pid, signal)
         #elseif canImport(Darwin)
@@ -388,9 +523,13 @@ actor ChildProcessManager {
             let err = errno
             if err != ECHILD {
                 logger.warning("Failed to wait for killed process \(handle.pid): \(err)")
+            } else {
+                logger.debug("Process \(handle.pid) already reaped (ECHILD)")
             }
         }
 
+        // Remove from activeProcesses
+        // Note: Don't close the FD - the caller owns it and will close it
         activeProcesses.removeValue(forKey: handle.pid)
     }
 
@@ -405,7 +544,16 @@ actor ChildProcessManager {
 
         if result == handle.pid {
             logger.debug("Reaped zombie process \(handle.pid)")
+            // Don't close FD - caller owns it
             activeProcesses.removeValue(forKey: handle.pid)
+        } else if result < 0 {
+            let err = errno
+            if err == ECHILD {
+                // Process already reaped
+                logger.debug("Process \(handle.pid) already reaped (ECHILD)")
+                // Don't close FD - caller owns it
+                activeProcesses.removeValue(forKey: handle.pid)
+            }
         }
     }
 
@@ -420,27 +568,53 @@ actor ChildProcessManager {
 
         if pid > 0 {
             logger.debug("Reaped zombie process: PID \(pid)")
+            // Remove from active processes but DON'T close the FD
+            // The FD might still be in use by the caller
+            // It will be closed when waitForExit() or reap(handle:) is called
             activeProcesses.removeValue(forKey: pid)
         }
     }
 
     /// Clean up all active processes
     func cleanup() {
-        logger.debug("Cleaning up \(activeProcesses.count) active processes")
+        logger.debug("Cleaning up \(activeProcesses.count) active processes, \(openFDs.count) open FDs")
 
+        // First, close all IPC FDs to prevent blocking
+        // Iterate over openFDs to catch FDs from incomplete spawn operations
+        // (successful spawns transfer ownership to caller, so only failed/in-progress
+        // spawns have FDs in openFDs)
+        for fd in Array(openFDs) {
+            closeFD(fd)
+        }
+
+        // Then kill all remaining processes
         for (_, handle) in activeProcesses {
             #if canImport(Glibc)
-                Glibc.close(handle.ipcFD)
                 Glibc.kill(handle.pid, SIGTERM)
             #elseif canImport(Darwin)
-                Darwin.close(handle.ipcFD)
                 Darwin.kill(handle.pid, SIGTERM)
+            #endif
+        }
+
+        // Wait a bit for graceful exit
+        #if canImport(Glibc)
+            usleep(100_000) // 100ms
+        #elseif canImport(Darwin)
+            usleep(100_000) // 100ms
+        #endif
+
+        // Force kill any remaining processes
+        for (_, handle) in activeProcesses {
+            #if canImport(Glibc)
+                Glibc.kill(handle.pid, SIGKILL)
+            #elseif canImport(Darwin)
+                Darwin.kill(handle.pid, SIGKILL)
             #endif
         }
 
         activeProcesses.removeAll()
 
-        // Final reap
+        // Final reap - use blocking wait to ensure all children are reaped
         var status: Int32 = 0
         #if canImport(Glibc)
             while Glibc.waitpid(-1, &status, WNOHANG) > 0 {
@@ -451,19 +625,44 @@ actor ChildProcessManager {
                 // Reap all zombies
             }
         #endif
+
+        logger.debug("Cleanup complete")
     }
 
     deinit {
         // Clean up in destructor
-        // Note: This runs on arbitrary thread, be careful
+        // Note: deinit on actors can synchronously access actor-isolated state (Swift 5.10+)
+
+        // Close all FDs first to prevent resource leaks
+        // Iterate over openFDs to catch all FDs including orphaned ones
+        for fd in openFDs {
+            // Direct close here since we're in deinit
+            #if canImport(Glibc)
+                Glibc.close(fd)
+            #elseif canImport(Darwin)
+                Darwin.close(fd)
+            #endif
+        }
+
+        // Kill all remaining processes with SIGKILL
         for (_, handle) in activeProcesses {
             #if canImport(Glibc)
-                Glibc.close(handle.ipcFD)
                 Glibc.kill(handle.pid, SIGKILL)
             #elseif canImport(Darwin)
-                Darwin.close(handle.ipcFD)
                 Darwin.kill(handle.pid, SIGKILL)
             #endif
         }
+
+        // Try to reap zombies (non-blocking, deinit shouldn't block)
+        var status: Int32 = 0
+        #if canImport(Glibc)
+            while Glibc.waitpid(-1, &status, WNOHANG) > 0 {
+                // Reap
+            }
+        #elseif canImport(Darwin)
+            while Darwin.waitpid(-1, &status, WNOHANG) > 0 {
+                // Reap
+            }
+        #endif
     }
 }
