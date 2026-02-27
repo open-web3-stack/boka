@@ -18,9 +18,29 @@ struct ProcessHandle {
 actor ChildProcessManager {
     private var activeProcesses: [pid_t: ProcessHandle] = [:]
     private let defaultTimeout: TimeInterval
+    private var openFDs: Set<Int32> = []  // Track open FDs to prevent double-close
 
     init(defaultTimeout: TimeInterval = 30.0) {
         self.defaultTimeout = defaultTimeout
+    }
+
+    /// Close an FD and track it to prevent double-close
+    private func closeFD(_ fd: Int32) {
+        guard openFDs.remove(fd) != nil else {
+            logger.debug("FD \(fd) already closed, skipping")
+            return
+        }
+        #if canImport(Glibc)
+            Glibc.close(fd)
+        #elseif canImport(Darwin)
+            Darwin.close(fd)
+        #endif
+        logger.debug("Closed FD \(fd)")
+    }
+
+    /// Mark an FD as open for tracking
+    private func trackFD(_ fd: Int32) {
+        openFDs.insert(fd)
     }
 
     /// Mark an FD close-on-exec to prevent descriptor leakage into spawned children.
@@ -81,6 +101,9 @@ actor ChildProcessManager {
 
             let parentFD = sockets[0]
             let childFD = sockets[1]
+
+            // Track the parentFD so we can safely close it later
+            trackFD(parentFD)
 
             setCloseOnExec(fd: parentFD)
             setCloseOnExec(fd: childFD)
@@ -210,6 +233,9 @@ actor ChildProcessManager {
             let parentFD = sockets[0]
             let childFD = sockets[1]
 
+            // Track the parentFD so we can safely close it later
+            trackFD(parentFD)
+
             setCloseOnExec(fd: parentFD)
             setCloseOnExec(fd: childFD)
 
@@ -325,11 +351,7 @@ actor ChildProcessManager {
                     logger.warning("Child process \(handle.pid) already reaped (ECHILD)")
                     activeProcesses.removeValue(forKey: handle.pid)
                     // Close the IPC FD to prevent resource leaks
-                    #if canImport(Glibc)
-                        Glibc.close(handle.ipcFD)
-                    #elseif canImport(Darwin)
-                        Darwin.close(handle.ipcFD)
-                    #endif
+                    closeFD(handle.ipcFD)
                     return 0
                 }
                 logger.error("waitpid failed for PID \(handle.pid): \(err)")
@@ -350,11 +372,7 @@ actor ChildProcessManager {
                     logger.debug("Child process \(handle.pid) exited with code: \(exitCode)")
                     activeProcesses.removeValue(forKey: handle.pid)
                     // Close the IPC FD
-                    #if canImport(Glibc)
-                        Glibc.close(handle.ipcFD)
-                    #elseif canImport(Darwin)
-                        Darwin.close(handle.ipcFD)
-                    #endif
+                    closeFD(handle.ipcFD)
                     return Int32(exitCode)
                 } else {
                     // Process terminated by signal
@@ -362,11 +380,7 @@ actor ChildProcessManager {
                     logger.warning("Child process \(handle.pid) terminated by signal: \(signal)")
                     activeProcesses.removeValue(forKey: handle.pid)
                     // Close the IPC FD
-                    #if canImport(Glibc)
-                        Glibc.close(handle.ipcFD)
-                    #elseif canImport(Darwin)
-                        Darwin.close(handle.ipcFD)
-                    #endif
+                    closeFD(handle.ipcFD)
                     return -1
                 }
             }
@@ -442,11 +456,7 @@ actor ChildProcessManager {
 
         // Clean up resources
         activeProcesses.removeValue(forKey: handle.pid)
-        #if canImport(Glibc)
-            Glibc.close(handle.ipcFD)
-        #elseif canImport(Darwin)
-            Darwin.close(handle.ipcFD)
-        #endif
+        closeFD(handle.ipcFD)
 
         throw IPCError.timeout
     }
@@ -460,9 +470,6 @@ actor ChildProcessManager {
             Darwin.kill(handle.pid, signal)
         #endif
 
-        // Don't close the IPC FD here - it will be closed by reap() or waitForExit()
-        // Closing it here causes double-close bugs when reap() is called after kill()
-
         // Try to reap the process immediately to avoid zombies
         var status: Int32 = 0
         #if canImport(Glibc)
@@ -473,28 +480,20 @@ actor ChildProcessManager {
 
         if result == handle.pid {
             logger.debug("Reaped killed process \(handle.pid)")
-            // Close IPC FD after successful reap
-            #if canImport(Glibc)
-                Glibc.close(handle.ipcFD)
-            #elseif canImport(Darwin)
-                Darwin.close(handle.ipcFD)
-            #endif
+            // Close IPC FD after successful reap (idempotent via tracking)
+            closeFD(handle.ipcFD)
             activeProcesses.removeValue(forKey: handle.pid)
         } else if result < 0 {
             let err = errno
             if err != ECHILD {
                 logger.warning("Failed to wait for killed process \(handle.pid): \(err)")
-                // Close IPC FD on error (except ECHILD which means already reaped)
-                #if canImport(Glibc)
-                    Glibc.close(handle.ipcFD)
-                #elseif canImport(Darwin)
-                    Darwin.close(handle.ipcFD)
-                #endif
+                // Close IPC FD on error (idempotent via tracking)
+                closeFD(handle.ipcFD)
                 activeProcesses.removeValue(forKey: handle.pid)
             } else {
-                // ECHILD: process already reaped, don't close FD here
-                // The caller should use reap() to properly clean up
-                logger.debug("Process \(handle.pid) already reaped (ECHILD), deferring FD cleanup to reap()")
+                // ECHILD: process already reaped elsewhere
+                // Close the FD idempotently (safe even if already closed)
+                closeFD(handle.ipcFD)
                 activeProcesses.removeValue(forKey: handle.pid)
             }
         }
@@ -512,33 +511,15 @@ actor ChildProcessManager {
 
         if result == handle.pid {
             logger.debug("Reaped zombie process \(handle.pid)")
-            // Close IPC FD (check if still valid first to avoid double-close)
-            let fdFlags = fcntl(handle.ipcFD, F_GETFL)
-            if fdFlags != -1 {
-                #if canImport(Glibc)
-                    Glibc.close(handle.ipcFD)
-                #elseif canImport(Darwin)
-                    Darwin.close(handle.ipcFD)
-                #endif
-            } else {
-                logger.debug("FD \(handle.ipcFD) already closed, skipping close in reap()")
-            }
+            // Close IPC FD (idempotent via tracking)
+            closeFD(handle.ipcFD)
             activeProcesses.removeValue(forKey: handle.pid)
         } else if result < 0 {
             let err = errno
             if err == ECHILD {
-                // Process already reaped, clean up FD (check if still valid first)
+                // Process already reaped, close FD idempotently
                 logger.debug("Process \(handle.pid) already reaped (ECHILD)")
-                let fdFlags = fcntl(handle.ipcFD, F_GETFL)
-                if fdFlags != -1 {
-                    #if canImport(Glibc)
-                        Glibc.close(handle.ipcFD)
-                    #elseif canImport(Darwin)
-                        Darwin.close(handle.ipcFD)
-                    #endif
-                } else {
-                    logger.debug("FD \(handle.ipcFD) already closed, skipping close in reap() for ECHILD")
-                }
+                closeFD(handle.ipcFD)
                 activeProcesses.removeValue(forKey: handle.pid)
             }
         }
@@ -568,11 +549,7 @@ actor ChildProcessManager {
 
         // First, close all IPC FDs to prevent blocking
         for (_, handle) in activeProcesses {
-            #if canImport(Glibc)
-                Glibc.close(handle.ipcFD)
-            #elseif canImport(Darwin)
-                Darwin.close(handle.ipcFD)
-            #endif
+            closeFD(handle.ipcFD)
         }
 
         // Then kill all processes
@@ -622,6 +599,8 @@ actor ChildProcessManager {
         // Note: This runs on arbitrary thread, be careful
         // Close all FDs first to prevent resource leaks
         for (_, handle) in activeProcesses {
+            // Direct close here since we're in deinit and can't use actor-isolated methods
+            // This is safe because deinit is the final cleanup
             #if canImport(Glibc)
                 Glibc.close(handle.ipcFD)
             #elseif canImport(Darwin)
