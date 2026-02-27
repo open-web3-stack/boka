@@ -36,4 +36,19 @@ public final class Executor: @unchecked Sendable {
             ctx: ctx,
         )
     }
+
+    /// Shutdown the executor and clean up resources
+    /// For pooled executors, this terminates all worker processes
+    public func shutdown() async {
+        // If using pooled sandbox frontend, shut down the pool
+        if let pooledFrontend = frontend as? ExecutorFrontendSandboxedWithPool {
+            await pooledFrontend.shutdown()
+        }
+    }
+
+    deinit {
+        // Note: Can't call async shutdown() from deinit
+        // Resources will be cleaned up via deinits of child actors
+        // Tests should explicitly call shutdown() for clean cleanup
+    }
 }

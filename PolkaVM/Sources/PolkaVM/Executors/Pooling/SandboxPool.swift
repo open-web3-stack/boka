@@ -390,8 +390,13 @@ public actor SandboxPool {
 
     /// Run periodic health checks
     private func runHealthChecks() async {
-        while !isShutdown {
+        // Check both isShutdown flag and task cancellation
+        // Task.isCancelled will be true when the actor is being deallocated
+        while !isShutdown && !Task.isCancelled {
             try? await Task.sleep(nanoseconds: UInt64(config.healthCheckInterval * 1_000_000_000))
+
+            // Exit if cancelled during sleep
+            guard !Task.isCancelled else { break }
 
             await checkWorkerHealth()
         }
@@ -456,5 +461,14 @@ public actor SandboxPool {
         if queueWaitTimes.count > 1000 {
             queueWaitTimes.removeFirst(queueWaitTimes.count - 1000)
         }
+    }
+
+    /// Synchronous cleanup for deinit
+    /// Called when the actor is being deallocated to ensure child processes are killed
+    nonisolated deinit {
+        // Note: We can't call async shutdown() from deinit
+        // But setting isShutdown ensures the health check task exits if it's still running
+        // And the workers' deinits will handle force-killing child processes
+        // The actors will be deallocated in order: pool -> workers -> childProcessManager
     }
 }

@@ -78,6 +78,9 @@ struct SandboxPoolTests {
         )
         print("Result 3: \(result3.exitReason)")
 
+        // Explicitly shutdown to clean up worker processes
+        await executor.shutdown()
+
         print("\n=== TEST PASSED ===\n")
     }
 
@@ -130,6 +133,9 @@ struct SandboxPoolTests {
             #expect(result.exitReason == ExitReason.halt || result.exitReason == .panic(.trap))
             successCount += 1
         }
+
+        // Explicitly shutdown to clean up worker processes
+        await executor.shutdown()
 
         print("\n=== SUCCESS: \(successCount)/\(iterations) executions ===\n")
         #expect(successCount == iterations)
