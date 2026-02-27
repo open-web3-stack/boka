@@ -545,14 +545,16 @@ actor ChildProcessManager {
 
     /// Clean up all active processes
     func cleanup() {
-        logger.debug("Cleaning up \(activeProcesses.count) active processes")
+        logger.debug("Cleaning up \(activeProcesses.count) active processes, \(openFDs.count) open FDs")
 
         // First, close all IPC FDs to prevent blocking
-        for (_, handle) in activeProcesses {
-            closeFD(handle.ipcFD)
+        // Iterate over openFDs (source of truth) to catch FDs from processes
+        // that were reaped by reapZombies() but not explicitly closed
+        for fd in Array(openFDs) {
+            closeFD(fd)
         }
 
-        // Then kill all processes
+        // Then kill all remaining processes
         for (_, handle) in activeProcesses {
             #if canImport(Glibc)
                 Glibc.kill(handle.pid, SIGTERM)
@@ -596,15 +598,16 @@ actor ChildProcessManager {
 
     deinit {
         // Clean up in destructor
-        // Note: This runs on arbitrary thread, be careful
+        // Note: deinit on actors can synchronously access actor-isolated state (Swift 5.10+)
+
         // Close all FDs first to prevent resource leaks
-        for (_, handle) in activeProcesses {
-            // Direct close here since we're in deinit and can't use actor-isolated methods
-            // This is safe because deinit is the final cleanup
+        // Iterate over openFDs to catch all FDs including orphaned ones
+        for fd in openFDs {
+            // Direct close here since we're in deinit
             #if canImport(Glibc)
-                Glibc.close(handle.ipcFD)
+                Glibc.close(fd)
             #elseif canImport(Darwin)
-                Darwin.close(handle.ipcFD)
+                Darwin.close(fd)
             #endif
         }
 
