@@ -50,13 +50,6 @@ actor ChildProcessManager {
         logger.debug("Transferred FD \(fd) to caller ownership")
     }
 
-    /// Notify that an FD has been closed by the owner (e.g., IPCClient)
-    /// This is called by the caller when they close an FD they own
-    func fdClosed(_ fd: Int32) {
-        openFDs.remove(fd)
-        logger.debug("Caller closed FD \(fd), removed from tracking")
-    }
-
     /// Mark an FD close-on-exec to prevent descriptor leakage into spawned children.
     /// Leaked parent IPC FDs can keep peer sockets alive and delay EOF detection.
     private func setCloseOnExec(fd: Int32) {
@@ -478,10 +471,6 @@ actor ChildProcessManager {
     func kill(handle: ProcessHandle, signal: Int32 = SIGTERM) {
         logger.debug("Killing child process \(handle.pid) with signal \(signal)")
 
-        // Close IPC FD immediately to send EOF and help child terminate
-        // This is safe even if caller still owns the FD (idempotent via tracking)
-        closeFD(handle.ipcFD)
-
         #if canImport(Glibc)
             Glibc.kill(handle.pid, signal)
         #elseif canImport(Darwin)
@@ -507,7 +496,8 @@ actor ChildProcessManager {
             }
         }
 
-        // Always remove from activeProcesses since we've sent the signal and closed the FD
+        // Remove from activeProcesses
+        // Note: Don't close the FD - the caller owns it and will close it
         activeProcesses.removeValue(forKey: handle.pid)
     }
 
@@ -522,15 +512,14 @@ actor ChildProcessManager {
 
         if result == handle.pid {
             logger.debug("Reaped zombie process \(handle.pid)")
-            // Close IPC FD (idempotent via tracking)
-            closeFD(handle.ipcFD)
+            // Don't close FD - caller owns it
             activeProcesses.removeValue(forKey: handle.pid)
         } else if result < 0 {
             let err = errno
             if err == ECHILD {
-                // Process already reaped, close FD idempotently
+                // Process already reaped
                 logger.debug("Process \(handle.pid) already reaped (ECHILD)")
-                closeFD(handle.ipcFD)
+                // Don't close FD - caller owns it
                 activeProcesses.removeValue(forKey: handle.pid)
             }
         }
