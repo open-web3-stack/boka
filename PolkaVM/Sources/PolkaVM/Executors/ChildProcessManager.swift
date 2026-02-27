@@ -43,6 +43,20 @@ actor ChildProcessManager {
         openFDs.insert(fd)
     }
 
+    /// Transfer ownership of an FD to the caller (removes from tracking without closing)
+    /// This is used when the FD is returned to the caller who becomes responsible for closing it
+    private func transferFD(_ fd: Int32) {
+        openFDs.remove(fd)
+        logger.debug("Transferred FD \(fd) to caller ownership")
+    }
+
+    /// Notify that an FD has been closed by the owner (e.g., IPCClient)
+    /// This is called by the caller when they close an FD they own
+    func fdClosed(_ fd: Int32) {
+        openFDs.remove(fd)
+        logger.debug("Caller closed FD \(fd), removed from tracking")
+    }
+
     /// Mark an FD close-on-exec to prevent descriptor leakage into spawned children.
     /// Leaked parent IPC FDs can keep peer sockets alive and delay EOF detection.
     private func setCloseOnExec(fd: Int32) {
@@ -210,6 +224,8 @@ actor ChildProcessManager {
                 }
 
                 logger.debug("Parent: Child ready, returning handle and parentFD \(parentFD) to caller")
+                // Transfer FD ownership to caller - they are responsible for closing it
+                transferFD(parentFD)
                 return (handle, parentFD)
             }
         #elseif os(macOS)
@@ -350,8 +366,7 @@ actor ChildProcessManager {
                     // Child has already been reaped (possibly by another thread/process)
                     logger.warning("Child process \(handle.pid) already reaped (ECHILD)")
                     activeProcesses.removeValue(forKey: handle.pid)
-                    // Close the IPC FD to prevent resource leaks
-                    closeFD(handle.ipcFD)
+                    // Don't close FD - caller owns it
                     return 0
                 }
                 logger.error("waitpid failed for PID \(handle.pid): \(err)")
@@ -371,16 +386,14 @@ actor ChildProcessManager {
                     let exitCode = (status >> 8) & 0xFF
                     logger.debug("Child process \(handle.pid) exited with code: \(exitCode)")
                     activeProcesses.removeValue(forKey: handle.pid)
-                    // Close the IPC FD
-                    closeFD(handle.ipcFD)
+                    // Don't close FD - caller owns it
                     return Int32(exitCode)
                 } else {
                     // Process terminated by signal
                     let signal = status & 0x7F
                     logger.warning("Child process \(handle.pid) terminated by signal: \(signal)")
                     activeProcesses.removeValue(forKey: handle.pid)
-                    // Close the IPC FD
-                    closeFD(handle.ipcFD)
+                    // Don't close FD - caller owns it
                     return -1
                 }
             }
@@ -456,7 +469,7 @@ actor ChildProcessManager {
 
         // Clean up resources
         activeProcesses.removeValue(forKey: handle.pid)
-        closeFD(handle.ipcFD)
+        // Don't close FD - caller owns it and will close it
 
         throw IPCError.timeout
     }
@@ -464,6 +477,11 @@ actor ChildProcessManager {
     /// Kill a child process and reap it to avoid zombies
     func kill(handle: ProcessHandle, signal: Int32 = SIGTERM) {
         logger.debug("Killing child process \(handle.pid) with signal \(signal)")
+
+        // Close IPC FD immediately to send EOF and help child terminate
+        // This is safe even if caller still owns the FD (idempotent via tracking)
+        closeFD(handle.ipcFD)
+
         #if canImport(Glibc)
             Glibc.kill(handle.pid, signal)
         #elseif canImport(Darwin)
@@ -480,24 +498,17 @@ actor ChildProcessManager {
 
         if result == handle.pid {
             logger.debug("Reaped killed process \(handle.pid)")
-            // Close IPC FD after successful reap (idempotent via tracking)
-            closeFD(handle.ipcFD)
-            activeProcesses.removeValue(forKey: handle.pid)
         } else if result < 0 {
             let err = errno
             if err != ECHILD {
                 logger.warning("Failed to wait for killed process \(handle.pid): \(err)")
-                // Close IPC FD on error (idempotent via tracking)
-                closeFD(handle.ipcFD)
-                activeProcesses.removeValue(forKey: handle.pid)
             } else {
-                // ECHILD: process already reaped elsewhere
-                // Close the FD idempotently (safe even if already closed)
-                closeFD(handle.ipcFD)
-                activeProcesses.removeValue(forKey: handle.pid)
+                logger.debug("Process \(handle.pid) already reaped (ECHILD)")
             }
         }
-        // If result == 0, process is still running, don't close FD or remove from activeProcesses
+
+        // Always remove from activeProcesses since we've sent the signal and closed the FD
+        activeProcesses.removeValue(forKey: handle.pid)
     }
 
     /// Force reap a specific process (if it's zombie)
