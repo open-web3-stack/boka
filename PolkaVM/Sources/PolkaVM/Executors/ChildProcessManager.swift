@@ -210,9 +210,11 @@ actor ChildProcessManager {
                 if fdFlagsAfterWait == -1 {
                     let err = errno
                     logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
-                    // Clean up FD before throwing
+                    // Clean up FD and remove from activeProcesses before throwing
                     closeFD(parentFD)
-                    // Try to reap the child process
+                    activeProcesses.removeValue(forKey: pid)
+                    // Try to kill/reap the child process
+                    Glibc.kill(pid, SIGKILL)
                     var status: Int32 = 0
                     _ = Glibc.waitpid(pid, &status, WNOHANG)
                     throw IPCError.writeFailed(Int(err))
@@ -332,22 +334,25 @@ actor ChildProcessManager {
             if fdFlagsAfterWait == -1 {
                 let err = errno
                 logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
-                // Clean up FD before throwing
+                // Clean up FD and remove from activeProcesses before throwing
                 closeFD(parentFD)
+                activeProcesses.removeValue(forKey: pid)
+                // Try to kill/reap the child process
+                #if canImport(Glibc)
+                    Glibc.kill(pid, SIGKILL)
+                    var status: Int32 = 0
+                    _ = Glibc.waitpid(pid, &status, WNOHANG)
+                #elseif canImport(Darwin)
+                    Darwin.kill(pid, SIGKILL)
+                    var status: Int32 = 0
+                    _ = Darwin.waitpid(pid, &status, WNOHANG)
+                #endif
                 throw IPCError.writeFailed(Int(err))
             }
 
             logger.debug("Parent: Child ready, returning handle and parentFD \(parentFD) to caller")
             // Transfer FD ownership to caller - they are responsible for closing it
             transferFD(parentFD)
-            return (handle, parentFD)
-            if fdFlagsAfterWait == -1 {
-                let err = errno
-                logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
-                throw IPCError.writeFailed(Int(err))
-            }
-
-            logger.debug("Parent: Child ready, returning handle and parentFD \(parentFD) to caller")
             return (handle, parentFD)
         #else
             throw IPCError.childProcessError("Sandboxed execution is not supported on this platform")
