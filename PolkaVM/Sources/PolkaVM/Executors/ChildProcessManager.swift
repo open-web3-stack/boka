@@ -203,7 +203,18 @@ actor ChildProcessManager {
                 // Wait for child to initialize and become ready
                 // In release mode, processes start faster so we need longer wait
                 // Also validate FD is still valid before returning
-                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                do {
+                    try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                } catch {
+                    // Task was cancelled - clean up before rethrowing
+                    logger.warning("Spawn cancelled for PID \(pid), cleaning up")
+                    closeFD(parentFD)
+                    activeProcesses.removeValue(forKey: pid)
+                    Glibc.kill(pid, SIGKILL)
+                    var status: Int32 = 0
+                    _ = Glibc.waitpid(pid, &status, WNOHANG)
+                    throw error
+                }
 
                 // Validate parentFD is still valid after wait
                 let fdFlagsAfterWait = fcntl(parentFD, F_GETFL)
@@ -227,9 +238,6 @@ actor ChildProcessManager {
             }
         #elseif os(macOS)
             logger.debug("Spawning child process: \(executablePath)")
-
-            // Clean up any zombie processes from previous runs before spawning new ones
-            reapZombies()
 
             // Create socket pair for IPC
             var sockets: [Int32] = [0, 0]
@@ -327,7 +335,18 @@ actor ChildProcessManager {
             // Wait for child to initialize and become ready
             // In release mode, processes start faster so we need longer wait
             // Also validate FD is still valid before returning
-            try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            } catch {
+                // Task was cancelled - clean up before rethrowing
+                logger.warning("Spawn cancelled for PID \(pid), cleaning up")
+                closeFD(parentFD)
+                activeProcesses.removeValue(forKey: pid)
+                Darwin.kill(pid, SIGKILL)
+                var status: Int32 = 0
+                _ = Darwin.waitpid(pid, &status, WNOHANG)
+                throw error
+            }
 
             // Validate parentFD is still valid after wait
             let fdFlagsAfterWait = fcntl(parentFD, F_GETFL)
@@ -338,15 +357,9 @@ actor ChildProcessManager {
                 closeFD(parentFD)
                 activeProcesses.removeValue(forKey: pid)
                 // Try to kill/reap the child process
-                #if canImport(Glibc)
-                    Glibc.kill(pid, SIGKILL)
-                    var status: Int32 = 0
-                    _ = Glibc.waitpid(pid, &status, WNOHANG)
-                #elseif canImport(Darwin)
-                    Darwin.kill(pid, SIGKILL)
-                    var status: Int32 = 0
-                    _ = Darwin.waitpid(pid, &status, WNOHANG)
-                #endif
+                Darwin.kill(pid, SIGKILL)
+                var status: Int32 = 0
+                _ = Darwin.waitpid(pid, &status, WNOHANG)
                 throw IPCError.writeFailed(Int(err))
             }
 
@@ -567,8 +580,9 @@ actor ChildProcessManager {
         logger.debug("Cleaning up \(activeProcesses.count) active processes, \(openFDs.count) open FDs")
 
         // First, close all IPC FDs to prevent blocking
-        // Iterate over openFDs (source of truth) to catch FDs from processes
-        // that were reaped by reapZombies() but not explicitly closed
+        // Iterate over openFDs to catch FDs from incomplete spawn operations
+        // (successful spawns transfer ownership to caller, so only failed/in-progress
+        // spawns have FDs in openFDs)
         for fd in Array(openFDs) {
             closeFD(fd)
         }
