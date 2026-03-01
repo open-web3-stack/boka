@@ -52,10 +52,11 @@ public actor SandboxPool {
         logger.debug("[POOL] Pool initialized with \(workers.count) workers (target: \(config.poolSize))")
 
         // Start health check task if enabled
+        // Use [weak self] to avoid strong reference cycle that prevents deallocation
         if config.healthCheckInterval > 0 {
             logger.debug("[POOL] Starting health check task (interval: \(config.healthCheckInterval)s)")
-            Task {
-                await runHealthChecks()
+            Task { [weak self] in
+                await self?.runHealthChecks()
             }
         }
     }
@@ -391,11 +392,12 @@ public actor SandboxPool {
     /// Run periodic health checks
     private func runHealthChecks() async {
         // Check both isShutdown flag and task cancellation
-        // Task.isCancelled will be true when the actor is being deallocated
+        // Task.isCancelled will be true when the weak self reference becomes nil
+        // and the task exits early
         while !isShutdown && !Task.isCancelled {
             try? await Task.sleep(nanoseconds: UInt64(config.healthCheckInterval * 1_000_000_000))
 
-            // Exit if cancelled during sleep
+            // Exit if cancelled during sleep or if self was deallocated
             guard !Task.isCancelled else { break }
 
             await checkWorkerHealth()
@@ -466,9 +468,9 @@ public actor SandboxPool {
     /// Synchronous cleanup for deinit
     /// Called when the actor is being deallocated to ensure child processes are killed
     nonisolated deinit {
-        // Note: We can't call async shutdown() from deinit
-        // But setting isShutdown ensures the health check task exits if it's still running
-        // And the workers' deinits will handle force-killing child processes
+        // Note: We can't call async shutdown() or set isShutdown from deinit
+        // The health check task uses [weak self] so it will exit when self becomes nil
+        // The workers' deinits will handle force-killing child processes
         // The actors will be deallocated in order: pool -> workers -> childProcessManager
     }
 }
