@@ -116,6 +116,66 @@ struct ChildProcessManagerTests {
             #expect(true)
         #endif
     }
+
+    @Test
+    func waitForExitTimeoutWithSIGKILLFallback() async throws {
+        #if os(macOS) || os(Linux)
+            let fileManager = FileManager.default
+            let tempDir = fileManager.temporaryDirectory.appendingPathComponent("child-process-timeout-\(UUID().uuidString)")
+            try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            defer {
+                try? fileManager.removeItem(at: tempDir)
+            }
+
+            let scriptURL = tempDir.appendingPathComponent("ignore-term.sh")
+            let scriptContents = """
+            #!/bin/sh
+            trap '' TERM
+            while true; do
+              sleep 1
+            done
+            """
+            try scriptContents.write(to: scriptURL, atomically: true, encoding: .utf8)
+
+            #if canImport(Glibc)
+                _ = Glibc.chmod(scriptURL.path, 0o755)
+            #elseif canImport(Darwin)
+                _ = Darwin.chmod(scriptURL.path, 0o755)
+            #endif
+
+            let manager = ChildProcessManager(defaultTimeout: 5.0)
+            let (handle, clientFD) = try await manager.spawnChildProcess(executablePath: scriptURL.path)
+            defer {
+                #if canImport(Glibc)
+                    _ = Glibc.close(clientFD)
+                #elseif canImport(Darwin)
+                    _ = Darwin.close(clientFD)
+                #endif
+            }
+
+            let start = Date()
+            var sawTimeout = false
+
+            do {
+                _ = try await manager.waitForExit(handle: handle, timeout: 0.3)
+                Issue.record("Expected timeout, but waitForExit returned normally")
+            } catch let error as IPCError {
+                if case .timeout = error {
+                    sawTimeout = true
+                } else {
+                    Issue.record("Expected IPCError.timeout, got \(error)")
+                }
+            } catch {
+                Issue.record("Expected IPCError.timeout, got \(error)")
+            }
+
+            let elapsed = Date().timeIntervalSince(start)
+            #expect(sawTimeout)
+            #expect(elapsed < 12.0)
+        #else
+            #expect(true)
+        #endif
+    }
 }
 
 private func resolveSandboxExecutablePathForTests() -> String? {

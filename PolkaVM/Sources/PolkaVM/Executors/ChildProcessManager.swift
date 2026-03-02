@@ -472,23 +472,56 @@ actor ChildProcessManager {
         if !gracefulExit {
             logger.warning("Child process \(handle.pid) didn't exit after SIGTERM, using SIGKILL")
             #if canImport(Glibc)
-                Glibc.kill(handle.pid, SIGKILL)
+                let killResult = Glibc.kill(handle.pid, SIGKILL)
             #elseif canImport(Darwin)
-                Darwin.kill(handle.pid, SIGKILL)
+                let killResult = Darwin.kill(handle.pid, SIGKILL)
             #endif
 
-            // Wait for it to actually exit (blocking this time)
-            var status: Int32 = 0
-            #if canImport(Glibc)
-                let result = Glibc.waitpid(handle.pid, &status, 0) // Blocking wait
-            #elseif canImport(Darwin)
-                let result = Darwin.waitpid(handle.pid, &status, 0) // Blocking wait
-            #endif
+            if killResult != 0 {
+                let err = errno
+                if err != ESRCH {
+                    logger.warning("Failed to SIGKILL child process \(handle.pid): \(err)")
+                }
+            }
 
-            if result == handle.pid {
-                logger.debug("Child process \(handle.pid) killed via SIGKILL")
-            } else if result < 0 && errno == ECHILD {
-                logger.debug("Child process \(handle.pid) reaped (ECHILD) after SIGKILL")
+            // Never block indefinitely here. In CI we observed rare hangs where a blocking
+            // waitpid(2) after SIGKILL could pin the whole job until workflow timeout.
+            var reapedAfterSIGKILL = false
+            for _ in 0 ..< 50 {  // 5 seconds max
+                var status: Int32 = 0
+                #if canImport(Glibc)
+                    let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
+                #elseif canImport(Darwin)
+                    let result = Darwin.waitpid(handle.pid, &status, WNOHANG)
+                #endif
+
+                if result == handle.pid {
+                    logger.debug("Child process \(handle.pid) killed via SIGKILL")
+                    reapedAfterSIGKILL = true
+                    break
+                }
+
+                if result < 0 {
+                    let err = errno
+                    if err == ECHILD {
+                        logger.debug("Child process \(handle.pid) reaped (ECHILD) after SIGKILL")
+                    } else {
+                        logger.warning("waitpid failed while reaping child process \(handle.pid) after SIGKILL: \(err)")
+                    }
+                    reapedAfterSIGKILL = true
+                    break
+                }
+
+                do {
+                    try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                } catch {
+                    // Keep cleanup deterministic even if task is cancelled.
+                    break
+                }
+            }
+
+            if !reapedAfterSIGKILL {
+                logger.error("Child process \(handle.pid) did not reap within 5.0s after SIGKILL; continuing without blocking waitpid")
             }
         }
 
