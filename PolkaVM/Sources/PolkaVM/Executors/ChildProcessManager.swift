@@ -50,15 +50,88 @@ actor ChildProcessManager {
         logger.debug("Transferred FD \(fd) to caller ownership")
     }
 
-    /// Sleep for a short duration without relying on async task resumption.
-    /// This avoids rare CI hangs where `Task.sleep` in process cleanup paths never resumes.
-    private func sleepFor(milliseconds: UInt32) {
-        let microseconds = useconds_t(milliseconds * 1_000)
+    /// Sleep for a short duration without blocking the actor executor thread.
+    /// We intentionally avoid `Task.sleep` due to CI hangs observed in lifecycle paths.
+    private func sleepFor(milliseconds: Int) async {
+        guard milliseconds > 0 else { return }
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(milliseconds)) {
+                continuation.resume()
+            }
+        }
+    }
+
+    /// Best-effort termination and non-blocking reap.
+    private func terminateAndReapBestEffort(pid: pid_t, signal: Int32 = SIGKILL) {
+        var status: Int32 = 0
         #if canImport(Glibc)
-            Glibc.usleep(microseconds)
+            _ = Glibc.kill(pid, signal)
+            _ = Glibc.waitpid(pid, &status, WNOHANG)
         #elseif canImport(Darwin)
-            Darwin.usleep(microseconds)
+            _ = Darwin.kill(pid, signal)
+            _ = Darwin.waitpid(pid, &status, WNOHANG)
         #endif
+    }
+
+    /// Shared cleanup for spawn failures/cancellations.
+    private func cleanupSpawnFailure(pid: pid_t, parentFD: Int32) {
+        closeFD(parentFD)
+        activeProcesses.removeValue(forKey: pid)
+        terminateAndReapBestEffort(pid: pid)
+    }
+
+    /// Wait until the child appears stable (running with a valid IPC FD) without fixed blocking delay.
+    private func waitForSpawnReadiness(pid: pid_t, parentFD: Int32, maxWaitMilliseconds: Int = 500) async throws {
+        let start = DispatchTime.now().uptimeNanoseconds
+        let maxWaitNanoseconds = UInt64(maxWaitMilliseconds) * 1_000_000
+        let stableNanoseconds: UInt64 = 50_000_000 // 50ms of healthy state
+        var healthySince: UInt64?
+
+        while true {
+            try Task.checkCancellation()
+
+            var status: Int32 = 0
+            #if canImport(Glibc)
+                let waitResult = Glibc.waitpid(pid, &status, WNOHANG)
+            #elseif canImport(Darwin)
+                let waitResult = Darwin.waitpid(pid, &status, WNOHANG)
+            #endif
+
+            if waitResult == pid {
+                // Short-lived commands (for example `/usr/bin/true`) can legitimately
+                // exit before the startup polling window completes.
+                logger.debug("Child process \(pid) exited during startup polling")
+                return
+            }
+            if waitResult < 0 {
+                let err = errno
+                if err == ECHILD {
+                    logger.debug("Child process \(pid) already reaped during startup polling (ECHILD)")
+                    return
+                }
+                throw IPCError.readFailed(Int(err))
+            }
+
+            let flags = fcntl(parentFD, F_GETFL)
+            if flags == -1 {
+                throw IPCError.writeFailed(Int(errno))
+            }
+
+            let now = DispatchTime.now().uptimeNanoseconds
+            if healthySince == nil {
+                healthySince = now
+            }
+
+            if let healthySince, now - healthySince >= stableNanoseconds {
+                return
+            }
+
+            if now - start >= maxWaitNanoseconds {
+                return
+            }
+
+            await sleepFor(milliseconds: 25)
+        }
     }
 
     /// Mark an FD close-on-exec to prevent descriptor leakage into spawned children.
@@ -211,27 +284,16 @@ actor ChildProcessManager {
 
                 logger.debug("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
 
-                // Wait for child to initialize and become ready
-                // In release mode, processes start faster so we need longer wait
-                // Also validate FD is still valid before returning
-                if Task.isCancelled {
+                do {
+                    try await waitForSpawnReadiness(pid: pid, parentFD: parentFD)
+                } catch is CancellationError {
                     logger.warning("Spawn cancelled for PID \(pid), cleaning up")
-                    closeFD(parentFD)
-                    activeProcesses.removeValue(forKey: pid)
-                    Glibc.kill(pid, SIGKILL)
-                    var status: Int32 = 0
-                    _ = Glibc.waitpid(pid, &status, WNOHANG)
+                    cleanupSpawnFailure(pid: pid, parentFD: parentFD)
                     throw CancellationError()
-                }
-                sleepFor(milliseconds: 500)
-                if Task.isCancelled {
-                    logger.warning("Spawn cancelled for PID \(pid), cleaning up")
-                    closeFD(parentFD)
-                    activeProcesses.removeValue(forKey: pid)
-                    Glibc.kill(pid, SIGKILL)
-                    var status: Int32 = 0
-                    _ = Glibc.waitpid(pid, &status, WNOHANG)
-                    throw CancellationError()
+                } catch {
+                    logger.warning("Spawn readiness failed for PID \(pid): \(error)")
+                    cleanupSpawnFailure(pid: pid, parentFD: parentFD)
+                    throw error
                 }
 
                 // Validate parentFD is still valid after wait
@@ -239,13 +301,7 @@ actor ChildProcessManager {
                 if fdFlagsAfterWait == -1 {
                     let err = errno
                     logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
-                    // Clean up FD and remove from activeProcesses before throwing
-                    closeFD(parentFD)
-                    activeProcesses.removeValue(forKey: pid)
-                    // Try to kill/reap the child process
-                    Glibc.kill(pid, SIGKILL)
-                    var status: Int32 = 0
-                    _ = Glibc.waitpid(pid, &status, WNOHANG)
+                    cleanupSpawnFailure(pid: pid, parentFD: parentFD)
                     throw IPCError.writeFailed(Int(err))
                 }
 
@@ -350,27 +406,16 @@ actor ChildProcessManager {
 
             logger.debug("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
 
-            // Wait for child to initialize and become ready
-            // In release mode, processes start faster so we need longer wait
-            // Also validate FD is still valid before returning
-            if Task.isCancelled {
+            do {
+                try await waitForSpawnReadiness(pid: pid, parentFD: parentFD)
+            } catch is CancellationError {
                 logger.warning("Spawn cancelled for PID \(pid), cleaning up")
-                closeFD(parentFD)
-                activeProcesses.removeValue(forKey: pid)
-                Darwin.kill(pid, SIGKILL)
-                var status: Int32 = 0
-                _ = Darwin.waitpid(pid, &status, WNOHANG)
+                cleanupSpawnFailure(pid: pid, parentFD: parentFD)
                 throw CancellationError()
-            }
-            sleepFor(milliseconds: 500)
-            if Task.isCancelled {
-                logger.warning("Spawn cancelled for PID \(pid), cleaning up")
-                closeFD(parentFD)
-                activeProcesses.removeValue(forKey: pid)
-                Darwin.kill(pid, SIGKILL)
-                var status: Int32 = 0
-                _ = Darwin.waitpid(pid, &status, WNOHANG)
-                throw CancellationError()
+            } catch {
+                logger.warning("Spawn readiness failed for PID \(pid): \(error)")
+                cleanupSpawnFailure(pid: pid, parentFD: parentFD)
+                throw error
             }
 
             // Validate parentFD is still valid after wait
@@ -378,13 +423,7 @@ actor ChildProcessManager {
             if fdFlagsAfterWait == -1 {
                 let err = errno
                 logger.error("Parent: parentFD \(parentFD) became invalid during spawn wait: \(err)")
-                // Clean up FD and remove from activeProcesses before throwing
-                closeFD(parentFD)
-                activeProcesses.removeValue(forKey: pid)
-                // Try to kill/reap the child process
-                Darwin.kill(pid, SIGKILL)
-                var status: Int32 = 0
-                _ = Darwin.waitpid(pid, &status, WNOHANG)
+                cleanupSpawnFailure(pid: pid, parentFD: parentFD)
                 throw IPCError.writeFailed(Int(err))
             }
 
@@ -403,6 +442,8 @@ actor ChildProcessManager {
         var lastCheckTime = startTime
 
         while Date().timeIntervalSince(startTime) < timeout {
+            try Task.checkCancellation()
+
             var status: Int32 = 0
             #if canImport(Glibc)
                 let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
@@ -449,7 +490,7 @@ actor ChildProcessManager {
             }
 
             // Child still running, wait a bit
-            sleepFor(milliseconds: 100)
+            await sleepFor(milliseconds: 100)
 
             // Log progress every 10 seconds for long-running processes
             let now = Date()
@@ -490,7 +531,7 @@ actor ChildProcessManager {
                 break
             }
 
-            sleepFor(milliseconds: 100)
+            await sleepFor(milliseconds: 100)
         }
 
         // If still running, use SIGKILL
@@ -537,7 +578,7 @@ actor ChildProcessManager {
                     break
                 }
 
-                sleepFor(milliseconds: 100)
+                await sleepFor(milliseconds: 100)
             }
 
             if !reapedAfterSIGKILL {
