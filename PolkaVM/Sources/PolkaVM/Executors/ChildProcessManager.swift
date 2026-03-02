@@ -90,26 +90,26 @@ actor ChildProcessManager {
         while true {
             try Task.checkCancellation()
 
-            var status: Int32 = 0
             #if canImport(Glibc)
-                let waitResult = Glibc.waitpid(pid, &status, WNOHANG)
+                let aliveResult = Glibc.kill(pid, 0)
             #elseif canImport(Darwin)
-                let waitResult = Darwin.waitpid(pid, &status, WNOHANG)
+                let aliveResult = Darwin.kill(pid, 0)
             #endif
 
-            if waitResult == pid {
-                // Short-lived commands (for example `/usr/bin/true`) can legitimately
-                // exit before the startup polling window completes.
-                logger.debug("Child process \(pid) exited during startup polling")
-                return
-            }
-            if waitResult < 0 {
+            // Do not call waitpid here: that would reap short-lived children and
+            // lose their real exit status before waitForExit can observe it.
+            if aliveResult != 0 {
                 let err = errno
-                if err == ECHILD {
-                    logger.debug("Child process \(pid) already reaped during startup polling (ECHILD)")
+                if err == ESRCH {
+                    logger.debug("Child process \(pid) not found during startup polling")
                     return
                 }
-                throw IPCError.readFailed(Int(err))
+                if err == EPERM {
+                    // Process exists but we lack permission to signal; continue polling.
+                    // This should not happen for our own child, but treat it as alive.
+                } else {
+                    throw IPCError.readFailed(Int(err))
+                }
             }
 
             let flags = fcntl(parentFD, F_GETFL)

@@ -32,6 +32,25 @@ struct ChildProcessManagerTests {
     }
 
     @Test
+    func shortLivedFailingChildPreservesExitCode() async throws {
+        #if os(macOS) || os(Linux)
+            let manager = ChildProcessManager(defaultTimeout: 5.0)
+            let (handle, clientFD) = try await manager.spawnChildProcess(executablePath: "/usr/bin/false")
+
+            #if canImport(Glibc)
+                _ = Glibc.close(clientFD)
+            #elseif canImport(Darwin)
+                _ = Darwin.close(clientFD)
+            #endif
+
+            let exitCode = try await manager.waitForExit(handle: handle, timeout: 5.0)
+            #expect(exitCode != 0)
+        #else
+            #expect(true)
+        #endif
+    }
+
+    @Test
     func invokePVMSandboxPathRespected() async {
         #if os(macOS) || os(Linux)
             let key = "BOKA_SANDBOX_PATH"
