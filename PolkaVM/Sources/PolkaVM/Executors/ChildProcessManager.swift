@@ -50,6 +50,17 @@ actor ChildProcessManager {
         logger.debug("Transferred FD \(fd) to caller ownership")
     }
 
+    /// Sleep for a short duration without relying on async task resumption.
+    /// This avoids rare CI hangs where `Task.sleep` in process cleanup paths never resumes.
+    private func sleepFor(milliseconds: UInt32) {
+        let microseconds = useconds_t(milliseconds * 1_000)
+        #if canImport(Glibc)
+            Glibc.usleep(microseconds)
+        #elseif canImport(Darwin)
+            Darwin.usleep(microseconds)
+        #endif
+    }
+
     /// Mark an FD close-on-exec to prevent descriptor leakage into spawned children.
     /// Leaked parent IPC FDs can keep peer sockets alive and delay EOF detection.
     private func setCloseOnExec(fd: Int32) {
@@ -203,17 +214,24 @@ actor ChildProcessManager {
                 // Wait for child to initialize and become ready
                 // In release mode, processes start faster so we need longer wait
                 // Also validate FD is still valid before returning
-                do {
-                    try await Task.sleep(nanoseconds: 500_000_000) // 500ms
-                } catch {
-                    // Task was cancelled - clean up before rethrowing
+                if Task.isCancelled {
                     logger.warning("Spawn cancelled for PID \(pid), cleaning up")
                     closeFD(parentFD)
                     activeProcesses.removeValue(forKey: pid)
                     Glibc.kill(pid, SIGKILL)
                     var status: Int32 = 0
                     _ = Glibc.waitpid(pid, &status, WNOHANG)
-                    throw error
+                    throw CancellationError()
+                }
+                sleepFor(milliseconds: 500)
+                if Task.isCancelled {
+                    logger.warning("Spawn cancelled for PID \(pid), cleaning up")
+                    closeFD(parentFD)
+                    activeProcesses.removeValue(forKey: pid)
+                    Glibc.kill(pid, SIGKILL)
+                    var status: Int32 = 0
+                    _ = Glibc.waitpid(pid, &status, WNOHANG)
+                    throw CancellationError()
                 }
 
                 // Validate parentFD is still valid after wait
@@ -335,17 +353,24 @@ actor ChildProcessManager {
             // Wait for child to initialize and become ready
             // In release mode, processes start faster so we need longer wait
             // Also validate FD is still valid before returning
-            do {
-                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
-            } catch {
-                // Task was cancelled - clean up before rethrowing
+            if Task.isCancelled {
                 logger.warning("Spawn cancelled for PID \(pid), cleaning up")
                 closeFD(parentFD)
                 activeProcesses.removeValue(forKey: pid)
                 Darwin.kill(pid, SIGKILL)
                 var status: Int32 = 0
                 _ = Darwin.waitpid(pid, &status, WNOHANG)
-                throw error
+                throw CancellationError()
+            }
+            sleepFor(milliseconds: 500)
+            if Task.isCancelled {
+                logger.warning("Spawn cancelled for PID \(pid), cleaning up")
+                closeFD(parentFD)
+                activeProcesses.removeValue(forKey: pid)
+                Darwin.kill(pid, SIGKILL)
+                var status: Int32 = 0
+                _ = Darwin.waitpid(pid, &status, WNOHANG)
+                throw CancellationError()
             }
 
             // Validate parentFD is still valid after wait
@@ -424,7 +449,7 @@ actor ChildProcessManager {
             }
 
             // Child still running, wait a bit
-            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            sleepFor(milliseconds: 100)
 
             // Log progress every 10 seconds for long-running processes
             let now = Date()
@@ -465,7 +490,7 @@ actor ChildProcessManager {
                 break
             }
 
-            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            sleepFor(milliseconds: 100)
         }
 
         // If still running, use SIGKILL
@@ -512,12 +537,7 @@ actor ChildProcessManager {
                     break
                 }
 
-                do {
-                    try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                } catch {
-                    // Keep cleanup deterministic even if task is cancelled.
-                    break
-                }
+                sleepFor(milliseconds: 100)
             }
 
             if !reapedAfterSIGKILL {
