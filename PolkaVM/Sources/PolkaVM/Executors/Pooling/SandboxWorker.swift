@@ -277,8 +277,27 @@ actor SandboxWorker {
     }
 
     nonisolated deinit {
-        // Note: Can't call async terminate() from deinit
-        // Process cleanup will happen via ChildProcessManager deinit
-        // or through explicit shutdown
+        // Force cleanup in deinit when async terminate() wasn't called
+        // This ensures child processes are killed and FDs are closed even if tests don't call shutdown
+
+        // Close IPC client FD synchronously
+        ipcClient.close()
+
+        // Kill child process synchronously
+        if let handle = processHandle {
+            #if canImport(Glibc)
+                Glibc.kill(handle.pid, SIGKILL)
+            #elseif canImport(Darwin)
+                Darwin.kill(handle.pid, SIGKILL)
+            #endif
+
+            // Try to reap the zombie process (non-blocking)
+            var status: Int32 = 0
+            #if canImport(Glibc)
+                _ = Glibc.waitpid(handle.pid, &status, WNOHANG)
+            #elseif canImport(Darwin)
+                _ = Darwin.waitpid(handle.pid, &status, WNOHANG)
+            #endif
+        }
     }
 }
