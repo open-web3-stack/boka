@@ -653,25 +653,37 @@ actor ChildProcessManager {
 
     /// Reap zombie processes
     func reapZombies() {
-        var status: Int32 = 0
-        #if canImport(Glibc)
-            let pid = Glibc.waitpid(-1, &status, WNOHANG)
-        #elseif canImport(Darwin)
-            let pid = Darwin.waitpid(-1, &status, WNOHANG)
-        #endif
+        // Never reap arbitrary children from this process. Multiple
+        // ChildProcessManager instances may coexist in the same test process.
+        // Using waitpid(-1, ...) can steal exit status from another manager.
+        for pid in Array(activeProcesses.keys) {
+            var status: Int32 = 0
+            #if canImport(Glibc)
+                let result = Glibc.waitpid(pid, &status, WNOHANG)
+            #elseif canImport(Darwin)
+                let result = Darwin.waitpid(pid, &status, WNOHANG)
+            #endif
 
-        if pid > 0 {
-            logger.debug("Reaped zombie process: PID \(pid)")
-            // Remove from active processes but DON'T close the FD
-            // The FD might still be in use by the caller
-            // It will be closed when waitForExit() or reap(handle:) is called
-            activeProcesses.removeValue(forKey: pid)
+            if result == pid {
+                logger.debug("Reaped zombie process: PID \(pid)")
+                // Don't close FD - caller owns it
+                activeProcesses.removeValue(forKey: pid)
+            } else if result < 0 {
+                let err = errno
+                if err == ECHILD {
+                    // Process already reaped by this manager on another path.
+                    activeProcesses.removeValue(forKey: pid)
+                } else if err != EINTR {
+                    logger.warning("Failed to probe/reap PID \(pid): \(err)")
+                }
+            }
         }
     }
 
     /// Clean up all active processes
     func cleanup() {
         logger.debug("Cleaning up \(activeProcesses.count) active processes, \(openFDs.count) open FDs")
+        let handles = Array(activeProcesses.values)
 
         // First, close all IPC FDs to prevent blocking
         // Iterate over openFDs to catch FDs from incomplete spawn operations
@@ -682,7 +694,7 @@ actor ChildProcessManager {
         }
 
         // Then kill all remaining processes
-        for (_, handle) in activeProcesses {
+        for handle in handles {
             #if canImport(Glibc)
                 Glibc.kill(handle.pid, SIGTERM)
             #elseif canImport(Darwin)
@@ -698,7 +710,7 @@ actor ChildProcessManager {
         #endif
 
         // Force kill any remaining processes
-        for (_, handle) in activeProcesses {
+        for handle in handles {
             #if canImport(Glibc)
                 Glibc.kill(handle.pid, SIGKILL)
             #elseif canImport(Darwin)
@@ -706,19 +718,18 @@ actor ChildProcessManager {
             #endif
         }
 
-        activeProcesses.removeAll()
+        // Final reap for known children only. Avoid waitpid(-1), which can
+        // steal status from sibling manager instances.
+        for handle in handles {
+            var status: Int32 = 0
+            #if canImport(Glibc)
+                _ = Glibc.waitpid(handle.pid, &status, WNOHANG)
+            #elseif canImport(Darwin)
+                _ = Darwin.waitpid(handle.pid, &status, WNOHANG)
+            #endif
+        }
 
-        // Final reap - use blocking wait to ensure all children are reaped
-        var status: Int32 = 0
-        #if canImport(Glibc)
-            while Glibc.waitpid(-1, &status, WNOHANG) > 0 {
-                // Reap all zombies
-            }
-        #elseif canImport(Darwin)
-            while Darwin.waitpid(-1, &status, WNOHANG) > 0 {
-                // Reap all zombies
-            }
-        #endif
+        activeProcesses.removeAll()
 
         logger.debug("Cleanup complete")
     }
@@ -747,16 +758,14 @@ actor ChildProcessManager {
             #endif
         }
 
-        // Try to reap zombies (non-blocking, deinit shouldn't block)
-        var status: Int32 = 0
-        #if canImport(Glibc)
-            while Glibc.waitpid(-1, &status, WNOHANG) > 0 {
-                // Reap
-            }
-        #elseif canImport(Darwin)
-            while Darwin.waitpid(-1, &status, WNOHANG) > 0 {
-                // Reap
-            }
-        #endif
+        // Try to reap only known children (non-blocking, deinit shouldn't block).
+        for (_, handle) in activeProcesses {
+            var status: Int32 = 0
+            #if canImport(Glibc)
+                _ = Glibc.waitpid(handle.pid, &status, WNOHANG)
+            #elseif canImport(Darwin)
+                _ = Darwin.waitpid(handle.pid, &status, WNOHANG)
+            #endif
+        }
     }
 }
