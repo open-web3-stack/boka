@@ -23,7 +23,9 @@ let package = Package(
         .package(path: "../PolkaVM"),
         .package(path: "../Database"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.0"),
-        .package(url: "https://github.com/ordo-one/package-benchmark.git", .upToNextMajor(from: "1.29.4")),
+        // 1.30+ switched jemalloc control to traits and no longer honors
+        // BENCHMARK_DISABLE_JEMALLOC, which breaks our Linux CI runners.
+        .package(url: "https://github.com/ordo-one/package-benchmark.git", .upToNextMinor(from: "1.29.4")),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
