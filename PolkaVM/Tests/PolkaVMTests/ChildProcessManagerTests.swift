@@ -32,6 +32,54 @@ struct ChildProcessManagerTests {
     }
 
     @Test
+    func shortLivedFailingChildPreservesExitCode() async throws {
+        #if os(macOS) || os(Linux)
+            let manager = ChildProcessManager(defaultTimeout: 5.0)
+            let (handle, clientFD) = try await manager.spawnChildProcess(executablePath: "/usr/bin/false")
+
+            #if canImport(Glibc)
+                _ = Glibc.close(clientFD)
+            #elseif canImport(Darwin)
+                _ = Darwin.close(clientFD)
+            #endif
+
+            let exitCode = try await manager.waitForExit(handle: handle, timeout: 5.0)
+            #expect(exitCode != 0)
+        #else
+            #expect(true)
+        #endif
+    }
+
+    @Test
+    func multipleManagersDoNotStealChildExitStatus() async throws {
+        #if os(macOS) || os(Linux)
+            let managerA = ChildProcessManager(defaultTimeout: 5.0)
+            let managerB = ChildProcessManager(defaultTimeout: 5.0)
+
+            let (handleA, fdA) = try await managerA.spawnChildProcess(executablePath: "/usr/bin/false")
+            #if canImport(Glibc)
+                _ = Glibc.close(fdA)
+            #elseif canImport(Darwin)
+                _ = Darwin.close(fdA)
+            #endif
+
+            // Trigger zombie reaping paths in a separate manager instance.
+            let (handleB, fdB) = try await managerB.spawnChildProcess(executablePath: "/usr/bin/true")
+            #if canImport(Glibc)
+                _ = Glibc.close(fdB)
+            #elseif canImport(Darwin)
+                _ = Darwin.close(fdB)
+            #endif
+            _ = try await managerB.waitForExit(handle: handleB, timeout: 5.0)
+
+            let exitCodeA = try await managerA.waitForExit(handle: handleA, timeout: 5.0)
+            #expect(exitCodeA != 0)
+        #else
+            #expect(true)
+        #endif
+    }
+
+    @Test
     func invokePVMSandboxPathRespected() async {
         #if os(macOS) || os(Linux)
             let key = "BOKA_SANDBOX_PATH"

@@ -10,7 +10,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BENCHMARK_DISABLE_JEMALLOC: true
   BOKA_BENCHMARK_CI_FAST: "1"
   BENCHMARK_CI_ARGS: "--skip 'pool\\..*' --skip 'jitperf\\..*' --skip 'vm\\.mode\\..*' --skip 'w3f\\..*' --skip 'rocksdb\\.profile\\..*'"
 

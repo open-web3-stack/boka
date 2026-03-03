@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -23,7 +23,13 @@ let package = Package(
         .package(path: "../PolkaVM"),
         .package(path: "../Database"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.0"),
-        .package(url: "https://github.com/ordo-one/package-benchmark.git", .upToNextMajor(from: "1.29.4")),
+        // package-benchmark 1.30+ controls jemalloc via traits.
+        // Keep dependency defaults disabled so Linux CI doesn't require system jemalloc.
+        .package(
+            url: "https://github.com/ordo-one/package-benchmark.git",
+            .upToNextMinor(from: "1.30.0"),
+            traits: []
+        ),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
