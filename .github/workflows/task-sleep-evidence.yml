@@ -55,6 +55,9 @@ jobs:
       with:
         components: rustfmt
 
+    - name: Build dependencies
+      run: make deps
+
     - name: Run Task.sleep Evidence Stress
       env:
         RUN_TASK_SLEEP_EVIDENCE: "1"
