@@ -38,7 +38,12 @@ test: githooks deps
 			continue; \
 		fi; \
 		printf "Testing %-12s ...\n" "$$pkg"; \
-		if swift test --package-path "$$pkg"; then \
+		if [ "$$pkg" = "Networking" ]; then \
+			test_cmd="swift test --package-path \"$$pkg\" --no-parallel"; \
+		else \
+			test_cmd="swift test --package-path \"$$pkg\""; \
+		fi; \
+		if eval "$$test_cmd"; then \
 			echo "  ✓ PASS"; \
 		else \
 			echo "  ✗ FAIL (exit code $$?)"; \
@@ -65,7 +70,11 @@ test-all: test test-cargo
 test-coverage:
 	@for pkg in $(TEST_PACKAGES); do \
 		echo "Running coverage for $$pkg..."; \
-		swift test --enable-code-coverage --package-path "$$pkg"; \
+		if [ "$$pkg" = "Networking" ]; then \
+			swift test --enable-code-coverage --package-path "$$pkg" --no-parallel; \
+		else \
+			swift test --enable-code-coverage --package-path "$$pkg"; \
+		fi; \
 	done
 
 .PHONY: build
