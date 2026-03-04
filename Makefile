@@ -39,11 +39,11 @@ test: githooks deps
 		fi; \
 		printf "Testing %-12s ...\n" "$$pkg"; \
 		if [ "$$pkg" = "Networking" ]; then \
-			test_cmd="swift test --package-path \"$$pkg\" --no-parallel"; \
+			swift test --package-path "$$pkg" --no-parallel; \
 		else \
-			test_cmd="swift test --package-path \"$$pkg\""; \
+			swift test --package-path "$$pkg"; \
 		fi; \
-		if eval "$$test_cmd"; then \
+		if [ $$? -eq 0 ]; then \
 			echo "  ✓ PASS"; \
 		else \
 			echo "  ✗ FAIL (exit code $$?)"; \
