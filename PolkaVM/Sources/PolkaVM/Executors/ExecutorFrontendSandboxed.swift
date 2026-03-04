@@ -126,19 +126,11 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
 
             // Clean up child process if it was spawned
             if let handle {
-                logger.error("[TASK_SLEEP_EVIDENCE] cleanup-start pid=\(handle.pid)")
                 // Try to kill the process and reap it to avoid zombies
                 await childProcessManager.kill(handle: handle)
                 // Try one more reap after a short delay
-                logger.error("[TASK_SLEEP_EVIDENCE] cleanup-before-task-sleep pid=\(handle.pid)")
-                do {
-                    try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                    logger.error("[TASK_SLEEP_EVIDENCE] cleanup-after-task-sleep pid=\(handle.pid)")
-                } catch {
-                    logger.error("[TASK_SLEEP_EVIDENCE] cleanup-task-sleep-threw pid=\(handle.pid) error=\(error)")
-                }
+                await sleepForCleanupDelay(milliseconds: 100)
                 await childProcessManager.reap(handle: handle)
-                logger.error("[TASK_SLEEP_EVIDENCE] cleanup-done pid=\(handle.pid)")
             }
 
             // Close client FD if it was opened
@@ -152,6 +144,17 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 gasUsed: Gas(0),
                 outputData: nil,
             )
+        }
+    }
+
+    /// Short non-blocking delay used in cleanup paths.
+    /// We intentionally avoid Task.sleep here due CI hangs under high-concurrency sandbox failures.
+    private func sleepForCleanupDelay(milliseconds: Int) async {
+        guard milliseconds > 0 else { return }
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(milliseconds)) {
+                continuation.resume()
+            }
         }
     }
 
