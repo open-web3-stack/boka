@@ -1,0 +1,86 @@
+name: Task Sleep Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: "How many repeated stress iterations to run"
+        required: false
+        default: "20"
+      batches:
+        description: "Batches per iteration"
+        required: false
+        default: "200"
+      parallel:
+        description: "Parallel invocations per batch"
+        required: false
+        default: "256"
+      iteration_timeout_seconds:
+        description: "Per-iteration timeout in seconds"
+        required: false
+        default: "1200"
+
+jobs:
+  evidence:
+    name: Task.sleep Cleanup Stress (Linux)
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 240
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - run: sudo apt-get update
+
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: us-east-2
+
+    - name: Setup Swift
+      uses: SwiftyLab/setup-swift@latest
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: rustfmt
+
+    - name: Run Task.sleep Evidence Stress
+      env:
+        RUN_TASK_SLEEP_EVIDENCE: "1"
+        EVIDENCE_BATCHES: ${{ github.event.inputs.batches || '200' }}
+        EVIDENCE_PARALLEL: ${{ github.event.inputs.parallel || '256' }}
+        ITERATIONS: ${{ github.event.inputs.iterations || '20' }}
+        ITERATION_TIMEOUT_SECONDS: ${{ github.event.inputs.iteration_timeout_seconds || '1200' }}
+      run: |
+        set -euo pipefail
+
+        echo "[TASK_SLEEP_EVIDENCE] iterations=${ITERATIONS} batches=${EVIDENCE_BATCHES} parallel=${EVIDENCE_PARALLEL} timeout=${ITERATION_TIMEOUT_SECONDS}s"
+
+        for i in $(seq 1 "${ITERATIONS}"); do
+          echo "[TASK_SLEEP_EVIDENCE] iteration=${i} start"
+          log_file="/tmp/task-sleep-evidence-${i}.log"
+
+          set +e
+          timeout "${ITERATION_TIMEOUT_SECONDS}s" \
+            swift test --package-path PolkaVM --filter "TaskSleepCleanupEvidenceTests.stressSandboxFailureCleanupPath" \
+            2>&1 | tee "${log_file}"
+          cmd_status=${PIPESTATUS[0]}
+          set -e
+
+          if [ "${cmd_status}" -ne 0 ]; then
+            echo "[TASK_SLEEP_EVIDENCE] iteration=${i} failed status=${cmd_status}"
+            echo "[TASK_SLEEP_EVIDENCE] tail of ${log_file}:"
+            tail -n 200 "${log_file}" || true
+            exit "${cmd_status}"
+          fi
+
+          echo "[TASK_SLEEP_EVIDENCE] iteration=${i} completed"
+        done
+
+        echo "[TASK_SLEEP_EVIDENCE] all iterations completed"
