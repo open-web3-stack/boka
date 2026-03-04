@@ -1,6 +1,11 @@
 name: Task Sleep Evidence
 
 on:
+  pull_request:
+    branches: ["master"]
+    paths:
+      - "PolkaVM/**"
+      - ".github/workflows/task-sleep-evidence.yml"
   workflow_dispatch:
     inputs:
       iterations:
