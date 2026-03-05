@@ -5,6 +5,7 @@ import Testing
 import TracingUtils
 import Utils
 
+@Suite(.serialized)
 struct PeerTests {
     enum TestError: Error {
         case invalidResponse

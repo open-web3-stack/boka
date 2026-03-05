@@ -125,9 +125,6 @@ jobs:
           if [ "$pkg" = "JAMTests" ]; then
             # Skip FuzzTests for JAMTests as they run in a separate parallel job
             swift test --package-path "$pkg" --skip "FuzzTests"
-          elif [ "$pkg" = "Networking" ]; then
-            # MsQuic-backed tests are flaky under swift-testing parallel execution.
-            swift test --package-path "$pkg" --no-parallel
           else
             swift test --package-path "$pkg"
           fi
@@ -142,9 +139,6 @@ jobs:
           if [ "$pkg" = "JAMTests" ]; then
             # Skip FuzzTests for JAMTests as they run in a separate parallel job
             swift test -c release --package-path "$pkg" --skip "FuzzTests"
-          elif [ "$pkg" = "Networking" ]; then
-            # MsQuic-backed tests are flaky under swift-testing parallel execution.
-            swift test -c release --package-path "$pkg" --no-parallel
           else
             swift test -c release --package-path "$pkg"
           fi
