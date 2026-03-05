@@ -48,7 +48,7 @@ jobs:
     - run: sudo apt-get update
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libjemalloc-dev
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-region: us-east-2
@@ -165,7 +165,7 @@ jobs:
     - run: sudo apt-get update
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+        packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libjemalloc-dev
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-region: us-east-2
