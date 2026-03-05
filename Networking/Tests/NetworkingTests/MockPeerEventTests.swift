@@ -4,6 +4,7 @@ import MsQuicSwift
 import Testing
 import Utils
 
+@Suite(.serialized)
 final class MockPeerEventTests {
     final class MockPeerEventHandler: QuicEventHandler {
         enum MockPeerAction {

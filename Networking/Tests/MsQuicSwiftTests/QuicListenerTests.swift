@@ -30,6 +30,7 @@ let pkcs12Data =
         """,
     )!
 
+@Suite(.serialized)
 struct QuicListenerTests {
     let registration: QuicRegistration
 

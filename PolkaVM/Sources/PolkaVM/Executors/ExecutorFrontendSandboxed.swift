@@ -129,7 +129,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 // Try to kill the process and reap it to avoid zombies
                 await childProcessManager.kill(handle: handle)
                 // Try one more reap after a short delay
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                await sleepForCleanupDelay(milliseconds: 100)
                 await childProcessManager.reap(handle: handle)
             }
 
@@ -144,6 +144,17 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 gasUsed: Gas(0),
                 outputData: nil,
             )
+        }
+    }
+
+    /// Short non-blocking delay used in cleanup paths.
+    /// We intentionally avoid Task.sleep here due CI hangs under high-concurrency sandbox failures.
+    private func sleepForCleanupDelay(milliseconds: Int) async {
+        guard milliseconds > 0 else { return }
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(milliseconds)) {
+                continuation.resume()
+            }
         }
     }
 

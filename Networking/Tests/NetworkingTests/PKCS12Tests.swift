@@ -4,6 +4,7 @@ import MsQuicSwift
 import Testing
 import Utils
 
+@Suite(.serialized)
 struct PKCS12Tests {
     @Test func invalidParseCertificate() throws {
         #expect(throws: CryptoError.self) {
