@@ -23,12 +23,11 @@ let package = Package(
         .package(path: "../PolkaVM"),
         .package(path: "../Database"),
         .package(url: "https://github.com/apple/swift-testing.git", branch: "6.0.0"),
-        // package-benchmark 1.30+ controls jemalloc via traits.
-        // Keep dependency defaults disabled so Linux CI doesn't require system jemalloc.
+        // Avoid forcing dependency traits here; some cached benchmark revisions used in CI
+        // don't declare traits, and SwiftPM treats explicit trait disabling as an error.
         .package(
             url: "https://github.com/ordo-one/package-benchmark.git",
-            .upToNextMinor(from: "1.30.0"),
-            traits: []
+            .upToNextMinor(from: "1.30.0")
         ),
     ],
     targets: [

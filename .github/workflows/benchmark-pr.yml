@@ -30,7 +30,7 @@ jobs:
       - run: sudo apt-get update
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+          packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libjemalloc-dev
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -124,6 +124,10 @@ jobs:
             git checkout "${{ github.head_ref }}" || true
           fi
 
+      - name: Resolve JAMTests package dependencies
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        run: cd JAMTests && swift package resolve
+
       - name: Run benchmarks for PR branch
         if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
         run: |
@@ -154,6 +158,11 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
+      - run: sudo apt-get update
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libjemalloc-dev
 
       - name: Setup Swift
         uses: SwiftyLab/setup-swift@latest
@@ -209,6 +218,10 @@ jobs:
           run-id: ${{ steps.find-master-baseline-run.outputs.run_id }}
           name: benchmark-master-results
           path: JAMTests/.benchmarkBaselines/Benchmarks/master
+
+      - name: Resolve JAMTests package dependencies
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        run: cd JAMTests && swift package resolve
 
       - name: Check thresholds against PR baseline
         run: |

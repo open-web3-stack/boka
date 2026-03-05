@@ -29,7 +29,7 @@ jobs:
       - run: sudo apt-get update
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev
+          packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libjemalloc-dev
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -114,6 +114,10 @@ jobs:
           else
             echo "has_benchmark=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Resolve JAMTests package dependencies
+        if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
+        run: cd JAMTests && swift package resolve
 
       - name: Run benchmarks for master baseline
         if: ${{ steps.check-benchmarks.outputs.has_benchmark == 'true' }}
