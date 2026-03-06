@@ -19,9 +19,17 @@ actor ChildProcessManager {
     private var activeProcesses: [pid_t: ProcessHandle] = [:]
     private let defaultTimeout: TimeInterval
     private var openFDs: Set<Int32> = []  // Track open FDs to prevent double-close
+    private let lifecycleProbeEnabled: Bool
 
     init(defaultTimeout: TimeInterval = 30.0) {
         self.defaultTimeout = defaultTimeout
+        let environment = ProcessInfo.processInfo.environment
+        lifecycleProbeEnabled = environment["BOKA_CHILD_PROCESS_TRACE"] == "1" || environment["GITHUB_ACTIONS"] == "true"
+    }
+
+    private func lifecycleProbe(_ message: @autoclosure () -> String) {
+        guard lifecycleProbeEnabled else { return }
+        logger.warning("[probe] \(message())")
     }
 
     /// Close an FD and track it to prevent double-close
@@ -52,13 +60,16 @@ actor ChildProcessManager {
 
     /// Sleep for a short duration without blocking the actor executor thread.
     /// We intentionally avoid `Task.sleep` due to CI hangs observed in lifecycle paths.
-    private func sleepFor(milliseconds: Int) async {
+    private func sleepFor(milliseconds: Int, reason: @autoclosure () -> String) async {
         guard milliseconds > 0 else { return }
+        let reasonValue = reason()
+        lifecycleProbe("sleep start: \(reasonValue), duration=\(milliseconds)ms")
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(milliseconds)) {
                 continuation.resume()
             }
         }
+        lifecycleProbe("sleep end: \(reasonValue)")
     }
 
     /// Best-effort termination and non-blocking reap.
@@ -86,9 +97,13 @@ actor ChildProcessManager {
         let maxWaitNanoseconds = UInt64(maxWaitMilliseconds) * 1_000_000
         let stableNanoseconds: UInt64 = 50_000_000 // 50ms of healthy state
         var healthySince: UInt64?
+        var pollIteration = 0
+
+        lifecycleProbe("waitForSpawnReadiness start: pid=\(pid), parentFD=\(parentFD), maxWaitMilliseconds=\(maxWaitMilliseconds)")
 
         while true {
             try Task.checkCancellation()
+            pollIteration += 1
 
             #if canImport(Glibc)
                 let aliveResult = Glibc.kill(pid, 0)
@@ -102,6 +117,7 @@ actor ChildProcessManager {
                 let err = errno
                 if err == ESRCH {
                     logger.debug("Child process \(pid) not found during startup polling")
+                    lifecycleProbe("waitForSpawnReadiness return ESRCH: pid=\(pid), pollIteration=\(pollIteration)")
                     return
                 }
                 if err == EPERM {
@@ -123,14 +139,19 @@ actor ChildProcessManager {
             }
 
             if let healthySince, now - healthySince >= stableNanoseconds {
+                lifecycleProbe("waitForSpawnReadiness healthy: pid=\(pid), pollIteration=\(pollIteration), elapsedNanoseconds=\(now - start)")
                 return
             }
 
             if now - start >= maxWaitNanoseconds {
+                lifecycleProbe("waitForSpawnReadiness max wait reached: pid=\(pid), pollIteration=\(pollIteration), elapsedNanoseconds=\(now - start)")
                 return
             }
 
-            await sleepFor(milliseconds: 25)
+            await sleepFor(
+                milliseconds: 25,
+                reason: "waitForSpawnReadiness pid=\(pid) pollIteration=\(pollIteration)"
+            )
         }
     }
 
@@ -283,6 +304,7 @@ actor ChildProcessManager {
                 activeProcesses[pid] = handle
 
                 logger.debug("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
+                lifecycleProbe("spawnChildProcess waiting for readiness: pid=\(pid), parentFD=\(parentFD), executablePath=\(executablePath)")
 
                 do {
                     try await waitForSpawnReadiness(pid: pid, parentFD: parentFD)
@@ -306,6 +328,7 @@ actor ChildProcessManager {
                 }
 
                 logger.debug("Parent: Child ready, returning handle and parentFD \(parentFD) to caller")
+                lifecycleProbe("spawnChildProcess readiness completed: pid=\(pid), parentFD=\(parentFD)")
                 // Transfer FD ownership to caller - they are responsible for closing it
                 transferFD(parentFD)
                 return (handle, parentFD)
@@ -405,6 +428,7 @@ actor ChildProcessManager {
             activeProcesses[pid] = handle
 
             logger.debug("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
+            lifecycleProbe("spawnChildProcess waiting for readiness: pid=\(pid), parentFD=\(parentFD), executablePath=\(executablePath)")
 
             do {
                 try await waitForSpawnReadiness(pid: pid, parentFD: parentFD)
@@ -428,6 +452,7 @@ actor ChildProcessManager {
             }
 
             logger.debug("Parent: Child ready, returning handle and parentFD \(parentFD) to caller")
+            lifecycleProbe("spawnChildProcess readiness completed: pid=\(pid), parentFD=\(parentFD)")
             // Transfer FD ownership to caller - they are responsible for closing it
             transferFD(parentFD)
             return (handle, parentFD)
@@ -440,9 +465,13 @@ actor ChildProcessManager {
     func waitForExit(handle: ProcessHandle, timeout: TimeInterval) async throws -> Int32 {
         let startTime = Date()
         var lastCheckTime = startTime
+        var pollIteration = 0
+
+        lifecycleProbe("waitForExit start: pid=\(handle.pid), timeout=\(timeout)")
 
         while Date().timeIntervalSince(startTime) < timeout {
             try Task.checkCancellation()
+            pollIteration += 1
 
             var status: Int32 = 0
             #if canImport(Glibc)
@@ -476,6 +505,7 @@ actor ChildProcessManager {
                     // Process exited normally
                     let exitCode = (status >> 8) & 0xFF
                     logger.debug("Child process \(handle.pid) exited with code: \(exitCode)")
+                    lifecycleProbe("waitForExit completed: pid=\(handle.pid), pollIteration=\(pollIteration), exitCode=\(exitCode)")
                     activeProcesses.removeValue(forKey: handle.pid)
                     // Don't close FD - caller owns it
                     return Int32(exitCode)
@@ -483,6 +513,7 @@ actor ChildProcessManager {
                     // Process terminated by signal
                     let signal = status & 0x7F
                     logger.warning("Child process \(handle.pid) terminated by signal: \(signal)")
+                    lifecycleProbe("waitForExit completed by signal: pid=\(handle.pid), pollIteration=\(pollIteration), signal=\(signal)")
                     activeProcesses.removeValue(forKey: handle.pid)
                     // Don't close FD - caller owns it
                     return -1
@@ -490,7 +521,10 @@ actor ChildProcessManager {
             }
 
             // Child still running, wait a bit
-            await sleepFor(milliseconds: 100)
+            await sleepFor(
+                milliseconds: 100,
+                reason: "waitForExit poll pid=\(handle.pid) pollIteration=\(pollIteration)"
+            )
 
             // Log progress every 10 seconds for long-running processes
             let now = Date()
@@ -512,7 +546,7 @@ actor ChildProcessManager {
 
         // Wait up to 2 seconds for graceful exit
         var gracefulExit = false
-        for _ in 0 ..< 20 {
+        for graceIteration in 0 ..< 20 {
             var status: Int32 = 0
             #if canImport(Glibc)
                 let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
@@ -523,15 +557,20 @@ actor ChildProcessManager {
             if result == handle.pid {
                 logger.debug("Child process \(handle.pid) exited gracefully after SIGTERM")
                 gracefulExit = true
+                lifecycleProbe("waitForExit graceful exit after SIGTERM: pid=\(handle.pid), graceIteration=\(graceIteration)")
                 break
             } else if result < 0 && errno == ECHILD {
                 // Already reaped
                 logger.debug("Child process \(handle.pid) reaped after SIGTERM")
                 gracefulExit = true
+                lifecycleProbe("waitForExit ECHILD after SIGTERM: pid=\(handle.pid), graceIteration=\(graceIteration)")
                 break
             }
 
-            await sleepFor(milliseconds: 100)
+            await sleepFor(
+                milliseconds: 100,
+                reason: "waitForExit SIGTERM pid=\(handle.pid) graceIteration=\(graceIteration)"
+            )
         }
 
         // If still running, use SIGKILL
@@ -553,7 +592,7 @@ actor ChildProcessManager {
             // Never block indefinitely here. In CI we observed rare hangs where a blocking
             // waitpid(2) after SIGKILL could pin the whole job until workflow timeout.
             var reapedAfterSIGKILL = false
-            for _ in 0 ..< 50 {  // 5 seconds max
+            for killIteration in 0 ..< 50 {  // 5 seconds max
                 var status: Int32 = 0
                 #if canImport(Glibc)
                     let result = Glibc.waitpid(handle.pid, &status, WNOHANG)
@@ -564,6 +603,7 @@ actor ChildProcessManager {
                 if result == handle.pid {
                     logger.debug("Child process \(handle.pid) killed via SIGKILL")
                     reapedAfterSIGKILL = true
+                    lifecycleProbe("waitForExit reaped after SIGKILL: pid=\(handle.pid), killIteration=\(killIteration)")
                     break
                 }
 
@@ -571,6 +611,7 @@ actor ChildProcessManager {
                     let err = errno
                     if err == ECHILD {
                         logger.debug("Child process \(handle.pid) reaped (ECHILD) after SIGKILL")
+                        lifecycleProbe("waitForExit ECHILD after SIGKILL: pid=\(handle.pid), killIteration=\(killIteration)")
                     } else {
                         logger.warning("waitpid failed while reaping child process \(handle.pid) after SIGKILL: \(err)")
                     }
@@ -578,7 +619,10 @@ actor ChildProcessManager {
                     break
                 }
 
-                await sleepFor(milliseconds: 100)
+                await sleepFor(
+                    milliseconds: 100,
+                    reason: "waitForExit SIGKILL pid=\(handle.pid) killIteration=\(killIteration)"
+                )
             }
 
             if !reapedAfterSIGKILL {
