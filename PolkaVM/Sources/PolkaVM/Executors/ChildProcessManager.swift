@@ -58,17 +58,40 @@ actor ChildProcessManager {
         logger.debug("Transferred FD \(fd) to caller ownership")
     }
 
-    /// Sleep for a short duration without blocking the actor executor thread.
-    /// We intentionally avoid `Task.sleep` due to CI hangs observed in lifecycle paths.
+    /// Sleep for a short duration in-process.
+    /// We intentionally avoid continuation-backed timers here because CI showed
+    /// `DispatchQueue.asyncAfter` continuations getting stranded in lifecycle waits.
     private func sleepFor(milliseconds: Int, reason: @autoclosure () -> String) async {
         guard milliseconds > 0 else { return }
         let reasonValue = reason()
         lifecycleProbe("sleep start: \(reasonValue), duration=\(milliseconds)ms")
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(milliseconds)) {
-                continuation.resume()
+
+        var remaining = timespec(
+            tv_sec: milliseconds / 1000,
+            tv_nsec: (milliseconds % 1000) * 1_000_000
+        )
+
+        while true {
+            var interrupted = timespec(tv_sec: 0, tv_nsec: 0)
+            #if canImport(Glibc)
+                let result = Glibc.nanosleep(&remaining, &interrupted)
+            #elseif canImport(Darwin)
+                let result = Darwin.nanosleep(&remaining, &interrupted)
+            #endif
+
+            if result == 0 {
+                break
             }
+
+            if errno == EINTR {
+                remaining = interrupted
+                continue
+            }
+
+            lifecycleProbe("sleep aborted: \(reasonValue), errno=\(errno)")
+            break
         }
+
         lifecycleProbe("sleep end: \(reasonValue)")
     }
 
