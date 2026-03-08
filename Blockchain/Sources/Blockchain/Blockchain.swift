@@ -80,4 +80,13 @@ public final class Blockchain: ServiceBase, @unchecked Sendable {
     ) async throws -> T {
         try await waitFor(eventType: eventType, check: check, timeout: timeout)
     }
+
+    public override func waitForResponse<Published: Event, Response: Event>(
+        to event: Published,
+        as responseType: Response.Type,
+        check: @escaping @Sendable (Response) -> Bool = { _ in true },
+        timeout: TimeInterval = 10,
+    ) async throws -> Response {
+        try await super.waitForResponse(to: event, as: responseType, check: check, timeout: timeout)
+    }
 }

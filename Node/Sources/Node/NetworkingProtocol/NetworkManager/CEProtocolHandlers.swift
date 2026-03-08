@@ -117,17 +117,6 @@ public struct CEProtocolHandlers: Sendable {
     // MARK: - State Request
 
     private func handleStateRequest(_ message: StateRequest) async -> [Data] {
-        // Publish state request event
-        blockchain.publish(
-            event: RuntimeEvents.StateRequestReceived(
-                headerHash: message.headerHash,
-                startKey: message.startKey,
-                endKey: message.endKey,
-                maxSize: message.maxSize,
-            ),
-        )
-
-        // Wait for response with timeout
         do {
             let requestId = try JamEncoder.encode(
                 message.headerHash,
@@ -136,8 +125,14 @@ public struct CEProtocolHandlers: Sendable {
                 message.maxSize,
             ).blake2b256hash()
 
-            let response = try await blockchain.waitFor(
-                RuntimeEvents.StateRequestReceivedResponse.self,
+            let response = try await blockchain.waitForResponse(
+                to: RuntimeEvents.StateRequestReceived(
+                    headerHash: message.headerHash,
+                    startKey: message.startKey,
+                    endKey: message.endKey,
+                    maxSize: message.maxSize,
+                ),
+                as: RuntimeEvents.StateRequestReceivedResponse.self,
                 check: { $0.requestId == requestId },
                 timeout: 5.0,
             )
@@ -207,19 +202,18 @@ public struct CEProtocolHandlers: Sendable {
 
     private func handleWorkPackageSharing(_ message: WorkPackageSharingMessage) async throws -> [Data] {
         let hash = message.bundle.hash()
-        blockchain
-            .publish(
-                event: RuntimeEvents
-                    .WorkPackageBundleReceived(
-                        coreIndex: message.coreIndex,
-                        bundle: message.bundle,
-                        segmentsRootMappings: message.segmentsRootMappings,
-                    ),
-            )
-
-        let resp = try await blockchain.waitFor(RuntimeEvents.WorkPackageBundleReceivedResponse.self) { event in
-            hash == event.workBundleHash
-        }
+        let resp = try await blockchain.waitForResponse(
+            to: RuntimeEvents
+                .WorkPackageBundleReceived(
+                    coreIndex: message.coreIndex,
+                    bundle: message.bundle,
+                    segmentsRootMappings: message.segmentsRootMappings,
+                ),
+            as: RuntimeEvents.WorkPackageBundleReceivedResponse.self,
+            check: { event in
+                hash == event.workBundleHash
+            },
+        )
         let (workReportHash, signature) = try resp.result.get()
         return try [JamEncoder.encode(workReportHash, signature)]
     }
@@ -228,19 +222,18 @@ public struct CEProtocolHandlers: Sendable {
 
     private func handleWorkReportDistribution(_ message: WorkReportDistributionMessage) async throws -> [Data] {
         let hash = message.workReport.hash()
-        blockchain
-            .publish(
-                event: RuntimeEvents
-                    .WorkReportReceived(
-                        workReport: message.workReport,
-                        slot: message.slot,
-                        signatures: message.signatures,
-                    ),
-            )
-
-        let resp = try await blockchain.waitFor(RuntimeEvents.WorkReportReceivedResponse.self) { event in
-            hash == event.workReportHash
-        }
+        let resp = try await blockchain.waitForResponse(
+            to: RuntimeEvents
+                .WorkReportReceived(
+                    workReport: message.workReport,
+                    slot: message.slot,
+                    signatures: message.signatures,
+                ),
+            as: RuntimeEvents.WorkReportReceivedResponse.self,
+            check: { event in
+                hash == event.workReportHash
+            },
+        )
         _ = try resp.result.get()
         return []
     }
@@ -262,11 +255,13 @@ public struct CEProtocolHandlers: Sendable {
         )
         let requestId = try receivedEvent.generateRequestId()
 
-        blockchain.publish(event: receivedEvent)
-
-        let resp = try await blockchain.waitFor(RuntimeEvents.ShardDistributionReceivedResponse.self) { event in
-            requestId == event.requestId
-        }
+        let resp = try await blockchain.waitForResponse(
+            to: receivedEvent,
+            as: RuntimeEvents.ShardDistributionReceivedResponse.self,
+            check: { event in
+                requestId == event.requestId
+            },
+        )
         let (bundleShard, segmentShards, justification) = try resp.result.get()
         return try [JamEncoder.encode(bundleShard, segmentShards, justification)]
     }
@@ -274,19 +269,17 @@ public struct CEProtocolHandlers: Sendable {
     // MARK: - Audit Shard Request
 
     private func handleAuditShardRequest(_ message: AuditShardRequestMessage) async -> [Data] {
-        // Publish audit shard request event
         let receivedEvent = RuntimeEvents.AuditShardRequestReceived(
             erasureRoot: message.erasureRoot,
             shardIndex: message.shardIndex,
         )
-        blockchain.publish(event: receivedEvent)
 
-        // Wait for response with timeout
         do {
             let requestId = try receivedEvent.generateRequestId()
 
-            let response = try await blockchain.waitFor(
-                RuntimeEvents.AuditShardRequestReceivedResponse.self,
+            let response = try await blockchain.waitForResponse(
+                to: receivedEvent,
+                as: RuntimeEvents.AuditShardRequestReceivedResponse.self,
                 check: { $0.requestId == requestId },
                 timeout: 5.0,
             )
@@ -308,20 +301,18 @@ public struct CEProtocolHandlers: Sendable {
     // MARK: - Segment Shard Request
 
     private func handleSegmentShardRequest1(_ message: SegmentShardRequestMessage) async -> [Data] {
-        // Publish segment shard request event
         let receivedEvent = RuntimeEvents.SegmentShardRequestReceived(
             erasureRoot: message.erasureRoot,
             shardIndex: message.shardIndex,
             segmentIndices: message.segmentIndices,
         )
-        blockchain.publish(event: receivedEvent)
 
-        // Wait for response with timeout
         do {
             let requestId = try receivedEvent.generateRequestId()
 
-            let response = try await blockchain.waitFor(
-                RuntimeEvents.SegmentShardRequestReceivedResponse.self,
+            let response = try await blockchain.waitForResponse(
+                to: receivedEvent,
+                as: RuntimeEvents.SegmentShardRequestReceivedResponse.self,
                 check: { $0.requestId == requestId },
                 timeout: 5.0,
             )
@@ -341,20 +332,18 @@ public struct CEProtocolHandlers: Sendable {
     }
 
     private func handleSegmentShardRequest2(_ message: SegmentShardRequestMessage) async -> [Data] {
-        // Publish segment shard request event
         let receivedEvent = RuntimeEvents.SegmentShardRequestReceived(
             erasureRoot: message.erasureRoot,
             shardIndex: message.shardIndex,
             segmentIndices: message.segmentIndices,
         )
-        blockchain.publish(event: receivedEvent)
 
-        // Wait for response with timeout
         do {
             let requestId = try receivedEvent.generateRequestId()
 
-            let response = try await blockchain.waitFor(
-                RuntimeEvents.SegmentShardRequestReceivedResponse.self,
+            let response = try await blockchain.waitForResponse(
+                to: receivedEvent,
+                as: RuntimeEvents.SegmentShardRequestReceivedResponse.self,
                 check: { $0.requestId == requestId },
                 timeout: 5.0,
             )
@@ -404,13 +393,10 @@ public struct CEProtocolHandlers: Sendable {
     }
 
     private func handlePreimageRequest(_ message: PreimageRequestMessage) async -> [Data] {
-        // Publish preimage request event
-        blockchain.publish(event: RuntimeEvents.PreimageRequestReceived(hash: message.hash))
-
-        // Wait for response with timeout
         do {
-            let response = try await blockchain.waitFor(
-                RuntimeEvents.PreimageRequestReceivedResponse.self,
+            let response = try await blockchain.waitForResponse(
+                to: RuntimeEvents.PreimageRequestReceived(hash: message.hash),
+                as: RuntimeEvents.PreimageRequestReceivedResponse.self,
                 check: { $0.hash == message.hash },
                 timeout: 5.0,
             )

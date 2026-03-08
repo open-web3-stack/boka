@@ -43,4 +43,13 @@ public class ServiceBase: @unchecked Sendable {
     ) async throws -> T {
         try await subscriptions.waitFor(eventType, check: check, timeout: timeout)
     }
+
+    func waitForResponse<Published: Event, Response: Event>(
+        to event: Published,
+        as responseType: Response.Type,
+        check: @escaping @Sendable (Response) -> Bool = { _ in true },
+        timeout: TimeInterval = 10,
+    ) async throws -> Response {
+        try await subscriptions.publishAndWaitFor(event, responseType: responseType, check: check, timeout: timeout)
+    }
 }
