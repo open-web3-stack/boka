@@ -1,5 +1,6 @@
 import Foundation
 import TracingUtils
+import Utils
 #if canImport(Glibc)
     import Glibc
 #elseif canImport(Darwin)
@@ -12,7 +13,7 @@ private let logger = Logger(label: "IPCClient")
 ///
 /// NOTE: This class uses `@unchecked Sendable` because:
 /// - It's only used for the duration of a single request
-/// - The DispatchQueue offloading ensures no concurrent access
+/// - The dedicated blocking thread ensures no concurrent access
 /// - All state is either immutable or locally synchronized
 final class IPCClient: @unchecked Sendable {
     private var fileDescriptor: Int32?
@@ -59,20 +60,23 @@ final class IPCClient: @unchecked Sendable {
         argumentData: Data?,
         executionMode: ExecutionMode,
     ) async throws -> (exitReason: ExitReason, gasUsed: UInt64, outputData: Data?) {
-        // ⚠️ Offload blocking I/O to DispatchQueue to avoid blocking Swift concurrency pool
+        // Offload blocking I/O to a dedicated thread so IPC timeouts cannot be
+        // starved behind unrelated work on libdispatch's shared global queues.
+        let boxedSelf = UncheckedSendableBox(self)
+        let boxedBlob = UncheckedSendableBox(blob)
+        let boxedArgumentData = UncheckedSendableBox(argumentData)
+        let deadline = DispatchTime.now() + timeout
+
         return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self else {
-                    continuation.resume(throwing: IPCError.malformedMessage)
-                    return
-                }
+            Thread.detachNewThread {
                 do {
-                    let result = try sendExecuteRequestBlocking(
-                        blob: blob,
+                    let result = try boxedSelf.value.sendExecuteRequestBlocking(
+                        blob: boxedBlob.value,
                         pc: pc,
                         gas: gas,
-                        argumentData: argumentData,
+                        argumentData: boxedArgumentData.value,
                         executionMode: executionMode,
+                        deadline: deadline,
                     )
                     continuation.resume(returning: result)
                 } catch {
@@ -89,12 +93,12 @@ final class IPCClient: @unchecked Sendable {
         gas: UInt64,
         argumentData: Data?,
         executionMode: ExecutionMode,
+        deadline: DispatchTime,
     ) throws -> (exitReason: ExitReason, gasUsed: UInt64, outputData: Data?) {
         guard let fd = fileDescriptor else {
             logger.error("[IPC] No file descriptor set")
             throw IPCError.malformedMessage
         }
-        let deadline = DispatchTime.now() + timeout
 
         let timestamp = Date().timeIntervalSince1970
         logger.trace("[IPC][\(timestamp)] Using file descriptor: \(fd)")
