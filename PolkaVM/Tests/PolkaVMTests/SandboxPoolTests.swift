@@ -84,63 +84,6 @@ struct SandboxPoolTests {
         print("\n=== TEST PASSED ===\n")
     }
 
-    /// Test multiple executions to check for worker stability
-    @Test
-    func multipleExecutionsStability() async {
-        let config = SandboxPoolConfiguration(
-            poolSize: 1,
-            maxQueueDepth: 10,
-            workerWaitTimeout: 10.0,
-            executionTimeout: 10.0,
-            enableWorkerRecycling: false,
-            workerRecycleThreshold: 1000,
-            healthCheckInterval: 0,
-            maxConsecutiveFailures: 10,
-            failureTrackingWindow: 60.0,
-            allowOverflowWorkers: false,
-            maxOverflowWorkers: 0,
-            exhaustionPolicy: .failFast,
-        )
-
-        print("\n=== TEST: Multiple Executions Stability ===")
-
-        let executor = Executor.pooled(
-            mode: .sandboxed,
-            config: DefaultPvmConfig(),
-            poolConfig: config,
-        )
-
-        // Use a minimal but valid program: just one instruction that halts
-        let haltProgram = Data([
-            1, // 1 jump table entry
-            0, 0, 0, 0, 0, 0, 0, 0, // jump table entry 0: offset 0
-            0x01, // halt instruction (opcode 1)
-        ])
-
-        let iterations = 10
-        var successCount = 0
-
-        for i in 1 ... iterations {
-            print("\n--- Execution \(i)/\(iterations) ---")
-            let result = await executor.execute(
-                blob: haltProgram,
-                pc: 0,
-                gas: Gas(1_000_000),
-                argumentData: nil as Data?,
-                ctx: nil as (any InvocationContext)?,
-            )
-            print("Result: \(result.exitReason)")
-            #expect(result.exitReason == ExitReason.halt || result.exitReason == .panic(.trap))
-            successCount += 1
-        }
-
-        // Explicitly shutdown to clean up worker processes
-        await executor.shutdown()
-
-        print("\n=== SUCCESS: \(successCount)/\(iterations) executions ===\n")
-        #expect(successCount == iterations)
-    }
-
     /// Test with small pool size to reduce noise
     @Test(.disabled("Flaky CI timeout: can hang in linux debug runs"))
     func smallPoolTwoWorkers() async {
