@@ -43,6 +43,10 @@ private let sandboxDebugEnabled: Bool = {
     return value == "1" || value == "true" || value == "yes" || value == "on"
 }()
 
+private let sandboxSingleShotMode: Bool = {
+    CommandLine.arguments.dropFirst().contains("--single-shot")
+}()
+
 /// Helper function to write debug messages to stderr
 private func debugWrite(_ message: String) {
     guard sandboxDebugEnabled else {
@@ -83,7 +87,7 @@ enum SandboxMain {
 
         logger.debug("Sandbox process ready, listening for IPC messages")
 
-        await server.run { request in
+        await server.run(singleShot: sandboxSingleShotMode) { request in
             // Handle execute request
             await handleExecuteRequest(request)
         }

@@ -50,14 +50,35 @@ actor ChildProcessManager {
         logger.debug("Transferred FD \(fd) to caller ownership")
     }
 
-    /// Sleep for a short duration without blocking the actor executor thread.
-    /// We intentionally avoid `Task.sleep` due to CI hangs observed in lifecycle paths.
+    /// Sleep for a short duration in-process.
+    /// We intentionally avoid continuation-backed timers here because CI showed
+    /// `DispatchQueue.asyncAfter` continuations getting stranded in lifecycle waits.
     private func sleepFor(milliseconds: Int) async {
         guard milliseconds > 0 else { return }
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(milliseconds)) {
-                continuation.resume()
+
+        var remaining = timespec(
+            tv_sec: milliseconds / 1000,
+            tv_nsec: (milliseconds % 1000) * 1_000_000
+        )
+
+        while true {
+            var interrupted = timespec(tv_sec: 0, tv_nsec: 0)
+            #if canImport(Glibc)
+                let result = Glibc.nanosleep(&remaining, &interrupted)
+            #elseif canImport(Darwin)
+                let result = Darwin.nanosleep(&remaining, &interrupted)
+            #endif
+
+            if result == 0 {
+                break
             }
+
+            if errno == EINTR {
+                remaining = interrupted
+                continue
+            }
+
+            break
         }
     }
 
@@ -80,15 +101,45 @@ actor ChildProcessManager {
         terminateAndReapBestEffort(pid: pid)
     }
 
+    /// Duplicate command-line arguments into stable C strings for spawn/exec calls.
+    private func duplicatedCStringArguments(_ arguments: [String]) throws -> [UnsafeMutablePointer<CChar>?] {
+        var duplicated: [UnsafeMutablePointer<CChar>?] = []
+        duplicated.reserveCapacity(arguments.count + 1)
+
+        for argument in arguments {
+            guard let copy = strdup(argument) else {
+                var partial = duplicated
+                freeCStringArguments(&partial)
+                throw IPCError.writeFailed(Int(ENOMEM))
+            }
+            duplicated.append(copy)
+        }
+
+        duplicated.append(nil)
+        return duplicated
+    }
+
+    /// Free a duplicated argv-style argument array.
+    private func freeCStringArguments(_ arguments: inout [UnsafeMutablePointer<CChar>?]) {
+        for index in arguments.indices {
+            if let pointer = arguments[index] {
+                free(pointer)
+                arguments[index] = nil
+            }
+        }
+    }
+
     /// Wait until the child appears stable (running with a valid IPC FD) without fixed blocking delay.
     private func waitForSpawnReadiness(pid: pid_t, parentFD: Int32, maxWaitMilliseconds: Int = 500) async throws {
         let start = DispatchTime.now().uptimeNanoseconds
         let maxWaitNanoseconds = UInt64(maxWaitMilliseconds) * 1_000_000
         let stableNanoseconds: UInt64 = 50_000_000 // 50ms of healthy state
         var healthySince: UInt64?
+        var pollIteration = 0
 
         while true {
             try Task.checkCancellation()
+            pollIteration += 1
 
             #if canImport(Glibc)
                 let aliveResult = Glibc.kill(pid, 0)
@@ -153,12 +204,26 @@ actor ChildProcessManager {
     ///
     /// - Parameter executablePath: Absolute or relative path to the executable to spawn.
     ///   If relative, will be searched in PATH.
+    /// - Parameter arguments: Optional command-line arguments to pass to the child process.
     ///
     /// - Returns: Tuple of process handle and client file descriptor for IPC
     /// - Throws: IPCError if spawning fails
-    func spawnChildProcess(executablePath: String) async throws -> (handle: ProcessHandle, clientFD: Int32) {
+    func spawnChildProcess(
+        executablePath: String,
+        arguments: [String] = []
+    ) async throws -> (handle: ProcessHandle, clientFD: Int32) {
         // Clean up any zombie processes from previous runs before spawning new ones
         reapZombies()
+
+        let command = [executablePath] + arguments
+        var argv = try duplicatedCStringArguments(command)
+        defer {
+            freeCStringArguments(&argv)
+        }
+
+        guard let execPath = argv[0] else {
+            throw IPCError.writeFailed(Int(EINVAL))
+        }
 
         #if os(Linux)
             logger.debug("Spawning child process: \(executablePath)")
@@ -206,10 +271,6 @@ actor ChildProcessManager {
             let childFlags = fcntl(childFD, F_GETFL)
             logger.debug("Socketpair validation: parentFD flags=\(parentFlags), childFD flags=\(childFlags)")
 
-            // Convert executable path to null-terminated C string array BEFORE fork
-            // This is async-signal-safe and avoids unsafe withCString in child after fork
-            let execPathCArray = executablePath.utf8CString
-
             // Fork child process
             let pid = Glibc.fork()
 
@@ -247,25 +308,13 @@ actor ChildProcessManager {
 
                 Glibc.close(childFD)
 
-                // Execute child process
-                // Use pre-allocated C string array (async-signal-safe)
-                // withUnsafeBufferPointer is safe here because we're in the child process
-                // and the array lives until execvp replaces the process image
-                execPathCArray.withUnsafeBufferPointer { buffer in
-                    let execPath = buffer.baseAddress!
-                    var argv: [UnsafeMutablePointer<CChar>?] = [
-                        UnsafeMutablePointer(mutating: execPath),
-                        nil,
-                    ]
+                let exeResult = Glibc.execvp(execPath, &argv)
 
-                    let exeResult = Glibc.execvp(execPath, &argv)
-
-                    // execvp only returns on failure
-                    // Use _exit() instead of exit() to avoid calling atexit() handlers
-                    // that were registered by the parent process
-                    if exeResult < 0 {
-                        _exit(1)
-                    }
+                // execvp only returns on failure
+                // Use _exit() instead of exit() to avoid calling atexit() handlers
+                // that were registered by the parent process
+                if exeResult < 0 {
+                    _exit(1)
                 }
 
                 // Should never reach here
@@ -283,7 +332,6 @@ actor ChildProcessManager {
                 activeProcesses[pid] = handle
 
                 logger.debug("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
-
                 do {
                     try await waitForSpawnReadiness(pid: pid, parentFD: parentFD)
                 } catch is CancellationError {
@@ -382,15 +430,7 @@ actor ChildProcessManager {
             }
 
             var pid: pid_t = 0
-            var execPathCArray = executablePath.utf8CString
-            let spawnResult = execPathCArray.withUnsafeMutableBufferPointer { buffer -> Int32 in
-                guard let execPath = buffer.baseAddress else {
-                    return EINVAL
-                }
-
-                var argv: [UnsafeMutablePointer<CChar>?] = [execPath, nil]
-                return posix_spawnp(&pid, execPath, &fileActions, nil, &argv, environ)
-            }
+            let spawnResult = posix_spawnp(&pid, execPath, &fileActions, nil, &argv, environ)
 
             guard spawnResult == 0 else {
                 closeFD(parentFD)
@@ -405,7 +445,6 @@ actor ChildProcessManager {
             activeProcesses[pid] = handle
 
             logger.debug("Spawned child process: PID \(pid), returning parentFD \(parentFD)")
-
             do {
                 try await waitForSpawnReadiness(pid: pid, parentFD: parentFD)
             } catch is CancellationError {
@@ -440,9 +479,11 @@ actor ChildProcessManager {
     func waitForExit(handle: ProcessHandle, timeout: TimeInterval) async throws -> Int32 {
         let startTime = Date()
         var lastCheckTime = startTime
+        var pollIteration = 0
 
         while Date().timeIntervalSince(startTime) < timeout {
             try Task.checkCancellation()
+            pollIteration += 1
 
             var status: Int32 = 0
             #if canImport(Glibc)

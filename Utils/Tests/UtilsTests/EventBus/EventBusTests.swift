@@ -13,6 +13,14 @@ struct AnotherTestEvent: Event {
     let name: String
 }
 
+struct ImmediateRequestEvent: Event {
+    let id: Int
+}
+
+struct ImmediateResponseEvent: Event {
+    let id: Int
+}
+
 struct EventBusTests {
     let eventBus = EventBus()
 
@@ -112,6 +120,21 @@ struct EventBusTests {
         #expect(receivedEvent1.id == 5)
         #expect(receivedEvent1.value == "test value")
         #expect(receivedEvent2.name == "another test")
+    }
+
+    @Test func publishAndWaitForHandlesImmediateResponse() async throws {
+        let eventBus = eventBus
+        _ = await eventBus.subscribe(ImmediateRequestEvent.self) { event in
+            await eventBus.publish(ImmediateResponseEvent(id: event.id))
+        }
+
+        let response = try await eventBus.publishAndWaitFor(
+            ImmediateRequestEvent(id: 42),
+            responseType: ImmediateResponseEvent.self,
+            check: { $0.id == 42 },
+        )
+
+        #expect(response.id == 42)
     }
 
     @Test func multipleWaitsForSameEventType() async throws {

@@ -211,10 +211,11 @@ public actor EventBus: Subscribable {
         continuation.resume(throwing: ContinuationError.timeout)
     }
 
-    public func waitFor<T: Event>(
+    private func awaitEvent<T: Event>(
         _ eventType: T.Type,
         check: @escaping @Sendable (T) -> Bool = { _ in true },
         timeout: TimeInterval = 10,
+        afterRegistration: (@Sendable () -> Void)? = nil,
     ) async throws -> T {
         let contId: Mutex<UniqueId?> = .init(nil)
         let timeoutTask: Mutex<Task<Void, Never>?> = .init(nil)
@@ -279,8 +280,31 @@ public actor EventBus: Subscribable {
             timeoutTask.withLock { value in
                 value = task
             }
+
+            afterRegistration?()
         }
 
         return res
+    }
+
+    public func waitFor<T: Event>(
+        _ eventType: T.Type,
+        check: @escaping @Sendable (T) -> Bool = { _ in true },
+        timeout: TimeInterval = 10,
+    ) async throws -> T {
+        try await awaitEvent(eventType, check: check, timeout: timeout)
+    }
+
+    public func publishAndWaitFor<Published: Event, Response: Event>(
+        _ event: Published,
+        responseType: Response.Type,
+        check: @escaping @Sendable (Response) -> Bool = { _ in true },
+        timeout: TimeInterval = 10,
+    ) async throws -> Response {
+        try await awaitEvent(responseType, check: check, timeout: timeout) { [event] in
+            Task { [self] in
+                await publish(event)
+            }
+        }
     }
 }

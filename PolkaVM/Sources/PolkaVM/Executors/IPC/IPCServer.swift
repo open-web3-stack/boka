@@ -34,7 +34,10 @@ public class IPCServer {
     }
 
     /// Run the IPC server loop
-    public func run(handler: @escaping @Sendable (IPCExecuteRequest) async throws -> IPCExecuteResponse) async {
+    public func run(
+        singleShot: Bool = false,
+        handler: @escaping @Sendable (IPCExecuteRequest) async throws -> IPCExecuteResponse
+    ) async {
         guard let fd = fileDescriptor else {
             logger.error("No file descriptor set")
             return
@@ -70,6 +73,11 @@ public class IPCServer {
                     logger.trace("[IPC-SERVER] Handling execute request")
                     await handleExecuteRequest(message, handler: handler)
                     logger.trace("[IPC-SERVER] Execute request handling complete")
+
+                    if singleShot {
+                        logger.trace("[IPC-SERVER] Single-shot mode complete, stopping server loop")
+                        isRunning = false
+                    }
 
                 case .heartbeat:
                     // Respond to heartbeat
