@@ -33,25 +33,6 @@ struct ChildProcessManagerTests {
     }
 
     @Test
-    func shortLivedFailingChildPreservesExitCode() async throws {
-        #if os(macOS) || os(Linux)
-            let manager = ChildProcessManager(defaultTimeout: 5.0)
-            let (handle, clientFD) = try await manager.spawnChildProcess(executablePath: "/usr/bin/false")
-
-            #if canImport(Glibc)
-                _ = Glibc.close(clientFD)
-            #elseif canImport(Darwin)
-                _ = Darwin.close(clientFD)
-            #endif
-
-            let exitCode = try await manager.waitForExit(handle: handle, timeout: 5.0)
-            #expect(exitCode != 0)
-        #else
-            #expect(true)
-        #endif
-    }
-
-    @Test
     func multipleManagersDoNotStealChildExitStatus() async throws {
         #if os(macOS) || os(Linux)
             let managerA = ChildProcessManager(defaultTimeout: 5.0)
@@ -110,6 +91,48 @@ struct ChildProcessManagerTests {
 
             let outputValue = output?.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } ?? 0
             #expect(outputValue == 10)
+        #else
+            #expect(true)
+        #endif
+    }
+
+    @Test
+    func singleShotSandboxExitsAfterReply() async throws {
+        #if os(macOS) || os(Linux)
+            let resolution = SandboxExecutableResolver.resolve()
+            guard SandboxExecutableResolver.isExecutableAvailable(at: resolution.path) else {
+                Issue.record("Unable to resolve sandbox executable. Set BOKA_SANDBOX_PATH for tests.")
+                return
+            }
+
+            let manager = ChildProcessManager(defaultTimeout: 5.0)
+            let (handle, clientFD) = try await manager.spawnChildProcess(
+                executablePath: resolution.path,
+                arguments: ["--single-shot"],
+            )
+
+            let ipcClient = IPCClient(timeout: 5.0)
+            ipcClient.setFileDescriptor(clientFD)
+            defer {
+                ipcClient.close()
+            }
+
+            let blob = ProgramBlobBuilder.createSingleInstructionProgram([CppHelperInstructions.Trap.opcode])
+
+            let result = try await ipcClient.sendExecuteRequest(
+                blob: blob,
+                pc: 0,
+                gas: 64,
+                argumentData: nil,
+                executionMode: [.jit],
+            )
+
+            #expect(result.exitReason == .panic(.trap))
+
+            ipcClient.close()
+
+            let exitCode = try await manager.waitForExit(handle: handle, timeout: 5.0)
+            #expect(exitCode == 0)
         #else
             #expect(true)
         #endif

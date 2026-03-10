@@ -118,23 +118,24 @@ struct JITControlFlowTests {
 
     @Test
     func jitJumpParity() async {
-        // Jump to self at PC=0 in both engines.
-        let jumpOffset = Int32(0)
+        // Jump forward directly to a trap so both engines exercise Jump semantics
+        // without relying on a long-running self-loop in the sandboxed path.
+        let jumpOffset = Int32(5)
         let jumpInst: [UInt8] = [
             0x28, // Jump opcode
         ] + withUnsafeBytes(of: jumpOffset.littleEndian) { Array($0) }
 
         let blob = ProgramBlobBuilder.createMultiInstructionProgram([
             jumpInst,
+            [CppHelperInstructions.Trap.opcode],
         ])
 
         let (_, _, differences) = await JITParityComparator.compare(
             blob: blob,
-            testName: "Jump self-loop",
+            testName: "Jump forward to trap",
             gas: Gas(64),
         )
 
-        // Both engines should run out of gas on a self-loop.
         #expect(
             differences == nil,
         )

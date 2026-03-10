@@ -68,6 +68,7 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
             // Spawn child process
             (handle, clientFD) = try await childProcessManager.spawnChildProcess(
                 executablePath: sandboxPath,
+                arguments: ["--single-shot"],
             )
 
             // Create IPC client and transfer ownership of the FD
@@ -91,12 +92,18 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
             // Clean up IPC
             ipcClient.close()
 
-            // Wait for child to exit
+            // Single-shot sandbox workers should exit on their own after replying.
             if let handle {
-                _ = try? await childProcessManager.waitForExit(
-                    handle: handle,
-                    timeout: 30.0,
-                )
+                do {
+                    let exitCode = try await childProcessManager.waitForExit(handle: handle, timeout: 5.0)
+                    if exitCode != 0 {
+                        logger.warning("Single-shot sandbox process exited with code \(exitCode)")
+                    }
+                } catch {
+                    logger.warning("Single-shot sandbox process did not exit cleanly: \(error)")
+                    await childProcessManager.kill(handle: handle, signal: SIGKILL)
+                    await childProcessManager.reap(handle: handle)
+                }
             }
 
             return VMExecutionResult(
@@ -126,11 +133,8 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
 
             // Clean up child process if it was spawned
             if let handle {
-                // Try to kill the process and reap it to avoid zombies
                 await childProcessManager.kill(handle: handle)
-                // Try one more reap after a short delay
-                await sleepForCleanupDelay(milliseconds: 100)
-                await childProcessManager.reap(handle: handle)
+                _ = try? await childProcessManager.waitForExit(handle: handle, timeout: 1.0)
             }
 
             // Close client FD if it was opened
@@ -144,17 +148,6 @@ final class ExecutorFrontendSandboxed: ExecutorFrontend {
                 gasUsed: Gas(0),
                 outputData: nil,
             )
-        }
-    }
-
-    /// Short non-blocking delay used in cleanup paths.
-    /// We intentionally avoid Task.sleep here due CI hangs under high-concurrency sandbox failures.
-    private func sleepForCleanupDelay(milliseconds: Int) async {
-        guard milliseconds > 0 else { return }
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(milliseconds)) {
-                continuation.resume()
-            }
         }
     }
 
