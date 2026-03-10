@@ -293,7 +293,8 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
     }
 
     func addConnection(_ connection: QuicConnection, addr: NetAddr, role: PeerRole) -> Bool {
-        connections.write { connections in
+        var connectionToClose: Connection<Handler>?
+        let didAdd = connections.write { connections in
             if role == .builder {
                 let currentCount = connections.byAddr.values.count(where: { $0.role == role })
                 if currentCount >= self.settings.maxBuilderConnections {
@@ -308,7 +309,7 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
                                 "lastActive": "\(conn.getLastActive())",
                             ],
                         )
-                        conn.close(abort: false)
+                        connectionToClose = conn
                     } else {
                         self.logger.warning("Max builder connections reached, no eligible replacement found")
                         return false
@@ -336,6 +337,8 @@ final class PeerImpl<Handler: StreamHandler>: Sendable {
             connections.byId[connection.id] = conn
             return true
         }
+        connectionToClose?.close(abort: false)
+        return didAdd
     }
 
     func reconnect(to address: NetAddr, role: PeerRole) throws {
@@ -588,7 +591,8 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
             // TODO: verify if it is current or next validator
 
             // Check for an existing connection by public key
-            return try impl.connections.write { connections in
+            var existingConnectionToClose: Connection<Handler>?
+            let openDecision: QuicStatus = impl.connections.write { connections in
                 if let existingConnection = connections.byPublicKey[publicKey] {
                     // Deterministically decide based on public key comparison
                     if !publicKey.lexicographicallyPrecedes(impl.publicKey) != conn.initiatedByLocal {
@@ -603,8 +607,7 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                             ],
                         )
                         connections.byPublicKey[publicKey] = conn
-                        existingConnection.close()
-                        try conn.opened(publicKey: publicKey)
+                        existingConnectionToClose = existingConnection
                         return .code(.success)
                     } else {
                         logger.debug(
@@ -615,16 +618,24 @@ private struct PeerEventHandler<Handler: StreamHandler>: QuicEventHandler {
                                 "remoteAddress": "\(conn.remoteAddress)",
                             ],
                         )
-                        // Mark the connection state so streams won't be processed
-                        conn.closing()
                         return .code(.connectionRefused)
                     }
                 } else {
                     connections.byPublicKey[publicKey] = conn
-                    try conn.opened(publicKey: publicKey)
                     return .code(.success)
                 }
             }
+            switch openDecision {
+            case .code(.success):
+                existingConnectionToClose?.close()
+                try conn.opened(publicKey: publicKey)
+            case .code(.connectionRefused):
+                // Mark the connection state so streams won't be processed.
+                conn.closing()
+            default:
+                break
+            }
+            return openDecision
         } catch {
             logger.warning(
                 "Certificate parsing failed",
