@@ -6,8 +6,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <unordered_map>
-#include <asmjit/core.h>
 #include "opcodes.hh"
+
+namespace asmjit {
+    inline namespace v1_21 {
+        class JitRuntime;
+    }
+}
 
 // JIT instruction generation interface
 // This is the C++ implementation of the JITInstructionGenerator protocol
@@ -125,18 +130,8 @@ struct RuntimeContext {
     asmjit::JitRuntime* _Nonnull runtime;
     std::unordered_map<void*, std::pair<void**, size_t>> dispatcherTables;
 
-    RuntimeContext() : runtime(new asmjit::JitRuntime()) {}
-
-    ~RuntimeContext() {
-        // Clean up dispatcher tables
-        for (auto& entry : dispatcherTables) {
-            if (entry.second.first) {
-                free(entry.second.first);
-            }
-        }
-        dispatcherTables.clear();
-        delete runtime;
-    }
+    RuntimeContext();
+    ~RuntimeContext();
 };
 
 // Create a new RuntimeContext (called from Swift)
