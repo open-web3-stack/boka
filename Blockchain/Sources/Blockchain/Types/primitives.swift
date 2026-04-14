@@ -11,7 +11,7 @@ public typealias DataLength = UInt32
 
 public typealias ValidatorIndex = UInt16
 public typealias CoreIndex = UInt16
-public typealias TicketIndex = UInt8
+public typealias TicketIndex = UInt
 public typealias EpochIndex = UInt32
 
 public typealias Ed25519PublicKey = Data32

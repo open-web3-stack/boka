@@ -37,7 +37,7 @@ extension SigningContext {
     public static func safroleTicketInputData(entropy: Data32, attempt: TicketIndex) -> Data {
         var vrfInputData = SigningContext.ticketSeal
         vrfInputData.append(entropy.data)
-        vrfInputData.append(attempt)
+        vrfInputData.append(contentsOf: attempt.encode(method: .variableWidth))
         return vrfInputData
     }
 

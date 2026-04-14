@@ -118,12 +118,10 @@ public final class SafroleService: ServiceBase, @unchecked Sendable, OnGenesis, 
 
         let prover = Bandersnatch.Prover(sercret: secret, ring: pubkeys, proverIdx: UInt(idx), ctx: ringContext)
 
-        var vrfInputData = SigningContext.safroleTicketInputData(entropy: entropy, attempt: 0)
-
         var tickets: [TicketItemAndOutput] = []
 
         for i in 0 ..< count {
-            vrfInputData[vrfInputData.count - 1] = TicketIndex(i)
+            let vrfInputData = SigningContext.safroleTicketInputData(entropy: entropy, attempt: TicketIndex(i))
             let sig = try prover.ringVRFSign(vrfInputData: vrfInputData)
             let out = try secret.getOutput(vrfInputData: vrfInputData)
             tickets.append(.init(ticket: .init(attempt: TicketIndex(i), signature: sig), output: out))

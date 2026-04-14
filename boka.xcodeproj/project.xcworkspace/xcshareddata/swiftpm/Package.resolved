@@ -1,13 +1,13 @@
 {
-  "originHash" : "450e95de5ee135e244cc990979fb5cc823ae24658856cc8aa3e443e66f016292",
+  "originHash" : "f52b39f66e45c4ff2c7c66a334654da61b27846432432e85ad4da60628354c72",
   "pins" : [
     {
       "identity" : "async-channels",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gh123man/Async-Channels.git",
       "state" : {
-        "revision" : "e4c71cd0364532d34b27e76f4ab7229abaaaefb4",
-        "version" : "1.0.2"
+        "revision" : "0fed3c0a90214bfd8cf129d091e648b1b516b6da",
+        "version" : "2.2.0"
       }
     },
     {
@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/HdrHistogram/hdrhistogram-swift.git",
       "state" : {
-        "revision" : "93a1618c8aa20f6a521a9da656a3e0591889e9dc",
-        "version" : "0.1.3"
+        "revision" : "de0b9b8a27956b9bfc9b4dce7d1c38ad7c579f19",
+        "version" : "0.1.4"
       }
     },
     {
@@ -78,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ordo-one/package-benchmark.git",
       "state" : {
-        "revision" : "6b8c88f8089e518063cb7efc928ddacfdf6d867e",
-        "version" : "1.29.4"
+        "revision" : "1ce127f3bdd2803b0b8f5ac72c940e5a29ca65a9",
+        "version" : "1.30.0"
       }
     },
     {
