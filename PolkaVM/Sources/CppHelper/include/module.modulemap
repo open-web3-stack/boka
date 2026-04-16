@@ -1,0 +1,5 @@
+module CppHelper {
+    umbrella header "CppHelper.h"
+    export *
+    module * { export * }
+}

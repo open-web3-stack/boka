@@ -2,12 +2,6 @@
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
-import Foundation
-
-let packageDirectory = URL(fileURLWithPath: #filePath)
-    .deletingLastPathComponent()
-    .path
-let asmJitIncludePath = "\(packageDirectory)/Sources/asmjit"
 
 let package = Package(
     name: "PolkaVM",
@@ -38,49 +32,11 @@ let package = Package(
                 "Utils",
                 "TracingUtils",
                 "Codec",
-                "AsmJitLib",
                 "CppHelper",
                 .product(name: "Logging", package: "swift-log"),
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-                .unsafeFlags([
-                    "-Xcc",
-                    "-I\(asmJitIncludePath)",
-                ]),
-            ],
-        ),
-        .target(
-            name: "AsmJitLib",
-            dependencies: [],
-            path: "Sources/asmjit",
-            exclude: [
-                "tools",
-                ".github",
-                "db",
-                "asmjit-testing",
-                "configure.sh",
-                "configure_sanitizers.sh",
-                "configure_vs2022_x64.bat",
-                "configure_vs2022_x86.bat",
-                "CMakeLists.txt",
-                "CMakePresets.json",
-                ".git",
-                ".gitignore",
-                ".editorconfig",
-                "LICENSE.md",
-                "README.md",
-                "CONTRIBUTING.md",
-                "asmjit/asmjit.natvis",
-            ],
-            sources: ["asmjit"],
-            publicHeadersPath: "include",
-            cxxSettings: [
-                .headerSearchPath("."),
-                .unsafeFlags([
-                    "-std=c++20",
-                ]),
-                .define("ASMJIT_STATIC"),
             ],
         ),
         .target(
@@ -121,31 +77,30 @@ let package = Package(
         ),
         .target(
             name: "CppHelper",
-            dependencies: [
-                "AsmJitLib",
-            ],
+            dependencies: [],
+            path: "Sources",
             exclude: [
-                ".DS_Store",
+                "asmjit/asmjit/asmjit.natvis",
             ],
             sources: [
-                "a64_labeled_helper.cpp",
-                "helper.cpp",
-                "instruction_decoder.cpp",
-                "instruction_dispatcher.cpp",
-                "instructions.cpp",
-                "jit_cfg_helper.cpp",
-                "jit_control_flow.cpp",
-                "jit_exports.cpp",
-                "x64_labeled_helper.cpp",
+                "CppHelper/a64_labeled_helper.cpp",
+                "CppHelper/helper.cpp",
+                "CppHelper/instruction_decoder.cpp",
+                "CppHelper/instruction_dispatcher.cpp",
+                "CppHelper/instructions.cpp",
+                "CppHelper/jit_cfg_helper.cpp",
+                "CppHelper/jit_control_flow.cpp",
+                "CppHelper/jit_exports.cpp",
+                "CppHelper/x64_labeled_helper.cpp",
+                "asmjit/asmjit",
             ],
-            publicHeadersPath: ".",
+            publicHeadersPath: "CppHelper/include",
             cxxSettings: [
-                .headerSearchPath("../asmjit"),
-                .unsafeFlags([
-                    "-std=c++20",
-                ]),
+                .headerSearchPath("asmjit"),
+                .define("ASMJIT_STATIC"),
             ],
         ),
     ],
     swiftLanguageModes: [.version("6")],
+    cxxLanguageStandard: .cxx20,
 )
