@@ -45,7 +45,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-    - run: sudo apt-get update
+    - run: bash .github/scripts/apt-get-update-with-retry.sh
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libjemalloc-dev
@@ -162,7 +162,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-    - run: sudo apt-get update
+    - run: bash .github/scripts/apt-get-update-with-retry.sh
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libjemalloc-dev
