@@ -94,23 +94,29 @@ struct DispatchQueueSchedulerTests {
     @Test func cancelRepeatingTask() async throws {
         let scheduler = makeScheduler(label: "DispatchQueueSchedulerTests.cancelRepeatingTask")
         let fireCount = ThreadSafeContainer<Int>(0)
-        let cancellation = ThreadSafeContainer<Cancellable?>(nil)
 
-        try await confirmation(expectedCount: 2) { confirm in
-            let cancel = scheduler.schedule(delay: 0.2, repeats: true) {
-                let count = fireCount.value + 1
-                fireCount.value = count
-                confirm()
+        try await confirmation(expectedCount: 1) { confirm in
+            let cancel = scheduler.schedule(delay: 0.5, repeats: true) {
+                let count = fireCount.write {
+                    $0 += 1
+                    return $0
+                }
 
-                if count == 2 {
-                    cancellation.value?.cancel()
+                if count == 1 {
+                    confirm()
                 }
             }
 
-            cancellation.value = cancel
+            // Cancel from the test task before the next repeating deadline to avoid racing
+            // with the timer source scheduling a subsequent async callback.
+            try await Task.sleep(for: .seconds(0.65))
+            #expect(fireCount.value == 1)
 
-            // Give the second invocation time to cancel before the third would be due.
-            try await Task.sleep(for: .seconds(0.7))
+            cancel.cancel()
+
+            // Wait past the next deadline to verify no additional invocation is queued.
+            try await Task.sleep(for: .seconds(0.6))
+            #expect(fireCount.value == 1)
         }
     }
 
