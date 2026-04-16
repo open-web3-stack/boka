@@ -4,12 +4,16 @@ import Testing
 import Utils
 
 struct DispatchQueueSchedulerTests {
-    let scheduler = DispatchQueueScheduler(
-        timeProvider: SystemTimeProvider(),
-        queue: .global(qos: .userInteractive), // to get higher priority so results are more deterministic
-    )
+    private func makeScheduler(label: String) -> DispatchQueueScheduler {
+        DispatchQueueScheduler(
+            timeProvider: SystemTimeProvider(),
+            queue: DispatchQueue(label: label, qos: .userInteractive)
+        )
+    }
 
     @Test func scheduleTaskWithoutDelay() async throws {
+        let scheduler = makeScheduler(label: "DispatchQueueSchedulerTests.scheduleTaskWithoutDelay")
+
         try await confirmation { confirm in
             let cancel = scheduler.schedule(delay: 0, repeats: false) {
                 confirm()
@@ -72,39 +76,47 @@ struct DispatchQueueSchedulerTests {
     //     }
     // }
 
-    @Test func cancelTask() async {
-        await withKnownIssue("unstable when cpu is busy", isIntermittent: true) {
-            try await confirmation(expectedCount: 0) { confirm in
-                let cancel = scheduler.schedule(delay: 0, repeats: false) {
-                    confirm()
-                }
+    @Test func cancelTask() async throws {
+        let scheduler = makeScheduler(label: "DispatchQueueSchedulerTests.cancelTask")
 
-                cancel.cancel()
-
-                try await Task.sleep(for: .seconds(0.1))
+        try await confirmation(expectedCount: 0) { confirm in
+            let cancel = scheduler.schedule(delay: 0.2, repeats: false) {
+                confirm()
             }
+
+            cancel.cancel()
+
+            // Wait past the original deadline to verify cancellation prevents execution.
+            try await Task.sleep(for: .seconds(0.3))
         }
     }
 
-    @Test func cancelRepeatingTask() async {
-        await withKnownIssue("unstable when cpu is busy", isIntermittent: true) {
-            try await confirmation(expectedCount: 2) { confirm in
-                let delay = 1.0
+    @Test func cancelRepeatingTask() async throws {
+        let scheduler = makeScheduler(label: "DispatchQueueSchedulerTests.cancelRepeatingTask")
+        let fireCount = ThreadSafeContainer<Int>(0)
+        let cancellation = ThreadSafeContainer<Cancellable?>(nil)
 
-                let cancel = scheduler.schedule(delay: delay, repeats: true) {
-                    confirm()
+        try await confirmation(expectedCount: 2) { confirm in
+            let cancel = scheduler.schedule(delay: 0.2, repeats: true) {
+                let count = fireCount.value + 1
+                fireCount.value = count
+                confirm()
+
+                if count == 2 {
+                    cancellation.value?.cancel()
                 }
-
-                try await Task.sleep(for: .seconds(2.2))
-
-                cancel.cancel()
-
-                try await Task.sleep(for: .seconds(0.1))
             }
+
+            cancellation.value = cancel
+
+            // Give the second invocation time to cancel before the third would be due.
+            try await Task.sleep(for: .seconds(0.7))
         }
     }
 
     @Test func onCancelHandler() async throws {
+        let scheduler = makeScheduler(label: "DispatchQueueSchedulerTests.onCancelHandler")
+
         try await confirmation(expectedCount: 1) { confirm in
             let cancel = scheduler.schedule(delay: 0.1, repeats: false, task: {
                 Issue.record("Task executed")
