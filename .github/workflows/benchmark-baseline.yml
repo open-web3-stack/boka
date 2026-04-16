@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - run: bash .github/scripts/apt-get-update-with-retry.sh
+      - run: sudo apt-get update
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libjemalloc-dev
