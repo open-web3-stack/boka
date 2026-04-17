@@ -41,27 +41,26 @@ struct JavajamTests {
 
         #expect(recoveryShards.count == recoveryCount)
 
-        withKnownIssue("TODO: does not match GP", isIntermittent: true) {
-            let recoveredData = try ErasureCoding.reconstruct(
-                shards: recoveryShards,
-                basicSize: basicSize,
-                originalCount: originalCount,
-                recoveryCount: recoveryCount,
-            )
+        let recoveredData = try ErasureCoding.reconstruct(
+            shards: recoveryShards,
+            basicSize: basicSize,
+            originalCount: originalCount,
+            recoveryCount: recoveryCount,
+            originalLength: originalData.count,
+        )
 
-            #expect(recoveredData == originalData)
+        #expect(recoveredData == originalData)
 
-            let generatedShards = try ErasureCoding.chunk(
-                data: originalData,
-                basicSize: basicSize,
-                recoveryCount: recoveryCount,
-            )
+        let generatedShards = try ErasureCoding.chunk(
+            data: originalData,
+            basicSize: basicSize,
+            recoveryCount: recoveryCount,
+        )
 
-            #expect(generatedShards.count == recoveryCount)
+        #expect(generatedShards.count == recoveryCount)
 
-            for (index, shard) in recoveryShards.enumerated() where index < generatedShards.count {
-                #expect(generatedShards[index] == shard.data)
-            }
+        for (index, shard) in recoveryShards.enumerated() where index < generatedShards.count {
+            #expect(generatedShards[index] == shard.data)
         }
     }
 }
