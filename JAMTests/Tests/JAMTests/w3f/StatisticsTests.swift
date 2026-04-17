@@ -79,9 +79,7 @@ struct StatisticsTests {
     }
 
     @Test(arguments: try StatisticsTests.loadTests(variant: .full))
-    func fullTests(_ testcase: Testcase) {
-        withKnownIssue("outdated testcase, missing reporters", isIntermittent: true) {
-            try statisticsTests(testcase, variant: .full)
-        }
+    func fullTests(_ testcase: Testcase) throws {
+        try statisticsTests(testcase, variant: .full)
     }
 }
