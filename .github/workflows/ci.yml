@@ -35,7 +35,7 @@ jobs:
   test:
     name: Build and Test (${{ matrix.config }})
     runs-on: [self-hosted, linux]
-    timeout-minutes: ${{ matrix.config == 'debug' && 90 || 50 }}
+    timeout-minutes: ${{ matrix.config == 'debug' && 90 || 75 }}
     strategy:
       fail-fast: false
       matrix:
