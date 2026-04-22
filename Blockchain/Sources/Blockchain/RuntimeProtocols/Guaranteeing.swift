@@ -199,10 +199,10 @@ extension Guaranteeing {
 
             let coreIndex = Int(report.coreIndex)
 
-            guard reports[coreIndex] == nil ||
-                timeslot >= (guarantee.timeslot + UInt32(config.value.preimageReplacementPeriod))
-            else {
-                throw .coreNotAvailable
+            if let existingReport = reports[coreIndex] {
+                guard timeslot >= (existingReport.timeslot + UInt32(config.value.preimageReplacementPeriod)) else {
+                    throw .coreNotAvailable
+                }
             }
 
             guard coreAuthorizationPool[coreIndex].contains(report.authorizerHash) else {

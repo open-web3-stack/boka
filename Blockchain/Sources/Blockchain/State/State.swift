@@ -467,6 +467,11 @@ extension State: ServiceAccounts {
     public mutating func remove(serviceAccount index: ServiceIndex) async throws {
         layer[serviceAccount: index] = nil
 
+        let layerKeys = Array(layer.toKV().map(\.key))
+        for key in layerKeys where StateKeys.isServiceKey(key, serviceIndex: index) {
+            layer[key] = nil
+        }
+
         let serviceByte = UInt8(index & 0xFF)
 
         let storageKeyValues = try await backend.getKeys(Data([serviceByte]), nil, nil)
