@@ -37,6 +37,6 @@ jobs:
         with:
           push: true
           file: scripts/release.Dockerfile
+          platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-

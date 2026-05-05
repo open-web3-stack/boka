@@ -89,6 +89,11 @@ struct Boka: AsyncParsableCommand {
     var dev: Bool = false
 
     mutating func run() async throws {
+        if let fuzzEnvironmentLaunch = try FuzzEnvironmentLaunch.parse(environment: ProcessInfo.processInfo.environment) {
+            try await fuzzEnvironmentLaunch.run()
+            return
+        }
+
         let services = try await Tracing.bootstrap("Boka", loggerOnly: true)
         for service in services {
             Task {

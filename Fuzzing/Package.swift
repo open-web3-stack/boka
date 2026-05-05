@@ -38,6 +38,7 @@ let package = Package(
         .testTarget(
             name: "FuzzingTests",
             dependencies: [
+                "Blockchain",
                 "Fuzzing",
                 .product(name: "Testing", package: "swift-testing"),
             ],

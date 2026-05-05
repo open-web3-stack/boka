@@ -10,6 +10,48 @@ public class FuzzingTarget {
     public enum FuzzingTargetError: Error {
         case invalidConfig
         case stateNotSet
+        case protocolViolation(String)
+    }
+
+    struct Session {
+        enum Action {
+            case handshake(FuzzPeerInfo)
+            case initialize(FuzzInitialize)
+            case importBlock(Block)
+            case getState(FuzzGetState)
+        }
+
+        private enum Phase {
+            case awaitingPeerInfo
+            case awaitingInitialize
+            case initialized
+        }
+
+        private var phase = Phase.awaitingPeerInfo
+
+        mutating func receive(_ message: FuzzingMessage) throws -> Action {
+            switch (phase, message) {
+            case let (.awaitingPeerInfo, .peerInfo(peerInfo)):
+                phase = .awaitingInitialize
+                return .handshake(peerInfo)
+
+            case let (.awaitingInitialize, .initialize(initialize)):
+                phase = .initialized
+                return .initialize(initialize)
+
+            case let (.initialized, .importBlock(block)):
+                return .importBlock(block)
+
+            case let (.initialized, .getState(headerHash)):
+                return .getState(headerHash)
+
+            case (.initialized, .initialize):
+                throw FuzzingTargetError.protocolViolation("received multiple Initialize messages in one session")
+
+            default:
+                throw FuzzingTargetError.protocolViolation("received unexpected message \(message)")
+            }
+        }
     }
 
     private let socket: FuzzingSocket
@@ -47,11 +89,15 @@ public class FuzzingTarget {
             do {
                 logger.info("Waiting for new connection")
                 let connection = try socket.acceptConnection()
+                defer {
+                    connection.close()
+                }
 
                 try await handleFuzzer(connection: connection)
 
-                connection.close()
                 logger.info("Connection closed, waiting for next connection")
+            } catch FuzzingTargetError.protocolViolation(let reason) {
+                logger.warning("Connection closed due to protocol violation: \(reason)")
             } catch {
                 logger.error("Error handling connection: \(error)")
             }
@@ -60,32 +106,36 @@ public class FuzzingTarget {
 
     private func handleFuzzer(connection: FuzzingSocketConnection) async throws {
         logger.info("New fuzzer connected")
+        resetSessionState()
 
         var messageCount = 0
+        var session = Session()
         while true {
             guard let message = try connection.receiveMessage() else { break }
             messageCount += 1
             logger.info("✉️  Message #\(messageCount)")
-            try await handleMessage(message: message, connection: connection)
+            let action = try session.receive(message)
+            try await handleAction(action, connection: connection)
         }
     }
 
-    private func handleMessage(message: FuzzingMessage, connection: FuzzingSocketConnection) async throws {
-        switch message {
-        case let .peerInfo(peerInfo):
-            try await handleHandShake(peerInfo: peerInfo, connection: connection)
+    private func resetSessionState() {
+        currentStateRef = nil
+        baseStateRef = nil
+        negotiatedFeatures = 0
+        runtime.ancestry = nil
+    }
 
+    private func handleAction(_ action: Session.Action, connection: FuzzingSocketConnection) async throws {
+        switch action {
+        case let .handshake(peerInfo):
+            try await handleHandShake(peerInfo: peerInfo, connection: connection)
         case let .initialize(initialize):
             try await handleInitialize(initialize: initialize, connection: connection)
-
         case let .importBlock(block):
             try await handleImportBlock(block: block, connection: connection)
-
         case let .getState(headerHash):
             try await handleGetState(headerHash: headerHash, connection: connection)
-
-        case .state, .stateRoot, .error:
-            logger.warning("Received response message \(message), ignored")
         }
     }
 

@@ -86,12 +86,14 @@ public class FuzzingSocket {
 
         guard bindResult == 0 else {
             _ = platformClose(socketFd)
+            socketFd = -1
             throw FuzzingSocketError.socketBindFailed
         }
 
         // Listen for connections
         guard listen(socketFd, 1) == 0 else {
             _ = platformClose(socketFd)
+            socketFd = -1
             throw FuzzingSocketError.socketListenFailed
         }
     }
@@ -136,16 +138,19 @@ public class FuzzingSocket {
 
         guard result == 0 else {
             _ = platformClose(socketFd)
+            socketFd = -1
             throw FuzzingSocketError.socketConnectFailed
         }
 
-        return FuzzingSocketConnection(fd: socketFd, config: config)
+        let connectionFd = socketFd
+        socketFd = -1
+        return FuzzingSocketConnection(fd: connectionFd, config: config)
     }
 }
 
 /// Represents an active socket connection for message exchange
 public class FuzzingSocketConnection {
-    private let fd: Int32
+    private var fd: Int32
     private let config: ProtocolConfigRef
 
     init(fd: Int32, config: ProtocolConfigRef) {
@@ -209,7 +214,7 @@ public class FuzzingSocketConnection {
             return try JamDecoder.decode(FuzzingMessage.self, from: data, withConfig: config)
         } catch {
             logger.error("Failed to decode: \(error)")
-            // Return an error message instead of throwing, to keep connection alive
+            // Surface malformed input as an unexpected protocol message.
             return .error("Failed to decode: \(error)")
         }
     }
@@ -241,5 +246,6 @@ public class FuzzingSocketConnection {
     public func close() {
         guard fd >= 0 else { return }
         _ = platformClose(fd)
+        fd = -1
     }
 }

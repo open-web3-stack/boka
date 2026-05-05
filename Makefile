@@ -30,7 +30,7 @@ TEST_PACKAGES := Blockchain Boka Codec Database Fuzzing JAMTests Networking Node
 TEST_FILTER ?=
 
 .PHONY: test
-test: githooks deps
+test: githooks deps build-sandbox-release
 	@echo "=== Running tests ==="
 	@failed=""; \
 	for pkg in $(TEST_PACKAGES); do \
@@ -38,7 +38,7 @@ test: githooks deps
 			continue; \
 		fi; \
 		printf "Testing %-12s ...\n" "$$pkg"; \
-		if swift test --package-path "$$pkg"; then \
+		if BOKA_SANDBOX_PATH="$(SANDBOX_PATH)" swift test --package-path "$$pkg"; then \
 			echo "  ✓ PASS"; \
 		else \
 			echo "  ✗ FAIL (exit code $$?)"; \
@@ -118,10 +118,9 @@ run: githooks
 devnet:
 	./scripts/devnet.sh
 
-# Determine build directory using SwiftPM
-# This works cross-platform (Linux, macOS) for both x86_64 and arm64
-BUILD_DIR := $(shell swift build --show-bin-path -c release 2>/dev/null)
-SANDBOX_PATH := $(BUILD_DIR)/boka-sandbox
+# Determine the PolkaVM build directory using SwiftPM.
+POLKAVM_BUILD_DIR := $(shell cd PolkaVM && swift build --show-bin-path -c release 2>/dev/null)
+SANDBOX_PATH := $(POLKAVM_BUILD_DIR)/boka-sandbox
 
 # Benchmark targets
 # Build sandbox in release mode and use it for benchmarks
