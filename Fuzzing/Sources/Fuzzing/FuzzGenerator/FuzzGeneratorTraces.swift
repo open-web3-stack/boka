@@ -1,14 +1,30 @@
 import Blockchain
+import Codec
 import Foundation
-import JAMTests
 import TracingUtils
 import Utils
 
 private let logger = Logger(label: "FuzzGeneratorTraces")
 
+private struct TraceTestcase: Codable, Sendable {
+    var preState: TraceState
+    var block: Block
+    var postState: TraceState
+}
+
+private struct TraceState: Codable, Sendable {
+    var root: Data32
+    var keyvals: [TraceKeyValue]
+}
+
+private struct TraceKeyValue: Codable, Sendable {
+    var key: Data31
+    var value: Data
+}
+
 /// A fuzz generator that loads test cases from JAM conformance fuzz traces
 public class FuzzGeneratorTraces: FuzzGenerator {
-    private let testCases: [JamTestnetTestcase]
+    private let testCases: [TraceTestcase]
 
     public init(tracesDir: String) throws {
         logger.info("Loading test vectors from directory: \(tracesDir)")
@@ -77,7 +93,7 @@ public class FuzzGeneratorTraces: FuzzGenerator {
         return block.asRef()
     }
 
-    private static func loadTestCases(from directory: String) throws -> [JamTestnetTestcase] {
+    private static func loadTestCases(from directory: String) throws -> [TraceTestcase] {
         logger.info("Loading test cases from directory: \(directory)")
 
         let basePath = directory
@@ -86,7 +102,7 @@ public class FuzzGeneratorTraces: FuzzGenerator {
             throw FuzzGeneratorError.invalidTestData("Directory does not exist: \(basePath)")
         }
 
-        var allDecodedTestCases: [JamTestnetTestcase] = []
+        var allDecodedTestCases: [TraceTestcase] = []
 
         /// Find all .bin files with depth of 2
         func findBinFiles(in path: String, currentDepth: Int = 0) throws -> [String] {
@@ -122,9 +138,12 @@ public class FuzzGeneratorTraces: FuzzGenerator {
         for testFilePath in testFiles {
             do {
                 let testData = try Data(contentsOf: URL(fileURLWithPath: testFilePath))
-                let rawTestCase = Testcase(description: URL(fileURLWithPath: testFilePath).lastPathComponent, data: testData)
-
-                let decoded = try JamTestnet.decodeTestcase(rawTestCase)
+                let decoded = try JamDecoder.decode(
+                    TraceTestcase.self,
+                    from: testData,
+                    withConfig: ProtocolConfigRef.tiny,
+                    allowTrailingBytes: true,
+                )
                 allDecodedTestCases.append(decoded)
                 logger.debug("Successfully loaded test case: \(testFilePath)")
             } catch {

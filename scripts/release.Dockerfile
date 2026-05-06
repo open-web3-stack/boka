@@ -90,7 +90,7 @@ RUN set -e; \
 	&& apt-get -q update && apt-get -q install -y curl && rm -rf /var/lib/apt/lists/* \
 	# - Download the GPG keys, Swift toolchain, and toolchain signature, and verify.
 	&& export GNUPGHOME="$(mktemp -d)" \
-	&& curl -fsSL "$SWIFT_BIN_URL" -o swift.tar.gz "$SWIFT_SIG_URL" -o swift.tar.gz.sig \
+	&& curl --retry 5 --retry-delay 2 --retry-connrefused -fsSL "$SWIFT_BIN_URL" -o swift.tar.gz "$SWIFT_SIG_URL" -o swift.tar.gz.sig \
 	&& gpg --batch --quiet --keyserver keyserver.ubuntu.com --recv-keys "$SWIFT_SIGNING_KEY" \
 	&& gpg --batch --verify swift.tar.gz.sig swift.tar.gz \
 	# - Unpack the toolchain, set libs permissions, and clean up.
