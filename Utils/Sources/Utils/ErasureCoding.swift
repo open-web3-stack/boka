@@ -339,7 +339,7 @@ public enum ErasureCoding {
 
     /// R_k: erasure-code reconstruction function (eq H.5)
     /// - Parameters:
-    ///   - shards: the shards to reconstruct the original data, should be ordered
+    ///   - shards: the shards to reconstruct the original data; shard indices are used for ordering
     ///   - basicSize: ≈ 2 * number of cores; 684 for full config
     ///   - originalCount: the total number of original items
     ///   - recoveryCount: the total number of recovery items
@@ -375,12 +375,27 @@ public enum ErasureCoding {
             return reconstructed
         }
 
-        // Fallback fast path: all original shards are available
-        // Use uniquingKeysWith to handle duplicate indices gracefully (keep first occurrence)
-        let originalMap = Dictionary(shards.map { (Int($0.index), $0.data) }, uniquingKeysWith: { first, _ in first })
-        let availableOriginals = (0 ..< originalCount).compactMap { originalMap[$0] }
-        if availableOriginals.count == originalCount {
-            let reconstructed = join(arr: availableOriginals)
+        var originalsByIndex = [Data?](repeating: nil, count: originalCount)
+        var availableOriginals = 0
+        for shard in shards {
+            let index = Int(shard.index)
+            guard index < originalCount, originalsByIndex[index] == nil else {
+                continue
+            }
+            originalsByIndex[index] = shard.data
+            availableOriginals += 1
+            if availableOriginals == originalCount {
+                break
+            }
+        }
+
+        if availableOriginals == originalCount {
+            var reconstructed = Data()
+            reconstructed.reserveCapacity(originalCount * shards[0].data.count)
+            for data in originalsByIndex {
+                guard let data else { throw Error.reconstructFailed }
+                reconstructed.append(data)
+            }
             if let originalLength {
                 return reconstructed.prefix(originalLength)
             }

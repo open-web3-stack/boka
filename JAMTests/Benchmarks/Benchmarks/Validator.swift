@@ -188,6 +188,31 @@ func validatorBenchmarks() {
         blackHole(reconstructed.count)
     }
 
+    Benchmark("erasure.reconstruct.originals.unordered", configuration: BokaBenchmark.configuration()) { benchmark in
+        let config = ProtocolConfigRef.mainnet
+        let originalData = Data(repeating: 0x42, count: config.value.segmentSize)
+        let basicSize = config.value.erasureCodedPieceSize
+        let recoveryCount = config.value.totalNumberOfValidators
+        let originalCount = basicSize / 2
+
+        let shardsData = try ErasureCoding.chunk(data: originalData, basicSize: basicSize, recoveryCount: recoveryCount)
+        let originalShards = shardsData.prefix(originalCount).enumerated().map { index, data in
+            ErasureCoding.Shard(data: data, index: UInt32(index))
+        }
+        let unorderedShards = Array(originalShards.dropFirst()) + Array(originalShards.prefix(1))
+
+        benchmark.startMeasurement()
+        let reconstructed = try ErasureCoding.reconstruct(
+            shards: unorderedShards,
+            basicSize: basicSize,
+            originalCount: originalCount,
+            recoveryCount: recoveryCount,
+            originalLength: originalData.count,
+        )
+        benchmark.stopMeasurement()
+        blackHole(reconstructed.count)
+    }
+
     // MARK: - Validator committee operations
 
     Benchmark("validator.committee", configuration: BokaBenchmark.scaledNano) { benchmark in
