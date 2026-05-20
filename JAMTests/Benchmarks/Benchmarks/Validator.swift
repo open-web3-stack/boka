@@ -151,6 +151,18 @@ func validatorBenchmarks() {
         blackHole(shards.count)
     }
 
+    Benchmark("erasure.full.chunk.logic", configuration: BokaBenchmark.milliseconds) { benchmark in
+        let config = ProtocolConfigRef.mainnet
+        let data = Data(repeating: 0x42, count: config.value.segmentSize)
+        let basicSize = config.value.erasureCodedPieceSize
+        let recoveryCount = config.value.totalNumberOfValidators
+
+        benchmark.startMeasurement()
+        let shards = try ErasureCoding.chunk(data: data, basicSize: basicSize, recoveryCount: recoveryCount)
+        benchmark.stopMeasurement()
+        blackHole(shards.count)
+    }
+
     Benchmark("erasure.decode.logic") { benchmark in
         _ = try await createGenesis(config: config)
 

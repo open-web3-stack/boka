@@ -78,6 +78,21 @@ final class RocksDBTests {
         #expect(try rocksDB.get(column: .col3, key: "key1".data) == "value3".data)
     }
 
+    @Test func multiGetReturnsExistingKeys() throws {
+        try rocksDB.put(column: .col1, key: "key1".data, value: "value1".data)
+        try rocksDB.put(column: .col1, key: "key2".data, value: "value2".data)
+
+        let values = try rocksDB.multiGet(column: .col1, keys: [
+            "key1".data,
+            "missing".data,
+            "key2".data,
+        ])
+
+        #expect(values["key1".data] == "value1".data)
+        #expect(values["key2".data] == "value2".data)
+        #expect(values["missing".data] == nil)
+    }
+
     @Test func largeValues() throws {
         // Test handling of large values
         let largeValue = Data((0 ..< 1_000_000).map { UInt8($0 % 256) })

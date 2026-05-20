@@ -146,6 +146,13 @@ extension RocksDB {
         _ data: Data...,
         fn: ([(ptr: UnsafeRawPointer, count: Int)]) -> R,
     ) throws -> R {
+        try call(data, fn: fn)
+    }
+
+    private static func call<R>(
+        _ data: [Data],
+        fn: ([(ptr: UnsafeRawPointer, count: Int)]) -> R,
+    ) throws -> R {
         try call(data) { _, ptrs in
             fn(ptrs)
         } onErr: { _ throws in
@@ -203,12 +210,12 @@ extension RocksDB {
         return ret.map { Data(bytesNoCopy: $0, count: len, deallocator: .free) }
     }
 
-    /// Phase 3: Batch read multiple keys in a single operation using RocksDB MultiGet API
+    /// Batch read multiple keys in a single operation using RocksDB MultiGet API.
     /// - Parameters:
     ///   - column: Column family to read from
     ///   - keys: Array of keys to read
     /// - Returns: Dictionary mapping keys to their values (missing keys are omitted)
-    /// - Note: Much more efficient than individual get() calls for multiple keys
+    /// - Note: Missing keys are omitted from the returned dictionary.
     public func multiGet(column: CFKey, keys: [Data]) throws -> [Data: Data] {
         logger.trace("multiGet() \(column) count: \(keys.count)")
 
@@ -216,18 +223,6 @@ extension RocksDB {
 
         let handle = getHandle(column: column)
         let numKeys = keys.count
-
-        // Prepare C arrays for RocksDB API
-        var keysPointers = [UnsafePointer<CChar>?](repeating: nil, count: numKeys)
-        var keysSizes = [Int](repeating: 0, count: numKeys)
-
-        // Convert keys to C strings
-        for (index, key) in keys.enumerated() {
-            keysPointers[index] = key.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> UnsafePointer<CChar>? in
-                buffer.baseAddress?.assumingMemoryBound(to: CChar.self)
-            }
-            keysSizes[index] = key.count
-        }
 
         // Prepare output arrays
         var valuesPointers = [UnsafeMutablePointer<CChar>?](repeating: nil, count: numKeys)
@@ -237,24 +232,29 @@ extension RocksDB {
         // Prepare column families array (all same for this operation)
         let cfHandles = [OpaquePointer?](repeating: handle, count: numKeys)
 
-        // Call RocksDB multi_get
-        keysPointers.withUnsafeMutableBufferPointer { keysPtr in
-            keysSizes.withUnsafeMutableBufferPointer { sizesPtr in
-                valuesPointers.withUnsafeMutableBufferPointer { valuesPtr in
-                    valuesSizes.withUnsafeMutableBufferPointer { valuesSizesPtr in
-                        errors.withUnsafeMutableBufferPointer { errorsPtr in
-                            cfHandles.withUnsafeBufferPointer { cfPtr in
-                                rocksdb_multi_get_cf(
-                                    db.value,
-                                    readOptions.value,
-                                    cfPtr.baseAddress,
-                                    numKeys,
-                                    keysPtr.baseAddress,
-                                    sizesPtr.baseAddress,
-                                    valuesPtr.baseAddress,
-                                    valuesSizesPtr.baseAddress,
-                                    errorsPtr.baseAddress,
-                                )
+        // Keep Data storage pinned while RocksDB reads the key pointer arrays.
+        try Self.call(keys) { ptrs in
+            var keysPointers: [UnsafePointer<CChar>?] = ptrs.map { $0.ptr.assumingMemoryBound(to: CChar.self) }
+            var keysSizes = ptrs.map(\.count)
+
+            keysPointers.withUnsafeMutableBufferPointer { keysPtr in
+                keysSizes.withUnsafeMutableBufferPointer { sizesPtr in
+                    valuesPointers.withUnsafeMutableBufferPointer { valuesPtr in
+                        valuesSizes.withUnsafeMutableBufferPointer { valuesSizesPtr in
+                            errors.withUnsafeMutableBufferPointer { errorsPtr in
+                                cfHandles.withUnsafeBufferPointer { cfPtr in
+                                    rocksdb_multi_get_cf(
+                                        db.value,
+                                        readOptions.value,
+                                        cfPtr.baseAddress,
+                                        numKeys,
+                                        keysPtr.baseAddress,
+                                        sizesPtr.baseAddress,
+                                        valuesPtr.baseAddress,
+                                        valuesSizesPtr.baseAddress,
+                                        errorsPtr.baseAddress,
+                                    )
+                                }
                             }
                         }
                     }
