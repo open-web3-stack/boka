@@ -72,4 +72,48 @@ struct StateBackendGetKeysTests {
         #expect(results.map(\.key) == keys.map(\.data))
         #expect(results.map(\.value) == [Data([0]), Data([1]), Data([2])])
     }
+
+    @Test("getKeys matches sorted filter semantics for paged queries")
+    func getKeysMatchesFilteredOrder() async throws {
+        let backend = InMemoryBackend()
+        let stateBackend = StateBackend(backend, config: ProtocolConfigRef.dev, rootHash: Data32())
+        let keys = [
+            stateKey(0, 0),
+            stateKey(0, 2),
+            stateKey(0, 4),
+            stateKey(1, 0),
+            stateKey(1, 3),
+            stateKey(2, 0),
+            stateKey(2, 1),
+        ]
+
+        try await stateBackend.writeRaw(keys.map { (key: $0, value: $0.data) })
+
+        let sortedKeys = keys.sorted { $0.data.lexicographicallyPrecedes($1.data) }
+        let queries: [(prefix: Data?, startKey: Data31?, limit: UInt32?)] = [
+            (nil, nil, nil),
+            (nil, stateKey(1, 0), 3),
+            (Data([0]), stateKey(0, 2), 2),
+            (Data([1]), stateKey(0, 4), nil),
+            (Data([1]), stateKey(2, 0), 10),
+            (Data([2]), nil, 1),
+        ]
+
+        for query in queries {
+            let results = try await stateBackend.getKeys(query.prefix, query.startKey, query.limit)
+            var expected = sortedKeys
+            if let prefix = query.prefix {
+                expected = expected.filter { $0.data.starts(with: prefix) }
+            }
+            if let startKey = query.startKey {
+                expected = expected.filter { !$0.data.lexicographicallyPrecedes(startKey.data) }
+            }
+            if let limit = query.limit {
+                expected = Array(expected.prefix(Int(limit)))
+            }
+
+            #expect(results.map(\.key) == expected.map(\.data))
+            #expect(results.map(\.value) == expected.map(\.data))
+        }
+    }
 }
