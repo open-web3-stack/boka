@@ -13,6 +13,9 @@ func polkaVMExecutionModeBenchmarks() {
 
     // Use default config for benchmarking
     let config = DefaultPvmConfig()
+    let batchIterations = BokaBenchmark.operationCount(100, ciFastCount: 8)
+    let repeatedIterations = BokaBenchmark.operationCount(10, ciFastCount: 4)
+    let throughputIterations = BokaBenchmark.operationCount(50, ciFastCount: 8)
 
     // MARK: - Test Programs
 
@@ -133,7 +136,7 @@ func polkaVMExecutionModeBenchmarks() {
 
     Benchmark("vm.mode.interpreter.batch100") { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< batchIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: [], // Interpreter mode
@@ -150,7 +153,7 @@ func polkaVMExecutionModeBenchmarks() {
 
     Benchmark("vm.mode.sandbox.batch100") { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< batchIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: .sandboxed, // Sandbox mode
@@ -233,7 +236,7 @@ func polkaVMExecutionModeBenchmarks() {
 
     Benchmark("vm.mode.interpreter.repeated") { benchmark in
         benchmark.startMeasurement()
-        for i in 0 ..< 10 {
+        for i in 0 ..< repeatedIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: [], // Interpreter mode
@@ -250,7 +253,7 @@ func polkaVMExecutionModeBenchmarks() {
 
     Benchmark("vm.mode.sandbox.repeated") { benchmark in
         benchmark.startMeasurement()
-        for i in 0 ..< 10 {
+        for i in 0 ..< repeatedIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: .sandboxed, // Sandbox mode
@@ -269,7 +272,7 @@ func polkaVMExecutionModeBenchmarks() {
 
     Benchmark("vm.mode.interpreter.throughput", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 50 {
+        for _ in 0 ..< throughputIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: [], // Interpreter mode
@@ -286,7 +289,7 @@ func polkaVMExecutionModeBenchmarks() {
 
     Benchmark("vm.mode.sandbox.throughput", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 50 {
+        for _ in 0 ..< throughputIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: .sandboxed, // Sandbox mode

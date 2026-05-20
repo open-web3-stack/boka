@@ -1,6 +1,21 @@
 import Benchmark
+import Foundation
 
 enum BokaBenchmark {
+    static var isCIFastMode: Bool {
+        guard let normalized = ProcessInfo.processInfo.environment["BOKA_BENCHMARK_CI_FAST"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        else {
+            return false
+        }
+        return !["", "0", "false", "no", "off"].contains(normalized)
+    }
+
+    static func operationCount(_ normalCount: Int, ciFastCount: Int) -> Int {
+        isCIFastMode ? min(normalCount, ciFastCount) : normalCount
+    }
+
     private static var timePercentiles: BenchmarkThresholds.RelativeThresholds {
         [
             .p25: 5.0,

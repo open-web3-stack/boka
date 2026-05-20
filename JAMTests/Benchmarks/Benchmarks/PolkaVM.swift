@@ -8,6 +8,7 @@ func polkaVMBenchmarks() {
 
     // Use default config for benchmarking
     let config = DefaultPvmConfig()
+    let batchIterations = BokaBenchmark.operationCount(100, ciFastCount: 8)
 
     // PVM bytecode: Minimal program that halts immediately
     // Format: [header...]
@@ -79,7 +80,7 @@ func polkaVMBenchmarks() {
 
     Benchmark("vm.batch.contracts") { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< batchIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 blob: emptyProgram,

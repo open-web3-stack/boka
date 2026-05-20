@@ -8,6 +8,9 @@ func jITSandboxPerformanceBenchmarks() {
     Benchmark.defaultConfiguration.timeUnits = BenchmarkTimeUnits.microseconds
 
     let config = DefaultPvmConfig()
+    let modeIterations = BokaBenchmark.operationCount(200, ciFastCount: 8)
+    let stressIterations = BokaBenchmark.operationCount(2000, ciFastCount: 8)
+    let minimalIterations = BokaBenchmark.operationCount(100, ciFastCount: 8)
 
     // Sum integers program
     let sumToNProgram = Data([
@@ -28,7 +31,7 @@ func jITSandboxPerformanceBenchmarks() {
 
     Benchmark("jitperf.mode.interpreter", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 200 {
+        for _ in 0 ..< modeIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: [],
@@ -45,7 +48,7 @@ func jITSandboxPerformanceBenchmarks() {
 
     Benchmark("jitperf.mode.jit", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 200 {
+        for _ in 0 ..< modeIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: .jit,
@@ -62,7 +65,7 @@ func jITSandboxPerformanceBenchmarks() {
 
     Benchmark("jitperf.mode.sandbox", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 200 {
+        for _ in 0 ..< modeIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: .sandboxed,
@@ -79,7 +82,7 @@ func jITSandboxPerformanceBenchmarks() {
 
     Benchmark("jitperf.mode.jitSandbox", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 200 {
+        for _ in 0 ..< modeIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: [.jit, .sandboxed],
@@ -98,7 +101,7 @@ func jITSandboxPerformanceBenchmarks() {
 
     Benchmark("jitperf.stress.jit", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 2000 {
+        for _ in 0 ..< stressIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: .jit,
@@ -115,7 +118,7 @@ func jITSandboxPerformanceBenchmarks() {
 
     Benchmark("jitperf.stress.jitSandbox", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 2000 {
+        for _ in 0 ..< stressIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: [.jit, .sandboxed],
@@ -134,7 +137,7 @@ func jITSandboxPerformanceBenchmarks() {
 
     Benchmark("jitperf.minimal.jit") { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< minimalIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: .jit,
@@ -151,7 +154,7 @@ func jITSandboxPerformanceBenchmarks() {
 
     Benchmark("jitperf.minimal.jitSandbox") { benchmark in
         benchmark.startMeasurement()
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< minimalIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: [.jit, .sandboxed],

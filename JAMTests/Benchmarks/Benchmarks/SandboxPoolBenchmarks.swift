@@ -33,11 +33,29 @@ func sandboxPoolBenchmarks() {
     registerQueueDepthBenchmarks(emptyProgram: emptyProgram)
 }
 
+private func benchmarkPoolConfig(_ base: SandboxPoolConfiguration) -> SandboxPoolConfiguration {
+    guard BokaBenchmark.isCIFastMode else {
+        return base
+    }
+
+    var config = base
+    config.poolSize = 1
+    config.maxQueueDepth = min(config.maxQueueDepth, 10)
+    config.workerWaitTimeout = min(config.workerWaitTimeout, 0.01)
+    config.executionTimeout = min(config.executionTimeout, 0.1)
+    config.enableWorkerRecycling = false
+    config.healthCheckInterval = 0
+    config.allowOverflowWorkers = false
+    config.maxOverflowWorkers = 0
+    config.exhaustionPolicy = .failFast
+    return config
+}
+
 private func registerPoolConfigurationBenchmarks(emptyProgram: Data) {
     // MARK: - Pool Configuration Comparisons
 
     Benchmark("pool.config.throughput.single") { benchmark in
-        let config = SandboxPoolConfiguration.throughputOptimized
+        let config = benchmarkPoolConfig(.throughputOptimized)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -57,7 +75,7 @@ private func registerPoolConfigurationBenchmarks(emptyProgram: Data) {
     }
 
     Benchmark("pool.config.latency.single") { benchmark in
-        let config = SandboxPoolConfiguration.latencyOptimized
+        let config = benchmarkPoolConfig(.latencyOptimized)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -77,7 +95,7 @@ private func registerPoolConfigurationBenchmarks(emptyProgram: Data) {
     }
 
     Benchmark("pool.config.memoryEfficient.single") { benchmark in
-        let config = SandboxPoolConfiguration.memoryEfficient
+        let config = benchmarkPoolConfig(.memoryEfficient)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -97,7 +115,7 @@ private func registerPoolConfigurationBenchmarks(emptyProgram: Data) {
     }
 
     Benchmark("pool.config.development.single") { benchmark in
-        let config = SandboxPoolConfiguration.development
+        let config = benchmarkPoolConfig(.development)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -123,6 +141,7 @@ private func registerPoolSizeBenchmarks(emptyProgram: Data) {
     Benchmark("pool.size.2.single") { benchmark in
         var config = SandboxPoolConfiguration.throughputOptimized
         config.poolSize = 2
+        config = benchmarkPoolConfig(config)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -144,6 +163,7 @@ private func registerPoolSizeBenchmarks(emptyProgram: Data) {
     Benchmark("pool.size.4.single") { benchmark in
         var config = SandboxPoolConfiguration.throughputOptimized
         config.poolSize = 4
+        config = benchmarkPoolConfig(config)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -165,6 +185,7 @@ private func registerPoolSizeBenchmarks(emptyProgram: Data) {
     Benchmark("pool.size.8.single") { benchmark in
         var config = SandboxPoolConfiguration.throughputOptimized
         config.poolSize = 8
+        config = benchmarkPoolConfig(config)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -186,6 +207,7 @@ private func registerPoolSizeBenchmarks(emptyProgram: Data) {
     Benchmark("pool.size.16.single") { benchmark in
         var config = SandboxPoolConfiguration.throughputOptimized
         config.poolSize = 16
+        config = benchmarkPoolConfig(config)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -209,19 +231,19 @@ private func registerConcurrentBenchmarks(fibonacciProgram: Data) {
     // MARK: - Concurrent Execution Benchmarks
 
     Benchmark("pool.concurrent.fibonacci", configuration: BokaBenchmark.milliseconds) { benchmark in
-        let config = SandboxPoolConfiguration.throughputOptimized
+        let config = benchmarkPoolConfig(.throughputOptimized)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
             poolConfig: config,
         )
+        let requestCount = BokaBenchmark.operationCount(50, ciFastCount: 1)
 
         benchmark.startMeasurement()
 
-        // Execute 50 concurrent requests
         await withTaskGroup(of: Void.self) { group in
             let exec = executor
-            for _ in 0 ..< 50 {
+            for _ in 0 ..< requestCount {
                 group.addTask {
                     let result = await exec.execute(
                         blob: fibonacciProgram,
@@ -243,7 +265,7 @@ private func registerComparisonBenchmarks(emptyProgram: Data, fibonacciProgram: 
     // MARK: - Pooled vs Non-Pooled Comparison
 
     Benchmark("pool.comparison.pooled.empty") { benchmark in
-        let config = SandboxPoolConfiguration.throughputOptimized
+        let config = benchmarkPoolConfig(.throughputOptimized)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -281,7 +303,7 @@ private func registerComparisonBenchmarks(emptyProgram: Data, fibonacciProgram: 
     }
 
     Benchmark("pool.comparison.pooled.fibonacci") { benchmark in
-        let config = SandboxPoolConfiguration.throughputOptimized
+        let config = benchmarkPoolConfig(.throughputOptimized)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -323,16 +345,17 @@ private func registerBatchBenchmarks(emptyProgram: Data) {
     // MARK: - Batch Performance (Key Metric!)
 
     Benchmark("pool.batch.pooled.100", configuration: BokaBenchmark.milliseconds) { benchmark in
-        let config = SandboxPoolConfiguration.throughputOptimized
+        let config = benchmarkPoolConfig(.throughputOptimized)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
             poolConfig: config,
         )
+        let executionCount = BokaBenchmark.operationCount(100, ciFastCount: 1)
 
         benchmark.startMeasurement()
 
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< executionCount {
             let result = await executor.execute(
                 blob: emptyProgram,
                 pc: 0,
@@ -351,10 +374,11 @@ private func registerBatchBenchmarks(emptyProgram: Data) {
             mode: .sandboxed,
             config: DefaultPvmConfig(),
         )
+        let executionCount = BokaBenchmark.operationCount(100, ciFastCount: 1)
 
         benchmark.startMeasurement()
 
-        for _ in 0 ..< 100 {
+        for _ in 0 ..< executionCount {
             let result = await executor.execute(
                 blob: emptyProgram,
                 pc: 0,
@@ -373,16 +397,17 @@ private func registerThroughputBenchmarks(fibonacciProgram: Data) {
     // MARK: - Throughput Benchmarks
 
     Benchmark("pool.throughput.pooled.fibonacci", configuration: BokaBenchmark.milliseconds) { benchmark in
-        let config = SandboxPoolConfiguration.throughputOptimized
+        let config = benchmarkPoolConfig(.throughputOptimized)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
             poolConfig: config,
         )
+        let executionCount = BokaBenchmark.operationCount(50, ciFastCount: 1)
 
         benchmark.startMeasurement()
 
-        for _ in 0 ..< 50 {
+        for _ in 0 ..< executionCount {
             let result = await executor.execute(
                 blob: fibonacciProgram,
                 pc: 0,
@@ -401,10 +426,11 @@ private func registerThroughputBenchmarks(fibonacciProgram: Data) {
             mode: .sandboxed,
             config: DefaultPvmConfig(),
         )
+        let executionCount = BokaBenchmark.operationCount(50, ciFastCount: 1)
 
         benchmark.startMeasurement()
 
-        for _ in 0 ..< 50 {
+        for _ in 0 ..< executionCount {
             let result = await executor.execute(
                 blob: fibonacciProgram,
                 pc: 0,
@@ -423,7 +449,7 @@ private func registerMemoryBenchmarks(sumToNProgram: Data) {
     // MARK: - Memory Intensive Workloads
 
     Benchmark("pool.memory.pooled.sumToN") { benchmark in
-        let config = SandboxPoolConfiguration.throughputOptimized
+        let config = benchmarkPoolConfig(.throughputOptimized)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -467,6 +493,7 @@ private func registerQueueDepthBenchmarks(emptyProgram: Data) {
     Benchmark("pool.queueDepth.10") { benchmark in
         var config = SandboxPoolConfiguration.throughputOptimized
         config.maxQueueDepth = 10
+        config = benchmarkPoolConfig(config)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -488,6 +515,7 @@ private func registerQueueDepthBenchmarks(emptyProgram: Data) {
     Benchmark("pool.queueDepth.1000") { benchmark in
         var config = SandboxPoolConfiguration.throughputOptimized
         config.maxQueueDepth = 1000
+        config = benchmarkPoolConfig(config)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -509,6 +537,7 @@ private func registerQueueDepthBenchmarks(emptyProgram: Data) {
     Benchmark("pool.queueDepth.10000") { benchmark in
         var config = SandboxPoolConfiguration.throughputOptimized
         config.maxQueueDepth = 10000
+        config = benchmarkPoolConfig(config)
         let executor = Executor.pooled(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
