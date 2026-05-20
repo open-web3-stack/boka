@@ -19,6 +19,7 @@ struct FuzzTests {
                 let path = "\(version)/\(timestamp)"
                 let testcases = try JamTestnet.loadTests(path: path, src: .fuzz)
                 return testcases
+                    .filter { !$0.description.hasSuffix("/report.bin") }
                     .filter { testcase in
                         !ignore.contains { ignorePath, ignorePrefix in
                             path == ignorePath && testcase.description.contains(ignorePrefix)

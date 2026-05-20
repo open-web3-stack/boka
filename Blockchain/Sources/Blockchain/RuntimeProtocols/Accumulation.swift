@@ -336,10 +336,6 @@ extension Accumulation {
         // parallel batch results merging
         var batchAccountChanges = AccountChanges()
         var newTransfers: [DeferredTransfers] = []
-        // initial privileged services
-        let initialDelegator = currentState.delegator
-        let initialRegistrar = currentState.registrar
-        let initialAssigners = currentState.assigners
         for (service, singleOutput) in batchResults {
             // u
             gasUsed.append((service, singleOutput.gasUsed))
@@ -359,9 +355,38 @@ extension Accumulation {
 
             // collect batch account changes
             try batchAccountChanges.checkAndMerge(with: singleOutput.state.accounts.changes)
+        }
 
+        Self.mergePrivilegedUpdates(into: &currentState, from: batchResults)
+
+        // d'
+        try await batchAccountChanges.apply(to: currentState.accounts) // (d U n) ∖ m
+        try await preimageIntegration(
+            servicePreimageSet: servicePreimageSet,
+            accounts: currentState.accounts,
+            timeslot: timeslot,
+        )
+
+        return ParallelAccumulationOutput(
+            state: currentState,
+            transfers: newTransfers,
+            commitments: commitments,
+            gasUsed: gasUsed,
+        )
+    }
+
+    static func mergePrivilegedUpdates(
+        into currentState: inout AccumulateState,
+        from batchResults: [(ServiceIndex, AccumulationResult)],
+    ) {
+        let initialManager = currentState.manager
+        let initialDelegator = currentState.delegator
+        let initialRegistrar = currentState.registrar
+        let initialAssigners = currentState.assigners
+
+        for (service, singleOutput) in batchResults {
             // a' - New assigners
-            if let index = currentState.assigners.firstIndex(of: service) {
+            if let index = initialAssigners.firstIndex(of: service) {
                 var temp = currentState.assigners
                 temp[index] = singleOutput.state.assigners[index]
                 currentState.assigners = temp
@@ -376,17 +401,17 @@ extension Accumulation {
             }
 
             // i' - Current delegator service can update validator queue
-            if service == privilegedServices.delegator {
+            if service == initialDelegator {
                 currentState.validatorQueue = singleOutput.state.validatorQueue
             }
             // q' - Current assigners update authorization queue
-            if let index = privilegedServices.assigners.firstIndex(of: service) {
+            if let index = initialAssigners.firstIndex(of: service) {
                 currentState.authorizationQueue[index] = singleOutput.state.authorizationQueue[index]
             }
         }
 
         // manager's changes override service's changes
-        if let managerResult = batchResults.first(where: { $0.0 == privilegedServices.manager })?.1 {
+        if let managerResult = batchResults.first(where: { $0.0 == initialManager })?.1 {
             // m' - manager always writes
             currentState.manager = managerResult.state.manager
             // z' - alwaysAcc always writes
@@ -404,21 +429,6 @@ extension Accumulation {
                 currentState.registrar = managerResult.state.registrar
             }
         }
-
-        // d'
-        try await batchAccountChanges.apply(to: currentState.accounts) // (d U n) ∖ m
-        try await preimageIntegration(
-            servicePreimageSet: servicePreimageSet,
-            accounts: currentState.accounts,
-            timeslot: timeslot,
-        )
-
-        return ParallelAccumulationOutput(
-            state: currentState,
-            transfers: newTransfers,
-            commitments: commitments,
-            gasUsed: gasUsed,
-        )
     }
 
     /// outer accumulate function ∆+
