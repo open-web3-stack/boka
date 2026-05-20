@@ -57,12 +57,8 @@ func testVectorsBenchmarks() {
             return (Array(0 ..< test.input), entropy)
         }
 
-        Benchmark("w3f.shuffle", configuration: .init(timeUnits: .microseconds)) { _ in
-            // Inner loop: Shuffle operations are very fast (<1µs), so we batch
-            // 10 iterations to ensure the measured time dominates overhead.
-            // This provides stable measurements while keeping per-operation
-            // semantics clear (the Benchmark harness handles repetitions).
-            for _ in 0 ..< 10 {
+        Benchmark("w3f.shuffle", configuration: BokaBenchmark.scaledNano) { benchmark in
+            for _ in benchmark.scaledIterations {
                 for (input, entropy) in shuffleCasesWithEntropy {
                     var inputArray = input
                     inputArray.shuffle(randomness: entropy)

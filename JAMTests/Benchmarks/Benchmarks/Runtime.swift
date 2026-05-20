@@ -20,11 +20,13 @@ func runtimeBenchmarks() {
 
     // MARK: - Runtime initialization
 
-    Benchmark("runtime.init") { benchmark in
+    Benchmark("runtime.init", configuration: BokaBenchmark.scaledNano) { benchmark in
         benchmark.startMeasurement()
-        let runtime = Runtime(config: config, ancestry: nil)
+        for _ in benchmark.scaledIterations {
+            let runtime = Runtime(config: config, ancestry: nil)
+            blackHole(runtime)
+        }
         benchmark.stopMeasurement()
-        blackHole(runtime)
     }
 
     // MARK: - Runtime.validate operations (validation only, no apply)
@@ -65,7 +67,7 @@ func runtimeBenchmarks() {
 
     // MARK: - State operations (state root computation)
 
-    Benchmark("runtime.state.root.computation", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("runtime.state.root.computation", configuration: BokaBenchmark.milliseconds) { benchmark in
         let (_, parentState) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
@@ -74,13 +76,11 @@ func runtimeBenchmarks() {
         blackHole(root)
     }
 
-    Benchmark("runtime.state.root.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("runtime.state.root.batch") { benchmark in
         let (_, genesisState) = try await createGenesis(config: config)
 
-        // Create multiple states to benchmark batch state root computation
         benchmark.startMeasurement()
-        // Access stateRoot on the same genesisState instance repeatedly
-        // If stateRoot is lazy and cached, this measures cache access rather than recomputation
+        // Access stateRoot on the same genesisState instance repeatedly; this measures cached-root access.
         for _ in 0 ..< 100 {
             let root = await genesisState.value.stateRoot
             blackHole(root)
@@ -90,16 +90,19 @@ func runtimeBenchmarks() {
 
     // MARK: - Block operations
 
-    Benchmark("runtime.block.toValidated") { benchmark in
+    Benchmark("runtime.block.toValidated", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (parentBlock, _) = try await createGenesis(config: config)
         let block = BlockRef.dummy(config: config, parent: parentBlock)
 
         benchmark.startMeasurement()
-        _ = try block.toValidated(config: config)
+        for _ in benchmark.scaledIterations {
+            let validated = try block.toValidated(config: config)
+            blackHole(validated)
+        }
         benchmark.stopMeasurement()
     }
 
-    Benchmark("runtime.block.toValidated.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("runtime.block.toValidated.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let (parentBlock, _) = try await createGenesis(config: config)
         var blocks: [BlockRef] = []
         for _ in 0 ..< 100 {
@@ -115,14 +118,16 @@ func runtimeBenchmarks() {
 
     // MARK: - Context operations
 
-    Benchmark("runtime.context.creation") { benchmark in
+    Benchmark("runtime.context.creation", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (parentBlock, parentState) = try await createGenesis(config: config)
         let stateRoot = await parentState.value.stateRoot
 
         benchmark.startMeasurement()
-        let context = Runtime.ApplyContext(timeslot: parentBlock.header.timeslot, stateRoot: stateRoot)
+        for _ in benchmark.scaledIterations {
+            let context = Runtime.ApplyContext(timeslot: parentBlock.header.timeslot, stateRoot: stateRoot)
+            blackHole(context)
+        }
         benchmark.stopMeasurement()
-        blackHole(context)
     }
 
     Benchmark("runtime.context.creation.batch") { benchmark in

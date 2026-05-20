@@ -57,7 +57,7 @@ func stateBackendBenchmarks() {
         blackHole(result)
     }
 
-    Benchmark("statebackend.get.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("statebackend.get.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestData(count: 1000)
@@ -92,7 +92,7 @@ func stateBackendBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("statebackend.put.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("statebackend.put.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestData(count: 1000)
@@ -156,7 +156,7 @@ func stateBackendBenchmarks() {
         blackHole(result)
     }
 
-    Benchmark("statebackend.storage.prefix", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("statebackend.storage.prefix", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestDataWithSharedPrefix(count: 1000)
@@ -196,7 +196,7 @@ func stateBackendBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("statebackend.write.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("statebackend.write.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let stateBackend = StateBackend(backend, config: ProtocolConfigRef.dev, rootHash: Data32())
         let testData = createTestData(count: 1000)
@@ -247,7 +247,7 @@ func stateBackendBenchmarks() {
         blackHole(results)
     }
 
-    Benchmark("statebackend.getkeys.complex", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("statebackend.getkeys.complex", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let stateBackend = StateBackend(backend, config: ProtocolConfigRef.dev, rootHash: Data32())
         let testData = createTestDataWithSharedPrefix(count: 1000)
@@ -276,7 +276,7 @@ func stateBackendBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("statebackend.batchupdate.mixed", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("statebackend.batchupdate.mixed", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let testData = createTestData(count: 1000)
 

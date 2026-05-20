@@ -208,7 +208,7 @@ private func registerPoolSizeBenchmarks(emptyProgram: Data) {
 private func registerConcurrentBenchmarks(fibonacciProgram: Data) {
     // MARK: - Concurrent Execution Benchmarks
 
-    Benchmark("pool.concurrent.fibonacci", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("pool.concurrent.fibonacci", configuration: BokaBenchmark.milliseconds) { benchmark in
         let config = SandboxPoolConfiguration.throughputOptimized
         let executor = Executor.pooled(
             mode: .sandboxed,
@@ -322,7 +322,7 @@ private func registerComparisonBenchmarks(emptyProgram: Data, fibonacciProgram: 
 private func registerBatchBenchmarks(emptyProgram: Data) {
     // MARK: - Batch Performance (Key Metric!)
 
-    Benchmark("pool.batch.pooled.100", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("pool.batch.pooled.100", configuration: BokaBenchmark.milliseconds) { benchmark in
         let config = SandboxPoolConfiguration.throughputOptimized
         let executor = Executor.pooled(
             mode: .sandboxed,
@@ -346,7 +346,7 @@ private func registerBatchBenchmarks(emptyProgram: Data) {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("pool.batch.nonpooled.100", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("pool.batch.nonpooled.100", configuration: BokaBenchmark.milliseconds) { benchmark in
         let executor = Executor(
             mode: .sandboxed,
             config: DefaultPvmConfig(),
@@ -372,7 +372,7 @@ private func registerBatchBenchmarks(emptyProgram: Data) {
 private func registerThroughputBenchmarks(fibonacciProgram: Data) {
     // MARK: - Throughput Benchmarks
 
-    Benchmark("pool.throughput.pooled.fibonacci", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("pool.throughput.pooled.fibonacci", configuration: BokaBenchmark.milliseconds) { benchmark in
         let config = SandboxPoolConfiguration.throughputOptimized
         let executor = Executor.pooled(
             mode: .sandboxed,
@@ -396,7 +396,7 @@ private func registerThroughputBenchmarks(fibonacciProgram: Data) {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("pool.throughput.nonpooled.fibonacci", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("pool.throughput.nonpooled.fibonacci", configuration: BokaBenchmark.milliseconds) { benchmark in
         let executor = Executor(
             mode: .sandboxed,
             config: DefaultPvmConfig(),

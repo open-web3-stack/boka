@@ -26,7 +26,7 @@ func jITSandboxPerformanceBenchmarks() {
 
     // MARK: - Execution Mode Comparisons
 
-    Benchmark("jitperf.mode.interpreter", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("jitperf.mode.interpreter", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         for _ in 0 ..< 200 {
             let (exitReason, _, _) = await invokePVM(
@@ -43,7 +43,7 @@ func jITSandboxPerformanceBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("jitperf.mode.jit", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("jitperf.mode.jit", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         for _ in 0 ..< 200 {
             let (exitReason, _, _) = await invokePVM(
@@ -60,7 +60,7 @@ func jITSandboxPerformanceBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("jitperf.mode.sandbox", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("jitperf.mode.sandbox", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         for _ in 0 ..< 200 {
             let (exitReason, _, _) = await invokePVM(
@@ -77,7 +77,7 @@ func jITSandboxPerformanceBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("jitperf.mode.jitSandbox", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("jitperf.mode.jitSandbox", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         for _ in 0 ..< 200 {
             let (exitReason, _, _) = await invokePVM(
@@ -96,7 +96,7 @@ func jITSandboxPerformanceBenchmarks() {
 
     // MARK: - Stress Test (Massive Iterations)
 
-    Benchmark("jitperf.stress.jit", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("jitperf.stress.jit", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         for _ in 0 ..< 2000 {
             let (exitReason, _, _) = await invokePVM(
@@ -113,7 +113,7 @@ func jITSandboxPerformanceBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("jitperf.stress.jitSandbox", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("jitperf.stress.jitSandbox", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         for _ in 0 ..< 2000 {
             let (exitReason, _, _) = await invokePVM(

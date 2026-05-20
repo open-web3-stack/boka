@@ -13,12 +13,6 @@ func blockchainBenchmarks() {
         return (block, state)
     }
 
-    func createBlockchain(config _: ProtocolConfigRef, genesisBlock: BlockRef,
-                          genesisState: StateRef) async throws -> BlockchainDataProvider
-    {
-        try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
-    }
-
     // Use a simple config for benchmarking
     let config = ProtocolConfigRef.tiny
 
@@ -35,16 +29,18 @@ func blockchainBenchmarks() {
 
     // MARK: - Block creation
 
-    Benchmark("block.create") { benchmark in
+    Benchmark("block.create", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (genesisBlock, _) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
-        let block = BlockRef.dummy(config: config, parent: genesisBlock)
+        for _ in benchmark.scaledIterations {
+            let block = BlockRef.dummy(config: config, parent: genesisBlock)
+            blackHole(block)
+        }
         benchmark.stopMeasurement()
-        blackHole(block)
     }
 
-    Benchmark("block.create.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("block.create.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let (genesisBlock, _) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
@@ -59,17 +55,19 @@ func blockchainBenchmarks() {
 
     // MARK: - Block validation
 
-    Benchmark("block.validate") { benchmark in
+    Benchmark("block.validate", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (genesisBlock, _) = try await createGenesis(config: config)
         let block = BlockRef.dummy(config: config, parent: genesisBlock)
 
         benchmark.startMeasurement()
-        let validated = try block.toValidated(config: config)
+        for _ in benchmark.scaledIterations {
+            let validated = try block.toValidated(config: config)
+            blackHole(validated)
+        }
         benchmark.stopMeasurement()
-        blackHole(validated)
     }
 
-    Benchmark("block.validate.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("block.validate.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let (genesisBlock, _) = try await createGenesis(config: config)
         var blocks: [BlockRef] = []
         blocks.reserveCapacity(100)
@@ -87,17 +85,19 @@ func blockchainBenchmarks() {
 
     // MARK: - Hash operations
 
-    Benchmark("block.hash.single") { benchmark in
+    Benchmark("block.hash.single", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (genesisBlock, _) = try await createGenesis(config: config)
         let block = BlockRef.dummy(config: config, parent: genesisBlock)
 
         benchmark.startMeasurement()
-        let hash = block.hash
+        for _ in benchmark.scaledIterations {
+            let hash = block.hash
+            blackHole(hash)
+        }
         benchmark.stopMeasurement()
-        blackHole(hash)
     }
 
-    Benchmark("block.hash.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("block.hash.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let (genesisBlock, _) = try await createGenesis(config: config)
         var blocks: [BlockRef] = []
         blocks.reserveCapacity(1000)
@@ -114,16 +114,18 @@ func blockchainBenchmarks() {
 
     // MARK: - Block mutation
 
-    Benchmark("block.mutate") { benchmark in
+    Benchmark("block.mutate", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (genesisBlock, _) = try await createGenesis(config: config)
         let block = BlockRef.dummy(config: config, parent: genesisBlock)
 
         benchmark.startMeasurement()
-        let mutated = block.mutate { b in
-            b.header.unsigned.timeslot = b.header.timeslot + 1
+        for _ in benchmark.scaledIterations {
+            let mutated = block.mutate { b in
+                b.header.unsigned.timeslot = b.header.timeslot + 1
+            }
+            blackHole(mutated)
         }
         benchmark.stopMeasurement()
-        blackHole(mutated)
     }
 
     Benchmark("block.mutate.batch") { benchmark in
@@ -148,7 +150,7 @@ func blockchainBenchmarks() {
 
     // MARK: - State root operations
 
-    Benchmark("blockchain.state.root", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("blockchain.state.root", configuration: BokaBenchmark.milliseconds) { benchmark in
         let (_, genesisState) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
@@ -161,14 +163,16 @@ func blockchainBenchmarks() {
 
     // MARK: - Chain queries
 
-    Benchmark("blockchain.get.block") { benchmark in
+    Benchmark("blockchain.get.block", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (genesisBlock, genesisState) = try await createGenesis(config: config)
         let provider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
 
         benchmark.startMeasurement()
-        let retrievedBlock = try await provider.getBlock(hash: genesisBlock.hash)
+        for _ in benchmark.scaledIterations {
+            let retrievedBlock = try await provider.getBlock(hash: genesisBlock.hash)
+            blackHole(retrievedBlock)
+        }
         benchmark.stopMeasurement()
-        blackHole(retrievedBlock)
     }
 
     Benchmark("blockchain.get.block.batch") { benchmark in
@@ -185,14 +189,16 @@ func blockchainBenchmarks() {
 
     // MARK: - Block header operations
 
-    Benchmark("blockchain.get.header") { benchmark in
+    Benchmark("blockchain.get.header", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (genesisBlock, genesisState) = try await createGenesis(config: config)
         let provider = try await BlockchainDataProvider(InMemoryDataProvider(genesisState: genesisState, genesisBlock: genesisBlock))
 
         benchmark.startMeasurement()
-        let header = try await provider.getHeader(hash: genesisBlock.hash)
+        for _ in benchmark.scaledIterations {
+            let header = try await provider.getHeader(hash: genesisBlock.hash)
+            blackHole(header)
+        }
         benchmark.stopMeasurement()
-        blackHole(header)
     }
 
     Benchmark("blockchain.get.header.batch") { benchmark in

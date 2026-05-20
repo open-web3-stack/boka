@@ -55,16 +55,17 @@ func validatorBenchmarks() {
         blackHole(guarantees)
     }
 
-    Benchmark("authoring.finalize") { benchmark in
+    Benchmark("authoring.finalize", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (genesisBlock, genesisState) = try await createGenesis(config: config)
         let block = BlockRef.dummy(config: config, parent: genesisBlock)
+        let entropy = genesisState.value.entropyPool.t3
 
         benchmark.startMeasurement()
-        // Simulate finalization by creating block header seal
-        let entropy = genesisState.value.entropyPool.t3
-        let epoch = block.header.timeslot.timeslotToEpochIndex(config: config)
-        blackHole(entropy)
-        blackHole(epoch)
+        for _ in benchmark.scaledIterations {
+            let epoch = block.header.timeslot.timeslotToEpochIndex(config: config)
+            blackHole(entropy)
+            blackHole(epoch)
+        }
         benchmark.stopMeasurement()
     }
 
@@ -122,16 +123,17 @@ func validatorBenchmarks() {
         blackHole(proofHash)
     }
 
-    Benchmark("hash.compare") { benchmark in
+    Benchmark("hash.compare", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (_, genesisState) = try await createGenesis(config: config)
         let stateRoot = await genesisState.value.stateRoot
         let proofHash = stateRoot.blake2b256hash()
 
         benchmark.startMeasurement()
-        // Benchmark hash comparison (baseline for proof verification)
-        let isValid = proofHash == stateRoot.blake2b256hash()
+        for _ in benchmark.scaledIterations {
+            let isValid = proofHash == stateRoot.blake2b256hash()
+            blackHole(isValid)
+        }
         benchmark.stopMeasurement()
-        blackHole(isValid)
     }
 
     // MARK: - Erasure coding operations
@@ -176,38 +178,38 @@ func validatorBenchmarks() {
 
     // MARK: - Validator committee operations
 
-    Benchmark("validator.committee") { benchmark in
+    Benchmark("validator.committee", configuration: BokaBenchmark.scaledNano) { benchmark in
         let (_, genesisState) = try await createGenesis(config: config)
         let validators = genesisState.value.currentValidators
-
-        benchmark.startMeasurement()
-        // Benchmark committee selection (Array.prefix operation)
         let committeeSize = min(100, validators.array.count)
-        let committee = Array(validators.array.prefix(committeeSize))
-        benchmark.stopMeasurement()
-        blackHole(committee.count)
-    }
-
-    Benchmark("validator.ticket.selection") { benchmark in
-        let (_, genesisState) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
-        // Benchmark ticket selection (Array.first access)
+        for _ in benchmark.scaledIterations {
+            let committee = Array(validators.array.prefix(committeeSize))
+            blackHole(committee.count)
+        }
+        benchmark.stopMeasurement()
+    }
+
+    Benchmark("validator.ticket.selection", configuration: BokaBenchmark.scaledNano) { benchmark in
+        let (_, genesisState) = try await createGenesis(config: config)
         let tickets = genesisState.value.safroleState.ticketsAccumulator.array
-        let selectedTicket = tickets.first
-        benchmark.stopMeasurement()
-        blackHole(selectedTicket)
-    }
-
-    Benchmark("validator.epoch.change") { benchmark in
-        let (_, genesisState) = try await createGenesis(config: config)
 
         benchmark.startMeasurement()
-        // Benchmark epoch calculation (arithmetic and timeslotToEpochIndex)
-        // Use multiple iterations to ensure measurable time
-        for _ in 0 ..< 10000 {
-            let epochLength = config.value.epochLength
-            let currentTimeslot = genesisState.value.timeslot
+        for _ in benchmark.scaledIterations {
+            let selectedTicket = tickets.first
+            blackHole(selectedTicket)
+        }
+        benchmark.stopMeasurement()
+    }
+
+    Benchmark("validator.epoch.change", configuration: BokaBenchmark.scaledNano) { benchmark in
+        let (_, genesisState) = try await createGenesis(config: config)
+        let epochLength = config.value.epochLength
+        let currentTimeslot = genesisState.value.timeslot
+
+        benchmark.startMeasurement()
+        for _ in benchmark.scaledIterations {
             let currentEpoch = currentTimeslot.timeslotToEpochIndex(config: config)
             let nextEpoch = currentEpoch + 1
             blackHole(epochLength)

@@ -16,19 +16,20 @@ private func configureCIBenchmarkDefaultsIfNeeded() {
         return
     }
 
-    print("CI benchmark mode enabled (maxDuration=100ms, maxIterations=8, warmupIterations=0)")
+    print("CI benchmark mode enabled (maxDuration=100ms, maxIterations=8, warmupIterations=1)")
 
     var configuration = Benchmark.defaultConfiguration
     // Keep CI baselines deterministic and bounded on slower self-hosted runners.
     configuration.maxDuration = .milliseconds(100)
     configuration.maxIterations = min(configuration.maxIterations, 8)
-    configuration.warmupIterations = 0
+    configuration.warmupIterations = 1
     Benchmark.defaultConfiguration = configuration
 }
 
 // MARK: - Entry Point
 
 let benchmarks: @Sendable () -> Void = {
+    BokaBenchmark.applyDefaultConfiguration()
     configureCIBenchmarkDefaultsIfNeeded()
 
     // Call all benchmark registration functions

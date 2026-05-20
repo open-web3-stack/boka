@@ -93,7 +93,7 @@ func polkaVMBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("vm.state.access.heavy", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("vm.state.access.heavy", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         // Run fibonacci with larger input for more computation
         let (exitReason, _, _) = await invokePVM(
@@ -144,7 +144,7 @@ func polkaVMBenchmarks() {
 
     // MARK: - Throughput benchmarks
 
-    Benchmark("vm.throughput.instructions", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("vm.throughput.instructions", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         // Run fibonacci with larger input
         let (exitReason, _, _) = await invokePVM(

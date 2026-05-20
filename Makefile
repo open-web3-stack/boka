@@ -128,7 +128,7 @@ BENCHMARK_ARGS ?=
 
 .PHONY: benchmark
 benchmark: githooks deps build-sandbox-release
-	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark $(BENCHMARK_ARGS)
 
 .PHONY: benchmark-list
 benchmark-list: githooks deps build-sandbox-release
@@ -142,7 +142,7 @@ benchmark-filter: githooks deps build-sandbox-release
 		echo "Error: FILTER parameter is required"; \
 		exit 1; \
 	fi
-	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark --filter $(FILTER)
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark --filter "$(FILTER)" $(BENCHMARK_ARGS)
 
 .PHONY: benchmark-baseline
 benchmark-baseline: githooks deps build-sandbox-release
@@ -152,6 +152,7 @@ benchmark-baseline: githooks deps build-sandbox-release
 		echo "Error: BASELINE parameter is required"; \
 		exit 1; \
 	fi
+	mkdir -p JAMTests/.benchmarkBaselines
 	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update $(BASELINE) $(BENCHMARK_ARGS)
 
 .PHONY: benchmark-compare
@@ -172,11 +173,12 @@ benchmark-check: githooks deps build-sandbox-release
 		echo "Error: BASELINE1 and BASELINE2 parameters are required"; \
 		exit 1; \
 	fi
-	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark baseline check $(BASELINE1) $(BASELINE2) --thresholds .benchmarkBaselines/thresholds.json
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package benchmark baseline check $(BASELINE1) $(BASELINE2) $(BENCHMARK_ARGS)
 
 .PHONY: benchmark-all
 benchmark-all: githooks deps build-sandbox-release
-	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update all
+	mkdir -p JAMTests/.benchmarkBaselines
+	cd JAMTests && BOKA_SANDBOX_PATH=$(SANDBOX_PATH) swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update all $(BENCHMARK_ARGS)
 
 # Helper target to build sandbox in release mode
 .PHONY: build-sandbox-release

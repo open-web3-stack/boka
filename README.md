@@ -69,6 +69,9 @@ Boka includes comprehensive performance benchmarks covering core blockchain oper
 # Run all benchmarks
 make benchmark
 
+# Forward package-benchmark options to the underlying command
+make benchmark BENCHMARK_ARGS="--skip 'pool\\..*' --no-progress"
+
 # List all available benchmarks
 make benchmark-list
 
@@ -108,10 +111,11 @@ make benchmark-check BASELINE1=master BASELINE2=pull_request
 
 Benchmarks run automatically in CI:
 
-- **PR Benchmarks**: Compare PR changes against master branch, fail on regressions
-- **Nightly Benchmarks**: Track performance over time, stored as artifacts for 90 days
+- **PR Benchmarks**: Compare PR changes against master branch and report configured threshold deviations
+- **Master Baselines**: Track performance on `master`, stored as artifacts for 90 days
 
-Regression thresholds are configured in `JAMTests/.benchmarkBaselines/thresholds.json`.
+Regression thresholds are configured alongside the benchmark code in
+`JAMTests/Benchmarks/Benchmarks/BenchmarkSupport.swift`.
 
 ## Packages
 

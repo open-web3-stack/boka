@@ -35,7 +35,7 @@ func merkleTrieBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("trie.insert.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("trie.insert.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestData(count: 1000)
@@ -64,7 +64,7 @@ func merkleTrieBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("trie.update.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("trie.update.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         var trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestData(count: 1000)
@@ -100,7 +100,7 @@ func merkleTrieBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("trie.delete.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("trie.delete.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         var trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestData(count: 1000)
@@ -132,7 +132,7 @@ func merkleTrieBenchmarks() {
         blackHole(result)
     }
 
-    Benchmark("trie.get.batch", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("trie.get.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestData(count: 1000)
@@ -149,7 +149,7 @@ func merkleTrieBenchmarks() {
 
     // MARK: - Root Hash Computation
 
-    Benchmark("trie.compute.root", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("trie.compute.root", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestData(count: 1000)
@@ -162,7 +162,7 @@ func merkleTrieBenchmarks() {
         blackHole(root)
     }
 
-    Benchmark("trie.compute.root.incremental", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("trie.compute.root.incremental", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestData(count: 100)
@@ -183,7 +183,7 @@ func merkleTrieBenchmarks() {
 
     // MARK: - Prefix Iteration
 
-    Benchmark("trie.iterate.prefix", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("trie.iterate.prefix", configuration: BokaBenchmark.milliseconds) { benchmark in
         let backend = InMemoryBackend()
         let trie = StateTrie(rootHash: Data32(), backend: backend)
         let testData = createTestData(count: 1000)

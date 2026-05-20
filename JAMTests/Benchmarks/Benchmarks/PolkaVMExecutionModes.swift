@@ -167,7 +167,7 @@ func polkaVMExecutionModeBenchmarks() {
 
     // MARK: - Heavy Computation Benchmarks (Larger Programs)
 
-    Benchmark("vm.mode.interpreter.heavyFibonacci", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("vm.mode.interpreter.heavyFibonacci", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(
             config: config,
@@ -182,7 +182,7 @@ func polkaVMExecutionModeBenchmarks() {
         blackHole(exitReason)
     }
 
-    Benchmark("vm.mode.sandbox.heavyFibonacci", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("vm.mode.sandbox.heavyFibonacci", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(
             config: config,
@@ -267,7 +267,7 @@ func polkaVMExecutionModeBenchmarks() {
 
     // MARK: - Throughput Benchmarks
 
-    Benchmark("vm.mode.interpreter.throughput", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("vm.mode.interpreter.throughput", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         for _ in 0 ..< 50 {
             let (exitReason, _, _) = await invokePVM(
@@ -284,7 +284,7 @@ func polkaVMExecutionModeBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("vm.mode.sandbox.throughput", configuration: .init(timeUnits: .milliseconds)) { benchmark in
+    Benchmark("vm.mode.sandbox.throughput", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         for _ in 0 ..< 50 {
             let (exitReason, _, _) = await invokePVM(
