@@ -127,6 +127,11 @@ public enum StateTrieError: Error {
     case invalidParent
 }
 
+private enum StartKeyRelation: Equatable {
+    case matchingPrefix
+    case afterStartKey
+}
+
 public actor StateTrie {
     private let backend: StateBackendProtocol
     public private(set) var rootHash: Data32
@@ -192,17 +197,49 @@ public actor StateTrie {
     }
 
     /// Collect all keys with their values matching a given prefix by traversing the trie
-    public func getKeyValues(matchingPrefix prefix: Data, bitsCount: UInt8) async throws -> [(key: Data31, value: Data)] {
+    public func getKeyValues(
+        matchingPrefix prefix: Data,
+        bitsCount: UInt8,
+        startKey: Data31? = nil,
+        limit: UInt32? = nil,
+    ) async throws -> [(key: Data31, value: Data)] {
         // 31 bytes = 248 bits max
         guard bitsCount <= 248 else { return [] }
+        if limit == 0 { return [] }
+
+        let relation: StartKeyRelation
+        if let startKey {
+            switch Self.comparePrefix(prefix, bitsCount: bitsCount, to: startKey) {
+            case ..<0:
+                return []
+            case 0:
+                relation = .matchingPrefix
+            default:
+                relation = .afterStartKey
+            }
+        } else {
+            relation = .afterStartKey
+        }
 
         // Navigate to the node where the prefix path ends
         guard let startNode = try await findByPrefix(hash: rootHash, prefix: prefix, bitsCount: bitsCount, depth: 0) else {
             return []
         }
 
-        // Collect all leaf keys with values from this subtree
-        return try await getLeavesValues(node: startNode)
+        var remaining = limit.map(Int.init)
+        var result: [(key: Data31, value: Data)] = []
+        if let remaining {
+            result.reserveCapacity(remaining)
+        }
+        try await collectLeavesValues(
+            node: startNode,
+            depth: bitsCount,
+            startKey: startKey,
+            relation: relation,
+            remaining: &remaining,
+            into: &result,
+        )
+        return result
     }
 
     /// Navigate the trie following the prefix bits to find the subtree root
@@ -262,37 +299,105 @@ public actor StateTrie {
         }
     }
 
-    /// Recursively collect all leaf keys with their values from a subtree
-    private func getLeavesValues(node: TrieNode) async throws -> [(key: Data31, value: Data)] {
-        if node.isBranch {
-            var result: [(key: Data31, value: Data)] = []
+    private func collectLeavesValues(
+        node: TrieNode,
+        depth: UInt8,
+        startKey: Data31?,
+        relation: StartKeyRelation,
+        remaining: inout Int?,
+        into result: inout [(key: Data31, value: Data)],
+    ) async throws {
+        if let remaining, remaining <= 0 {
+            return
+        }
 
-            // Sequential processing to prevent task explosion
-            if let leftNode = try await get(hash: node.left, bypassCache: true, prefetchSiblings: false) {
-                result += try await getLeavesValues(node: leftNode)
+        if node.isBranch {
+            let nextDepth = depth + 1
+
+            if let startKey, relation == .matchingPrefix {
+                if Self.bitAt(startKey.data, position: depth) {
+                    // The left subtree has a 0 bit where startKey has 1, so it is entirely before startKey.
+                    if let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false) {
+                        try await collectLeavesValues(
+                            node: rightNode,
+                            depth: nextDepth,
+                            startKey: startKey,
+                            relation: .matchingPrefix,
+                            remaining: &remaining,
+                            into: &result,
+                        )
+                    }
+                } else {
+                    if let leftNode = try await get(hash: node.left, bypassCache: true, prefetchSiblings: false) {
+                        try await collectLeavesValues(
+                            node: leftNode,
+                            depth: nextDepth,
+                            startKey: startKey,
+                            relation: .matchingPrefix,
+                            remaining: &remaining,
+                            into: &result,
+                        )
+                    }
+                    if remaining.map({ $0 > 0 }) ?? true,
+                       let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false)
+                    {
+                        try await collectLeavesValues(
+                            node: rightNode,
+                            depth: nextDepth,
+                            startKey: startKey,
+                            relation: .afterStartKey,
+                            remaining: &remaining,
+                            into: &result,
+                        )
+                    }
+                }
+            } else {
+                if let leftNode = try await get(hash: node.left, bypassCache: true, prefetchSiblings: false) {
+                    try await collectLeavesValues(
+                        node: leftNode,
+                        depth: nextDepth,
+                        startKey: startKey,
+                        relation: relation,
+                        remaining: &remaining,
+                        into: &result,
+                    )
+                }
+                if remaining.map({ $0 > 0 }) ?? true,
+                   let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false)
+                {
+                    try await collectLeavesValues(
+                        node: rightNode,
+                        depth: nextDepth,
+                        startKey: startKey,
+                        relation: relation,
+                        remaining: &remaining,
+                        into: &result,
+                    )
+                }
             }
-            if let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false) {
-                result += try await getLeavesValues(node: rightNode)
-            }
-            return result
         } else {
             // Leaf node - extract key and value
             let keyData = Data(node.left.data[relative: 1 ..< 32])
-            guard let key = Data31(keyData) else { return [] }
+            guard let key = Data31(keyData) else { return }
 
-            // Get value: embedded leaves have it in node.value, regular leaves need backend fetch
+            if let startKey, key.data.lexicographicallyPrecedes(startKey.data) {
+                return
+            }
+
             let value: Data
             if let embeddedValue = node.value {
                 value = embeddedValue
             } else {
-                // Regular leaf - fetch value from backend
                 guard let fetchedValue = try await backend.readValue(hash: node.right) else {
-                    return []
+                    return
                 }
                 value = fetchedValue
             }
 
-            return [(key: key, value: value)]
+            result.append((key: key, value: value))
+            if let current = remaining {
+                remaining = current - 1
+            }
         }
     }
 
@@ -784,5 +889,17 @@ public actor StateTrie {
         let bitIndex = 7 - (position % 8)
         let byte = data[safeRelative: Int(byteIndex)] ?? 0
         return (byte & (1 << bitIndex)) != 0
+    }
+
+    private static func comparePrefix(_ prefix: Data, bitsCount: UInt8, to key: Data31) -> Int {
+        for bit in 0 ..< Int(bitsCount) {
+            let bitPosition = UInt8(bit)
+            let prefixBit = bitAt(prefix, position: bitPosition)
+            let keyBit = bitAt(key.data, position: bitPosition)
+            if prefixBit != keyBit {
+                return prefixBit ? 1 : -1
+            }
+        }
+        return 0
     }
 }

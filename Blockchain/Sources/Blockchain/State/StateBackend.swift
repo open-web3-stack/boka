@@ -45,28 +45,16 @@ public final class StateBackend: Sendable {
     ///   - limit: Optional maximum number of results to return.
     /// - Returns: Array of (key, value) pairs in lexicographic order (guaranteed by trie structure)
     public func getKeys(_ prefix: Data?, _ startKey: Data31?, _ limit: UInt32?) async throws -> [(key: Data, value: Data)] {
-        // Step 1: Collect all matching keys with values using efficient trie traversal
-        // Note: Trie traversal visits left (0) before right (1), so results are already sorted
-        var keyValues: [(key: Data31, value: Data)]
+        let queryPrefix = prefix ?? Data()
+        guard queryPrefix.count <= 31 else { return [] }
+        let bitsCount = UInt8(queryPrefix.count * 8)
+        let keyValues = try await trie.getKeyValues(
+            matchingPrefix: queryPrefix,
+            bitsCount: bitsCount,
+            startKey: startKey,
+            limit: limit,
+        )
 
-        if let prefix, !prefix.isEmpty {
-            let bitsCount = UInt8(prefix.count * 8)
-            keyValues = try await trie.getKeyValues(matchingPrefix: prefix, bitsCount: bitsCount)
-        } else {
-            keyValues = try await trie.getKeyValues(matchingPrefix: Data(), bitsCount: 0)
-        }
-
-        // Step 2: Apply startKey filter
-        if let startKey {
-            keyValues = keyValues.filter { !$0.key.data.lexicographicallyPrecedes(startKey.data) }
-        }
-
-        // Step 3: Apply limit
-        if let limit {
-            keyValues = Array(keyValues.prefix(Int(limit)))
-        }
-
-        // Step 4: Convert to (Data, Data) format
         return keyValues.map { (key: $0.key.data, value: $0.value) }
     }
 

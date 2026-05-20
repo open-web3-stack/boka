@@ -24,6 +24,18 @@ func stateBackendBenchmarks() {
         }
     }
 
+    func createTestDataWithSpreadPrefixes(count: Int) -> [(key: Data31, value: Data)] {
+        (0 ..< count).map { i in
+            let keyData = Data([UInt8(i % 256), UInt8((i / 256) % 256), UInt8((i / 65536) % 256)] + Data(repeating: 0, count: 28))
+            let valueData = Data([UInt8(i % 256), UInt8((i / 256) % 256), UInt8((i / 65536) % 256)])
+            return (key: Data31(keyData)!, value: valueData + Data(repeating: UInt8(i % 256), count: 32))
+        }
+    }
+
+    func sortedByKey(_ values: [(key: Data31, value: Data)]) -> [(key: Data31, value: Data)] {
+        values.sorted { $0.key.data.lexicographicallyPrecedes($1.key.data) }
+    }
+
     // MARK: - Trie Node Operations
 
     Benchmark("statebackend.get.node.hit") { benchmark in
@@ -243,6 +255,44 @@ func stateBackendBenchmarks() {
 
         benchmark.startMeasurement()
         let results = try await stateBackend.getKeys(nil, nil, 100)
+        benchmark.stopMeasurement()
+        blackHole(results)
+    }
+
+    Benchmark("statebackend.getkeys.limit.smallFromLarge", configuration: BokaBenchmark.milliseconds) { benchmark in
+        let backend = InMemoryBackend()
+        let stateBackend = StateBackend(backend, config: ProtocolConfigRef.dev, rootHash: Data32())
+        let testData = createTestDataWithSharedPrefix(count: 8192)
+        try await stateBackend.writeRaw(testData)
+
+        benchmark.startMeasurement()
+        let results = try await stateBackend.getKeys(Data([0x00]), nil, 10)
+        benchmark.stopMeasurement()
+        blackHole(results)
+    }
+
+    Benchmark("statebackend.getkeys.startkey.deep", configuration: BokaBenchmark.milliseconds) { benchmark in
+        let backend = InMemoryBackend()
+        let stateBackend = StateBackend(backend, config: ProtocolConfigRef.dev, rootHash: Data32())
+        let testData = createTestDataWithSharedPrefix(count: 8192)
+        try await stateBackend.writeRaw(testData)
+        let sortedData = sortedByKey(testData)
+        let startKey = sortedData[8000].key
+
+        benchmark.startMeasurement()
+        let results = try await stateBackend.getKeys(Data([0x00]), startKey, 25)
+        benchmark.stopMeasurement()
+        blackHole(results)
+    }
+
+    Benchmark("statebackend.getkeys.prefix.sparse", configuration: BokaBenchmark.milliseconds) { benchmark in
+        let backend = InMemoryBackend()
+        let stateBackend = StateBackend(backend, config: ProtocolConfigRef.dev, rootHash: Data32())
+        let testData = createTestDataWithSpreadPrefixes(count: 8192)
+        try await stateBackend.writeRaw(testData)
+
+        benchmark.startMeasurement()
+        let results = try await stateBackend.getKeys(Data([0x7F]), nil, nil)
         benchmark.stopMeasurement()
         blackHole(results)
     }
