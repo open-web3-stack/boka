@@ -34,6 +34,13 @@ func polkaVMBenchmarks() {
 
     // MARK: - Simple operations
 
+    Benchmark("vm.standardProgram.init.empty") { benchmark in
+        benchmark.startMeasurement()
+        let program = try StandardProgram(blob: emptyProgram, argumentData: Data())
+        benchmark.stopMeasurement()
+        blackHole(program)
+    }
+
     Benchmark("vm.contract.transfer") { benchmark in
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(

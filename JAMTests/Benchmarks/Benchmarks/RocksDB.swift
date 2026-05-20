@@ -45,6 +45,25 @@ func rocksdbBenchmarks() {
         return stateData
     }
 
+    func createRefKeys(count: Int) -> [Data] {
+        var keys: [Data] = []
+        keys.reserveCapacity(count)
+
+        for i in 0 ..< count {
+            let lowByte = UInt8(truncatingIfNeeded: i)
+            var key = Data()
+            key.reserveCapacity(31)
+            key.append(0x52)
+            key.append(UInt8(truncatingIfNeeded: i >> 16))
+            key.append(UInt8(truncatingIfNeeded: i >> 8))
+            key.append(lowByte)
+            key.append(contentsOf: repeatElement(lowByte, count: 27))
+            keys.append(key)
+        }
+
+        return keys
+    }
+
     // Use a simple config for benchmarking
     let config = ProtocolConfigRef.tiny
 
@@ -160,6 +179,30 @@ func rocksdbBenchmarks() {
         for state in states {
             try await rocksDB.add(state: state)
         }
+        benchmark.stopMeasurement()
+    }
+
+    Benchmark("rocksdb.state.batchUpdate.refDeltas", configuration: BokaBenchmark.milliseconds) { benchmark in
+        let tempDir = try createTempDirectory()
+        defer { tempDir.cleanup() }
+        let (genesisBlock, genesisState) = try await createGenesis(config: config)
+        let stateData = try await extractStateData(from: genesisState)
+
+        let rocksDB = try await RocksDBBackend(
+            path: tempDir.url,
+            config: config,
+            genesisBlock: genesisBlock,
+            genesisStateData: stateData,
+        )
+
+        let refKeys = createRefKeys(count: BokaBenchmark.operationCount(512, ciFastCount: 128))
+        let seedOps = refKeys.map { StateBackendOperation.refUpdate(key: $0, delta: 1) }
+        try await rocksDB.batchUpdate(seedOps)
+
+        let updateOps = refKeys.map { StateBackendOperation.refUpdate(key: $0, delta: 1) }
+
+        benchmark.startMeasurement()
+        try await rocksDB.batchUpdate(updateOps)
         benchmark.stopMeasurement()
     }
 
