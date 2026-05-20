@@ -28,6 +28,25 @@ private enum StateLayerValue: Sendable {
     }
 }
 
+private enum FixedStateLayerKeys {
+    static let coreAuthorizationPool = StateKeys.CoreAuthorizationPoolKey().encode()
+    static let authorizationQueue = StateKeys.AuthorizationQueueKey().encode()
+    static let recentHistory = StateKeys.RecentHistoryKey().encode()
+    static let safroleState = StateKeys.SafroleStateKey().encode()
+    static let judgements = StateKeys.JudgementsKey().encode()
+    static let entropyPool = StateKeys.EntropyPoolKey().encode()
+    static let validatorQueue = StateKeys.ValidatorQueueKey().encode()
+    static let currentValidators = StateKeys.CurrentValidatorsKey().encode()
+    static let previousValidators = StateKeys.PreviousValidatorsKey().encode()
+    static let reports = StateKeys.ReportsKey().encode()
+    static let timeslot = StateKeys.TimeslotKey().encode()
+    static let privilegedServices = StateKeys.PrivilegedServicesKey().encode()
+    static let activityStatistics = StateKeys.ActivityStatisticsKey().encode()
+    static let accumulationQueue = StateKeys.AccumulationQueueKey().encode()
+    static let accumulationHistory = StateKeys.AccumulationHistoryKey().encode()
+    static let lastAccumulationOutputs = StateKeys.LastAccumulationOutputsKey().encode()
+}
+
 public struct StateLayer: Sendable {
     private var changes: [Data31: StateLayerValue] = [:]
 
@@ -52,160 +71,160 @@ public struct StateLayer: Sendable {
     // α: The core αuthorizations pool.
     public var coreAuthorizationPool: StateKeys.CoreAuthorizationPoolKey.Value {
         get {
-            changes[StateKeys.CoreAuthorizationPoolKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.coreAuthorizationPool]!.value()!
         }
         set {
-            changes[StateKeys.CoreAuthorizationPoolKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.coreAuthorizationPool] = .init(newValue)
         }
     }
 
     // φ: The authorization queue.
     public var authorizationQueue: StateKeys.AuthorizationQueueKey.Value {
         get {
-            changes[StateKeys.AuthorizationQueueKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.authorizationQueue]!.value()!
         }
         set {
-            changes[StateKeys.AuthorizationQueueKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.authorizationQueue] = .init(newValue)
         }
     }
 
     // β: Information on the most recent βlocks.
     public var recentHistory: StateKeys.RecentHistoryKey.Value {
         get {
-            changes[StateKeys.RecentHistoryKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.recentHistory]!.value()!
         }
         set {
-            changes[StateKeys.RecentHistoryKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.recentHistory] = .init(newValue)
         }
     }
 
     // γ: State concerning Safrole.
     public var safroleState: StateKeys.SafroleStateKey.Value {
         get {
-            changes[StateKeys.SafroleStateKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.safroleState]!.value()!
         }
         set {
-            changes[StateKeys.SafroleStateKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.safroleState] = .init(newValue)
         }
     }
 
     // ψ: past judgements
     public var judgements: StateKeys.JudgementsKey.Value {
         get {
-            changes[StateKeys.JudgementsKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.judgements]!.value()!
         }
         set {
-            changes[StateKeys.JudgementsKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.judgements] = .init(newValue)
         }
     }
 
     // η: The eηtropy accumulator and epochal raηdomness.
     public var entropyPool: StateKeys.EntropyPoolKey.Value {
         get {
-            changes[StateKeys.EntropyPoolKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.entropyPool]!.value()!
         }
         set {
-            changes[StateKeys.EntropyPoolKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.entropyPool] = .init(newValue)
         }
     }
 
     // ι: The validator keys and metadata to be drawn from next.
     public var validatorQueue: StateKeys.ValidatorQueueKey.Value {
         get {
-            changes[StateKeys.ValidatorQueueKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.validatorQueue]!.value()!
         }
         set {
-            changes[StateKeys.ValidatorQueueKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.validatorQueue] = .init(newValue)
         }
     }
 
     // κ: The validator κeys and metadata currently active.
     public var currentValidators: StateKeys.CurrentValidatorsKey.Value {
         get {
-            changes[StateKeys.CurrentValidatorsKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.currentValidators]!.value()!
         }
         set {
-            changes[StateKeys.CurrentValidatorsKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.currentValidators] = .init(newValue)
         }
     }
 
     // λ: The validator keys and metadata which were active in the prior epoch.
     public var previousValidators: StateKeys.PreviousValidatorsKey.Value {
         get {
-            changes[StateKeys.PreviousValidatorsKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.previousValidators]!.value()!
         }
         set {
-            changes[StateKeys.PreviousValidatorsKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.previousValidators] = .init(newValue)
         }
     }
 
     // ρ: The ρending reports, per core, which are being made available prior to accumulation.
     public var reports: StateKeys.ReportsKey.Value {
         get {
-            changes[StateKeys.ReportsKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.reports]!.value()!
         }
         set {
-            changes[StateKeys.ReportsKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.reports] = .init(newValue)
         }
     }
 
     // τ: The most recent block’s τimeslot.
     public var timeslot: StateKeys.TimeslotKey.Value {
         get {
-            changes[StateKeys.TimeslotKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.timeslot]!.value()!
         }
         set {
-            changes[StateKeys.TimeslotKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.timeslot] = .init(newValue)
         }
     }
 
     // χ: The privileged service indices.
     public var privilegedServices: StateKeys.PrivilegedServicesKey.Value {
         get {
-            changes[StateKeys.PrivilegedServicesKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.privilegedServices]!.value()!
         }
         set {
-            changes[StateKeys.PrivilegedServicesKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.privilegedServices] = .init(newValue)
         }
     }
 
     // π: The activity statistics for the validators.
     public var activityStatistics: StateKeys.ActivityStatisticsKey.Value {
         get {
-            changes[StateKeys.ActivityStatisticsKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.activityStatistics]!.value()!
         }
         set {
-            changes[StateKeys.ActivityStatisticsKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.activityStatistics] = .init(newValue)
         }
     }
 
     // ϑ: The accumulation queue.
     public var accumulationQueue: StateKeys.AccumulationQueueKey.Value {
         get {
-            changes[StateKeys.AccumulationQueueKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.accumulationQueue]!.value()!
         }
         set {
-            changes[StateKeys.AccumulationQueueKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.accumulationQueue] = .init(newValue)
         }
     }
 
     // ξ: The accumulation history.
     public var accumulationHistory: StateKeys.AccumulationHistoryKey.Value {
         get {
-            changes[StateKeys.AccumulationHistoryKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.accumulationHistory]!.value()!
         }
         set {
-            changes[StateKeys.AccumulationHistoryKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.accumulationHistory] = .init(newValue)
         }
     }
 
     // θ: The most recent Accumulation outputs
     public var lastAccumulationOutputs: StateKeys.LastAccumulationOutputsKey.Value {
         get {
-            changes[StateKeys.LastAccumulationOutputsKey().encode()]!.value()!
+            changes[FixedStateLayerKeys.lastAccumulationOutputs]!.value()!
         }
         set {
-            changes[StateKeys.LastAccumulationOutputsKey().encode()] = .init(newValue)
+            changes[FixedStateLayerKeys.lastAccumulationOutputs] = .init(newValue)
         }
     }
 

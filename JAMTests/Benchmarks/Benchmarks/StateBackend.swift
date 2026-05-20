@@ -36,6 +36,23 @@ func stateBackendBenchmarks() {
         values.sorted { $0.key.data.lexicographicallyPrecedes($1.key.data) }
     }
 
+    // MARK: - State Layer Operations
+
+    Benchmark("statelayer.fixedKeys.getset", configuration: BokaBenchmark.milliseconds) { benchmark in
+        var state = State.dummy(config: ProtocolConfigRef.dev)
+        var checksum: UInt64 = 0
+
+        benchmark.startMeasurement()
+        for i in 0 ..< 10_000 {
+            state.timeslot = TimeslotIndex(i)
+            checksum &+= UInt64(state.timeslot)
+        }
+        benchmark.stopMeasurement()
+
+        blackHole(checksum)
+        blackHole(state)
+    }
+
     // MARK: - Trie Node Operations
 
     Benchmark("statebackend.get.node.hit") { benchmark in
