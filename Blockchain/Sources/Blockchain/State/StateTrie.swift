@@ -246,7 +246,7 @@ public actor StateTrie {
             return try await get(hash: hash, bypassCache: true)
         }
 
-        guard let node = try await get(hash: hash, bypassCache: true, prefetchSiblings: false) else { return nil }
+        guard let node = try await get(hash: hash, bypassCache: true) else { return nil }
 
         if node.isBranch {
             let bitValue = Self.bitAt(prefix, position: depth)
@@ -282,10 +282,10 @@ public actor StateTrie {
             var result: [Data31] = []
 
             // Sequential processing to prevent task explosion
-            if let leftNode = try await get(hash: node.left, bypassCache: true, prefetchSiblings: false) {
+            if let leftNode = try await get(hash: node.left, bypassCache: true) {
                 result += try await getLeaves(node: leftNode)
             }
-            if let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false) {
+            if let rightNode = try await get(hash: node.right, bypassCache: true) {
                 result += try await getLeaves(node: rightNode)
             }
             return result
@@ -314,7 +314,7 @@ public actor StateTrie {
             if let startKey, relation == .matchingPrefix {
                 if Self.bitAt(startKey.data, position: depth) {
                     // The left subtree has a 0 bit where startKey has 1, so it is entirely before startKey.
-                    if let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false) {
+                    if let rightNode = try await get(hash: node.right, bypassCache: true) {
                         try await collectLeavesValues(
                             node: rightNode,
                             depth: nextDepth,
@@ -325,7 +325,7 @@ public actor StateTrie {
                         )
                     }
                 } else {
-                    if let leftNode = try await get(hash: node.left, bypassCache: true, prefetchSiblings: false) {
+                    if let leftNode = try await get(hash: node.left, bypassCache: true) {
                         try await collectLeavesValues(
                             node: leftNode,
                             depth: nextDepth,
@@ -336,7 +336,7 @@ public actor StateTrie {
                         )
                     }
                     if remaining.map({ $0 > 0 }) ?? true,
-                       let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false)
+                       let rightNode = try await get(hash: node.right, bypassCache: true)
                     {
                         try await collectLeavesValues(
                             node: rightNode,
@@ -349,7 +349,7 @@ public actor StateTrie {
                     }
                 }
             } else {
-                if let leftNode = try await get(hash: node.left, bypassCache: true, prefetchSiblings: false) {
+                if let leftNode = try await get(hash: node.left, bypassCache: true) {
                     try await collectLeavesValues(
                         node: leftNode,
                         depth: nextDepth,
@@ -360,7 +360,7 @@ public actor StateTrie {
                     )
                 }
                 if remaining.map({ $0 > 0 }) ?? true,
-                   let rightNode = try await get(hash: node.right, bypassCache: true, prefetchSiblings: false)
+                   let rightNode = try await get(hash: node.right, bypassCache: true)
                 {
                     try await collectLeavesValues(
                         node: rightNode,
@@ -415,7 +415,7 @@ public actor StateTrie {
         return nil
     }
 
-    private func get(hash: Data32, bypassCache: Bool = false, prefetchSiblings: Bool = true) async throws -> TrieNode? {
+    private func get(hash: Data32, bypassCache: Bool = false) async throws -> TrieNode? {
         if hash == Data32() {
             return nil
         }
@@ -424,30 +424,13 @@ public actor StateTrie {
             return nil
         }
 
-        // Check in-memory nodes first (current operation)
         if let node = nodes[id] {
-            // Phase 2 Week 4: Prefetch siblings when returning cached node
-            if prefetchSiblings, node.isBranch {
-                // Prefetch both children asynchronously (don't await)
-                Task {
-                    _ = try? await get(hash: node.left, bypassCache: false, prefetchSiblings: false)
-                    _ = try? await get(hash: node.right, bypassCache: false, prefetchSiblings: false)
-                }
-            }
             return node
         }
 
         // Check LRU cache for previously loaded nodes (unless bypassed)
         if !bypassCache, let cache = nodeCache, let cachedNode = cache.get(id) {
             cacheStats?.recordHit()
-            // Phase 2 Week 4: Prefetch siblings when returning cached node
-            if prefetchSiblings, cachedNode.isBranch {
-                // Prefetch both children asynchronously (don't await)
-                Task {
-                    _ = try? await get(hash: cachedNode.left, bypassCache: false, prefetchSiblings: false)
-                    _ = try? await get(hash: cachedNode.right, bypassCache: false, prefetchSiblings: false)
-                }
-            }
             return cachedNode
         }
 
@@ -469,15 +452,6 @@ public actor StateTrie {
         // Cache the node for future access
         if let cache = nodeCache {
             cache.put(id, value: node)
-        }
-
-        // Phase 2 Week 4: Prefetch siblings after loading from backend
-        if prefetchSiblings, node.isBranch {
-            // Prefetch both children asynchronously (don't await)
-            Task {
-                _ = try? await get(hash: node.left, bypassCache: false, prefetchSiblings: false)
-                _ = try? await get(hash: node.right, bypassCache: false, prefetchSiblings: false)
-            }
         }
 
         return node
