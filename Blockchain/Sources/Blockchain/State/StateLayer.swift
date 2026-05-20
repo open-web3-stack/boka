@@ -20,11 +20,43 @@ private enum StateLayerValue: Sendable {
         return nil
     }
 
+    var codableValue: (Codable & Sendable)? {
+        if case let .value(value) = self {
+            return value
+        }
+        return nil
+    }
+
     var isDeleted: Bool {
         if case .deleted = self {
             return true
         }
         return false
+    }
+}
+
+private struct StateLayerKeyValueSequence: Sequence {
+    typealias Element = (key: Data31, value: (Codable & Sendable)?)
+
+    let changes: [Data31: StateLayerValue]
+
+    func makeIterator() -> Iterator {
+        Iterator(iterator: changes.makeIterator())
+    }
+
+    struct Iterator: IteratorProtocol {
+        private var iterator: Dictionary<Data31, StateLayerValue>.Iterator
+
+        fileprivate init(iterator: Dictionary<Data31, StateLayerValue>.Iterator) {
+            self.iterator = iterator
+        }
+
+        mutating func next() -> Element? {
+            guard let item = iterator.next() else {
+                return nil
+            }
+            return (key: item.key, value: item.value.codableValue)
+        }
     }
 }
 
@@ -283,7 +315,7 @@ public struct StateLayer: Sendable {
 
 extension StateLayer {
     public func toKV() -> some Sequence<(key: Data31, value: (Codable & Sendable)?)> {
-        changes.map { (key: $0.key, value: $0.value.value()) }
+        StateLayerKeyValueSequence(changes: changes)
     }
 }
 

@@ -36,6 +36,14 @@ func stateBackendBenchmarks() {
         values.sorted { $0.key.data.lexicographicallyPrecedes($1.key.data) }
     }
 
+    func createStateLayerChanges(count: Int) -> [(key: any StateKey, value: Codable & Sendable)] {
+        (0 ..< count).map { i in
+            let keyData = Data([UInt8(i % 256), UInt8((i / 256) % 256)])
+            let value = Data([UInt8(i % 256)]) + Data(repeating: UInt8((i / 256) % 256), count: 32)
+            return (key: StateKeys.ServiceAccountStorageKey(index: ServiceIndex(i), key: keyData), value: value)
+        }
+    }
+
     // MARK: - State Layer Operations
 
     Benchmark("statelayer.fixedKeys.getset", configuration: BokaBenchmark.milliseconds) { benchmark in
@@ -51,6 +59,24 @@ func stateBackendBenchmarks() {
 
         blackHole(checksum)
         blackHole(state)
+    }
+
+    Benchmark("statelayer.toKV.changedCount", configuration: BokaBenchmark.milliseconds) { benchmark in
+        let layer = StateLayer(changes: createStateLayerChanges(count: 1000))
+        var checksum = 0
+
+        benchmark.startMeasurement()
+        for _ in 0 ..< 100 {
+            for item in layer.toKV() {
+                checksum &+= item.key.data.count
+                if item.value != nil {
+                    checksum &+= 1
+                }
+            }
+        }
+        benchmark.stopMeasurement()
+
+        blackHole(checksum)
     }
 
     // MARK: - Trie Node Operations
