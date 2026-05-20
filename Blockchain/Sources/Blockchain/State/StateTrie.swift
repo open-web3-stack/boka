@@ -228,9 +228,6 @@ public actor StateTrie {
 
         var remaining = limit.map(Int.init)
         var result: [(key: Data31, value: Data)] = []
-        if let remaining {
-            result.reserveCapacity(remaining)
-        }
         try await collectLeavesValues(
             node: startNode,
             depth: bitsCount,

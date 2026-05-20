@@ -54,4 +54,22 @@ struct StateBackendGetKeysTests {
 
         #expect(results.map(\.key) == keys[1...].map(\.data))
     }
+
+    @Test("getKeys treats UInt32.max limit as an unbounded page")
+    func getKeysMaxLimit() async throws {
+        let backend = InMemoryBackend()
+        let stateBackend = StateBackend(backend, config: ProtocolConfigRef.dev, rootHash: Data32())
+        let keys = [
+            stateKey(0, 0),
+            stateKey(0, 1),
+            stateKey(0, 2),
+        ]
+
+        try await stateBackend.writeRaw(keys.map { (key: $0, value: Data([$0.data[1]])) })
+
+        let results = try await stateBackend.getKeys(Data([0]), nil, UInt32.max)
+
+        #expect(results.map(\.key) == keys.map(\.data))
+        #expect(results.map(\.value) == [Data([0]), Data([1]), Data([2])])
+    }
 }
