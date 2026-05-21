@@ -104,6 +104,8 @@ jobs:
       uses: dtolnay/rust-toolchain@nightly
       with:
         components: rustfmt
+    - name: Build native dependencies
+      run: make deps
     - name: Configure Sandbox Executable Path
       run: |
         swift build -c ${{ matrix.config }} --package-path PolkaVM --product boka-sandbox
@@ -133,7 +135,6 @@ jobs:
     - name: Build and Test (Release)
       if: matrix.config == 'release'
       run: |
-        make deps
         for pkg in Blockchain Codec Database JAMTests Networking Node PolkaVM RPC Utils; do
           echo "Testing $pkg (release)..."
           if [ "$pkg" = "JAMTests" ]; then
@@ -219,6 +220,8 @@ jobs:
       uses: dtolnay/rust-toolchain@nightly
       with:
         components: rustfmt
+    - name: Build native dependencies
+      run: make deps
     - name: Configure Sandbox Executable Path
       run: |
         swift build -c release --package-path PolkaVM --product boka-sandbox
@@ -228,8 +231,6 @@ jobs:
           exit 1
         fi
         echo "BOKA_SANDBOX_PATH=$SANDBOX_BIN" >> "$GITHUB_ENV"
-    - name: Build dependencies
-      run: make deps
     - name: Run Fuzz Tests (${{ matrix.mode }})
       run: |
         # Set test filter based on mode
