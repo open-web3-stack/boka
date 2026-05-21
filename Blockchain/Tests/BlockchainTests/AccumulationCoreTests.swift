@@ -123,6 +123,64 @@ struct AccumulationCoreTests {
         #expect(first.updates.count == 4)
     }
 
+    @Test
+    func accountChangesApplyAddsAndUpdatesServiceData() async throws {
+        var state = State.dummy(config: config)
+        var existing = ServiceAccount.dummy(config: config).toDetails()
+        existing.balance = Balance(100)
+        state.set(serviceAccount: 31, account: existing)
+        let accounts = ServiceAccountsMutRef(state)
+
+        var newAccount = ServiceAccount.dummy(config: config)
+        newAccount.storage[Data([1])] = Data([2, 3])
+        newAccount.preimages[data32(4)] = Data([5, 6])
+
+        var updated = existing
+        updated.balance = Balance(250)
+        let preimageInfo: StateKeys.ServiceAccountPreimageInfoKey.Value = [9]
+
+        var changes = AccountChanges()
+        changes.addNewAccount(index: 30, account: newAccount)
+        changes.addAccountUpdate(index: 31, account: updated)
+        changes.addStorageUpdate(index: 31, key: Data([7]), value: Data([8]))
+        changes.addPreimageUpdate(index: 31, hash: data32(9), value: Data([10]))
+        changes.addPreimageInfoUpdate(index: 31, hash: data32(9), length: 1, value: preimageInfo)
+
+        try await changes.apply(to: accounts)
+
+        let added = try await accounts.value.get(serviceAccount: 30)
+        #expect(added?.codeHash == newAccount.codeHash)
+        #expect(try await accounts.value.get(serviceAccount: 30, storageKey: Data([1])) == Data([2, 3]))
+        #expect(try await accounts.value.get(serviceAccount: 30, preimageHash: data32(4)) == Data([5, 6]))
+
+        #expect(try await accounts.value.get(serviceAccount: 31)?.balance == Balance(250))
+        #expect(try await accounts.value.get(serviceAccount: 31, storageKey: Data([7])) == Data([8]))
+        #expect(try await accounts.value.get(serviceAccount: 31, preimageHash: data32(9)) == Data([10]))
+        #expect(try await accounts.value.get(serviceAccount: 31, preimageHash: data32(9), length: 1) == preimageInfo)
+    }
+
+    @Test
+    func accountChangesApplyRemovesLastAndSkipsEarlierUpdatesForRemovedService() async throws {
+        var state = State.dummy(config: config)
+        state.set(serviceAccount: 32, account: ServiceAccount.dummy(config: config).toDetails())
+        let accounts = ServiceAccountsMutRef(state)
+
+        var changes = AccountChanges()
+        changes.addNewAccount(index: 32, account: ServiceAccount.dummy(config: config))
+        changes.addAccountUpdate(index: 32, account: ServiceAccount.dummy(config: config).toDetails())
+        changes.addStorageUpdate(index: 32, key: Data([1]), value: Data([2]))
+        changes.addPreimageUpdate(index: 32, hash: data32(3), value: Data([4]))
+        changes.addPreimageInfoUpdate(index: 32, hash: data32(3), length: 1, value: [5])
+        changes.addRemovedAccount(index: 32)
+
+        try await changes.apply(to: accounts)
+
+        #expect(try await accounts.value.get(serviceAccount: 32) == nil)
+        #expect(try await accounts.value.get(serviceAccount: 32, storageKey: Data([1])) == nil)
+        #expect(try await accounts.value.get(serviceAccount: 32, preimageHash: data32(3)) == nil)
+        #expect(try await accounts.value.get(serviceAccount: 32, preimageHash: data32(3), length: 1) == nil)
+    }
+
     private func expectAccumulationError(
         _ expected: AccumulationError,
         operation: () throws -> Void,
@@ -137,4 +195,3 @@ struct AccumulationCoreTests {
         }
     }
 }
-
