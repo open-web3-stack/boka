@@ -51,11 +51,11 @@ struct FuzzEnvironmentLaunch {
             throw Error.invalidSpec(specValue)
         }
 
-        return FuzzEnvironmentLaunch(
-            socketPath: try requiredValue("JAM_FUZZ_SOCK_PATH", in: environment),
+        return try FuzzEnvironmentLaunch(
+            socketPath: requiredValue("JAM_FUZZ_SOCK_PATH", in: environment),
             spec: spec,
-            dataPath: try requiredValue("JAM_FUZZ_DATA_PATH", in: environment),
-            logLevel: try parseLogLevel(environment["JAM_FUZZ_LOG_LEVEL"]),
+            dataPath: requiredValue("JAM_FUZZ_DATA_PATH", in: environment),
+            logLevel: parseLogLevel(environment["JAM_FUZZ_LOG_LEVEL"]),
         )
     }
 

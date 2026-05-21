@@ -243,7 +243,7 @@ private struct DisputesState: Disputes {
         currentValidators = try ConfigFixedSizeArray(config: config, array: keys.map(\.validatorKey))
         previousValidators = currentValidators
 
-        var reportSlots = Array<ReportItem?>(repeating: nil, count: config.value.totalNumberOfCores)
+        var reportSlots = [ReportItem?](repeating: nil, count: config.value.totalNumberOfCores)
         if let report {
             reportSlots[0] = ReportItem(workReport: report, timeslot: timeslot)
         }

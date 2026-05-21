@@ -65,11 +65,10 @@ final class BasicBlockBuilder {
                 )
             }
 
-            let instructionLength: UInt32
-            if cxxLength > 0 {
-                instructionLength = cxxLength
+            let instructionLength: UInt32 = if cxxLength > 0 {
+                cxxLength
             } else {
-                instructionLength = program.skip(UInt32(currentPC)) + 1
+                program.skip(UInt32(currentPC)) + 1
             }
 
             if instructionLength == 0 || currentPC + Int(instructionLength) > program.code.count {

@@ -44,8 +44,8 @@ public class ServiceBase: @unchecked Sendable {
         try await subscriptions.waitFor(eventType, check: check, timeout: timeout)
     }
 
-    func waitForResponse<Published: Event, Response: Event>(
-        to event: Published,
+    func waitForResponse<Response: Event>(
+        to event: some Event,
         as responseType: Response.Type,
         check: @escaping @Sendable (Response) -> Bool = { _ in true },
         timeout: TimeInterval = 10,

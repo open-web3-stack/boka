@@ -186,7 +186,7 @@ private struct RuntimeGuaranteeingBenchmarkState: Guaranteeing {
     var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
     var recentHistory: RecentHistory
     var offenders: Set<Ed25519PublicKey>

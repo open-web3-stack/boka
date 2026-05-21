@@ -27,7 +27,7 @@ let package = Package(
         // don't declare traits, and SwiftPM treats explicit trait disabling as an error.
         .package(
             url: "https://github.com/ordo-one/package-benchmark.git",
-            .upToNextMinor(from: "1.30.0")
+            .upToNextMinor(from: "1.30.0"),
         ),
     ],
     targets: [

@@ -19,19 +19,19 @@ struct RuntimeEventsTests {
         )
         #expect(
             try stateRequest.generateRequestId() ==
-                JamEncoder.encode(data32(1), data31(2), data31(3), UInt32(128)).blake2b256hash()
+                JamEncoder.encode(data32(1), data31(2), data31(3), UInt32(128)).blake2b256hash(),
         )
 
         let shardDistribution = RuntimeEvents.ShardDistributionReceived(erasureRoot: data32(4), shardIndex: 7)
         #expect(
             try shardDistribution.generateRequestId() ==
-                JamEncoder.encode(data32(4), UInt16(7)).blake2b256hash()
+                JamEncoder.encode(data32(4), UInt16(7)).blake2b256hash(),
         )
 
         let auditShard = RuntimeEvents.AuditShardRequestReceived(erasureRoot: data32(5), shardIndex: 8)
         #expect(
             try auditShard.generateRequestId() ==
-                JamEncoder.encode(data32(5), UInt16(8)).blake2b256hash()
+                JamEncoder.encode(data32(5), UInt16(8)).blake2b256hash(),
         )
 
         let segmentShard = RuntimeEvents.SegmentShardRequestReceived(
@@ -41,7 +41,7 @@ struct RuntimeEventsTests {
         )
         #expect(
             try segmentShard.generateRequestId() ==
-                JamEncoder.encode(data32(6), UInt16(9), [UInt16(10), UInt16(11)]).blake2b256hash()
+                JamEncoder.encode(data32(6), UInt16(9), [UInt16(10), UInt16(11)]).blake2b256hash(),
         )
 
         let bundle = RuntimeEvents.BundleRequestReceived(erasureRoot: data32(12))
@@ -50,7 +50,7 @@ struct RuntimeEventsTests {
         let segment = RuntimeEvents.SegmentRequestReceived(segmentsRoot: data32(13), segmentIndices: [14, 15])
         #expect(
             try segment.generateRequestId() ==
-                JamEncoder.encode(data32(13), [UInt16(14), UInt16(15)]).blake2b256hash()
+                JamEncoder.encode(data32(13), [UInt16(14), UInt16(15)]).blake2b256hash(),
         )
     }
 
@@ -171,7 +171,7 @@ struct RuntimeEventsTests {
     }
 
     @Test
-    func networkEventInitializersStorePayloads() throws {
+    func networkEventInitializersStorePayloads() {
         let config = ProtocolConfigRef.tiny
         let workPackage = WorkPackage.dummy(config: config).asRef()
         let bundle = WorkPackageBundle.dummy(config: config)
@@ -292,7 +292,7 @@ struct RuntimeEventsTests {
         #expect(audit.evidence == .firstTranche(data96(16)))
     }
 
-    private func assertFailure<Success>(_ result: Result<Success, Error>) {
+    private func assertFailure(_ result: Result<some Any, Error>) {
         if case .success = result {
             Issue.record("Expected failure result")
         }

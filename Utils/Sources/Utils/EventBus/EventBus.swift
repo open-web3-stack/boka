@@ -86,7 +86,7 @@ public actor EventBus: Subscribable {
         self.handlerMiddleware = handlerMiddleware
     }
 
-    func waitContinuationCount<T: Event>(for eventType: T.Type) -> Int {
+    func waitContinuationCount(for eventType: (some Event).Type) -> Int {
         waitContinuations[ObjectIdentifier(eventType)]?.count ?? 0
     }
 
@@ -179,8 +179,8 @@ public actor EventBus: Subscribable {
         return handler.id
     }
 
-    private func removeWaitContinuation<T: Event>(
-        _ eventType: T.Type,
+    private func removeWaitContinuation(
+        _ eventType: (some Event).Type,
         id: UniqueId,
     ) {
         let key = ObjectIdentifier(eventType)
@@ -196,8 +196,8 @@ public actor EventBus: Subscribable {
         }
     }
 
-    private func timeoutWaitContinuation<T: Event>(
-        _ eventType: T.Type,
+    private func timeoutWaitContinuation(
+        _ eventType: (some Event).Type,
         id: UniqueId,
         continuation: SafeContinuation<Event>,
     ) {
@@ -236,7 +236,7 @@ public actor EventBus: Subscribable {
             }
         }
 
-        let res = try await withCheckedThrowingContinuation { (originalContinuation: CheckedContinuation<T, Error>) in
+        return try await withCheckedThrowingContinuation { (originalContinuation: CheckedContinuation<T, Error>) in
             let localHasResumed = Atomic<Bool>(false)
 
             @Sendable func resumeOnce(_ result: Result<T, Error>) {
@@ -283,8 +283,6 @@ public actor EventBus: Subscribable {
 
             afterRegistration?()
         }
-
-        return res
     }
 
     public func waitFor<T: Event>(
@@ -295,8 +293,8 @@ public actor EventBus: Subscribable {
         try await awaitEvent(eventType, check: check, timeout: timeout)
     }
 
-    public func publishAndWaitFor<Published: Event, Response: Event>(
-        _ event: Published,
+    public func publishAndWaitFor<Response: Event>(
+        _ event: some Event,
         responseType: Response.Type,
         check: @escaping @Sendable (Response) -> Bool = { _ in true },
         timeout: TimeInterval = 10,

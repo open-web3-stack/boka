@@ -12,9 +12,9 @@ import Utils
 #endif
 
 #if os(Linux)
-    // Block SIGPIPE at module initialization to prevent termination on broken pipe
-    // When parent closes IPC socket, write() returns EPIPE instead of SIGPIPE signal
-    // This MUST be called before any async operations or Swift runtime setup
+    /// Block SIGPIPE at module initialization to prevent termination on broken pipe
+    /// When parent closes IPC socket, write() returns EPIPE instead of SIGPIPE signal
+    /// This MUST be called before any async operations or Swift runtime setup
     private func blockSIGPIPE() {
         var blockSet = sigset_t()
         sigemptyset(&blockSet)
@@ -23,7 +23,7 @@ import Utils
         pthread_sigmask(SIG_BLOCK, &blockSet, &oldSet)
     }
 
-    // Execute at module load time
+    /// Execute at module load time
     private let _blockSIGPIPE: Void = {
         blockSIGPIPE()
         return ()
@@ -43,9 +43,7 @@ private let sandboxDebugEnabled: Bool = {
     return value == "1" || value == "true" || value == "yes" || value == "on"
 }()
 
-private let sandboxSingleShotMode: Bool = {
-    CommandLine.arguments.dropFirst().contains("--single-shot")
-}()
+private let sandboxSingleShotMode: Bool = CommandLine.arguments.dropFirst().contains("--single-shot")
 
 /// Helper function to write debug messages to stderr
 private func debugWrite(_ message: String) {

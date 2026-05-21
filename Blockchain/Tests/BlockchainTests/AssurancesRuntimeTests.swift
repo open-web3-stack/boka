@@ -61,7 +61,7 @@ struct AssurancesRuntimeTests {
             _ = try state.update(
                 config: config,
                 timeslot: 7,
-                extrinsic: makeAvailability([try makeAssurance(coreIndex: 1, validatorIndex: 0)]),
+                extrinsic: makeAvailability([makeAssurance(coreIndex: 1, validatorIndex: 0)]),
             )
         }
     }
@@ -105,4 +105,3 @@ private struct AssuranceState: Assurances {
     var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
 }
-

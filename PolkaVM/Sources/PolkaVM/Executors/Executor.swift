@@ -27,7 +27,7 @@ public final class Executor: @unchecked Sendable {
         argumentData: Data?,
         ctx: (any InvocationContext)?,
     ) async -> VMExecutionResult {
-        return await frontend.execute(
+        await frontend.execute(
             config: config,
             blob: blob,
             pc: pc,

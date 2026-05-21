@@ -2,8 +2,8 @@
 //
 // Test utilities for executing and verifying individual JIT-compiled instructions
 
-import Foundation
 import CppHelper
+import Foundation
 @testable import PolkaVM
 import Testing
 import TracingUtils

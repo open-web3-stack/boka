@@ -7,7 +7,7 @@ struct DispatchQueueSchedulerTests {
     private func makeScheduler(label: String) -> DispatchQueueScheduler {
         DispatchQueueScheduler(
             timeProvider: SystemTimeProvider(),
-            queue: DispatchQueue(label: label, qos: .userInteractive)
+            queue: DispatchQueue(label: label, qos: .userInteractive),
         )
     }
 

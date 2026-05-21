@@ -64,12 +64,12 @@ struct WorkResultTests {
     }
 }
 
-private extension Result where Failure == WorkResultError {
-    var successValue: Success? {
+extension Result where Failure == WorkResultError {
+    fileprivate var successValue: Success? {
         try? get()
     }
 
-    var failureValue: WorkResultError? {
+    fileprivate var failureValue: WorkResultError? {
         if case let .failure(error) = self {
             error
         } else {

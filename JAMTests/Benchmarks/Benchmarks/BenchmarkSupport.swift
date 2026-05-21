@@ -47,7 +47,7 @@ enum BokaBenchmark {
                 .p50: 10,
                 .p75: 10,
                 .p90: 10,
-            ]
+            ],
         )
     }
 
@@ -79,9 +79,9 @@ enum BokaBenchmark {
         timeUnits: BenchmarkTimeUnits = .microseconds,
         scalingFactor: BenchmarkScalingFactor = .one,
         maxDuration: Duration = .seconds(1),
-        maxIterations: Int = 10_000,
+        maxIterations: Int = 10000,
         warmupIterations: Int = 2,
-        thresholds: [BenchmarkMetric: BenchmarkThresholds]? = defaultThresholds
+        thresholds: [BenchmarkMetric: BenchmarkThresholds]? = defaultThresholds,
     ) -> Benchmark.Configuration {
         .init(
             metrics: metrics,
@@ -102,7 +102,7 @@ enum BokaBenchmark {
             thresholds: [
                 .wallClock: timeThresholds,
                 .throughput: timeThresholds,
-            ]
+            ],
         )
     }
 

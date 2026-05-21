@@ -394,7 +394,7 @@ public actor SandboxPool {
         // Check both isShutdown flag and task cancellation
         // Task.isCancelled will be true when the weak self reference becomes nil
         // and the task exits early
-        while !isShutdown && !Task.isCancelled {
+        while !isShutdown, !Task.isCancelled {
             try? await Task.sleep(nanoseconds: UInt64(config.healthCheckInterval * 1_000_000_000))
 
             // Exit if cancelled during sleep or if self was deallocated

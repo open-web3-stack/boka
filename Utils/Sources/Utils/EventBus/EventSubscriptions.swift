@@ -49,8 +49,8 @@ public struct EventSubscriptions: ~Copyable, Sendable {
         try await eventBus.waitFor(eventType, check: check, timeout: timeout)
     }
 
-    public func publishAndWaitFor<Published: Event, Response: Event>(
-        _ event: Published,
+    public func publishAndWaitFor<Response: Event>(
+        _ event: some Event,
         responseType: Response.Type,
         check: @escaping @Sendable (Response) -> Bool = { _ in true },
         timeout: TimeInterval = 10,

@@ -58,12 +58,12 @@ struct AccumulationMergeTests {
         let baseState = State.dummy(config: config)
         let assignerValues = assigners ?? Array(repeating: ServiceIndex(0), count: config.value.totalNumberOfCores)
 
-        return AccumulateState(
+        return try AccumulateState(
             accounts: ServiceAccountsMutRef(baseState),
-            validatorQueue: try makeValidatorQueue(startingAt: 1),
-            authorizationQueue: try makeAuthorizationQueue(startingAt: 1),
+            validatorQueue: makeValidatorQueue(startingAt: 1),
+            authorizationQueue: makeAuthorizationQueue(startingAt: 1),
             manager: 0,
-            assigners: try ConfigFixedSizeArray(config: config, array: assignerValues),
+            assigners: ConfigFixedSizeArray(config: config, array: assignerValues),
             delegator: delegator,
             registrar: 0,
             alwaysAcc: [:],
@@ -94,7 +94,7 @@ struct AccumulationMergeTests {
         startingAt start: UInt8,
     ) throws -> ConfigFixedSizeArray<
         ConfigFixedSizeArray<Data32, ProtocolConfig.MaxAuthorizationsQueueItems>,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     > {
         let queues = try (0 ..< config.value.totalNumberOfCores).map { core in
             let items = (0 ..< config.value.maxAuthorizationsQueueItems).map {

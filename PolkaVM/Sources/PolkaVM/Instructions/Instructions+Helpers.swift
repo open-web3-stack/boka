@@ -149,5 +149,4 @@ extension Instructions {
         let rd = try Registers.Index(r3: data.at(relative: 1))
         return (ra, rb, rd)
     }
-
 }

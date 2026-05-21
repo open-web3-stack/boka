@@ -8,9 +8,9 @@ struct AuthorizationRuntimeTests {
 
     @Test
     func updateRemovesUsedAuthorizersAndAppendsQueuedAuthorizers() throws {
-        let state = AuthorizationState(
-            coreAuthorizationPool: try makePool([[1, 2], [3]]),
-            authorizationQueue: try makeQueue(startingAt: 100),
+        let state = try AuthorizationState(
+            coreAuthorizationPool: makePool([[1, 2], [3]]),
+            authorizationQueue: makeQueue(startingAt: 100),
         )
 
         let postState = try state.update(
@@ -25,9 +25,9 @@ struct AuthorizationRuntimeTests {
 
     @Test
     func updateRejectsAuthorizerMissingFromPool() throws {
-        let state = AuthorizationState(
-            coreAuthorizationPool: try makePool([[1, 2], [3]]),
-            authorizationQueue: try makeQueue(startingAt: 100),
+        let state = try AuthorizationState(
+            coreAuthorizationPool: makePool([[1, 2], [3]]),
+            authorizationQueue: makeQueue(startingAt: 100),
         )
 
         #expect(throws: AuthorizationError.self) {
@@ -43,13 +43,13 @@ struct AuthorizationRuntimeTests {
         _ values: [[UInt8]],
     ) throws -> ConfigFixedSizeArray<
         ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     > {
         let rows = try values.map { row in
             try ConfigLimitedSizeArray<
                 Data32,
                 ProtocolConfig.Int0,
-                ProtocolConfig.MaxAuthorizationsPoolItems
+                ProtocolConfig.MaxAuthorizationsPoolItems,
             >(config: config, array: row.map(data32))
         }
         return try ConfigFixedSizeArray(config: config, array: rows)
@@ -59,7 +59,7 @@ struct AuthorizationRuntimeTests {
         startingAt start: UInt8,
     ) throws -> ConfigFixedSizeArray<
         ConfigFixedSizeArray<Data32, ProtocolConfig.MaxAuthorizationsQueueItems>,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     > {
         let rows = try (0 ..< config.value.totalNumberOfCores).map { core in
             let items = (0 ..< config.value.maxAuthorizationsQueueItems).map { offset in
@@ -77,15 +77,14 @@ struct AuthorizationRuntimeTests {
 private struct AuthorizationState: Authorization {
     var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
     var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<Data32, ProtocolConfig.MaxAuthorizationsQueueItems>,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
 
     mutating func mergeWith(postState: AuthorizationPostState) {
         coreAuthorizationPool = postState.coreAuthorizationPool
     }
 }
-

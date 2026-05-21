@@ -17,4 +17,3 @@ func data64(_ byte: UInt8) -> Data64 {
 func data128(_ byte: UInt8) -> Data128 {
     Data128(Data(repeating: byte, count: 128))!
 }
-

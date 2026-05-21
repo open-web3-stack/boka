@@ -51,9 +51,9 @@ struct GuaranteeingRuntimeTests {
     }
 
     @Test
-    func validateGuaranteesRejectsMissingServiceAccount() async {
-        let state = try! GuaranteeingState(config: config)
-        let extrinsic = try! makeExtrinsic(digests: [
+    func validateGuaranteesRejectsMissingServiceAccount() async throws {
+        let state = try GuaranteeingState(config: config)
+        let extrinsic = try makeExtrinsic(digests: [
             makeDigest(serviceIndex: 7, codeHash: data32(1), gasLimit: Gas(10)),
         ])
 
@@ -63,10 +63,10 @@ struct GuaranteeingRuntimeTests {
     }
 
     @Test
-    func validateGuaranteesRejectsMismatchedCodeHash() async {
+    func validateGuaranteesRejectsMismatchedCodeHash() async throws {
         let account = makeAccount(codeHash: data32(1), minAccumlateGas: Gas(10))
-        let state = try! GuaranteeingState(config: config, serviceAccounts: [7: account])
-        let extrinsic = try! makeExtrinsic(digests: [
+        let state = try GuaranteeingState(config: config, serviceAccounts: [7: account])
+        let extrinsic = try makeExtrinsic(digests: [
             makeDigest(serviceIndex: 7, codeHash: data32(2), gasLimit: Gas(10)),
         ])
 
@@ -76,10 +76,10 @@ struct GuaranteeingRuntimeTests {
     }
 
     @Test
-    func validateGuaranteesRejectsDigestBelowServiceMinimumGas() async {
+    func validateGuaranteesRejectsDigestBelowServiceMinimumGas() async throws {
         let account = makeAccount(codeHash: data32(1), minAccumlateGas: Gas(11))
-        let state = try! GuaranteeingState(config: config, serviceAccounts: [7: account])
-        let extrinsic = try! makeExtrinsic(digests: [
+        let state = try GuaranteeingState(config: config, serviceAccounts: [7: account])
+        let extrinsic = try makeExtrinsic(digests: [
             makeDigest(serviceIndex: 7, codeHash: data32(1), gasLimit: Gas(10)),
         ])
 
@@ -89,10 +89,10 @@ struct GuaranteeingRuntimeTests {
     }
 
     @Test
-    func validateGuaranteesRejectsTotalGasOverBlockLimit() async {
+    func validateGuaranteesRejectsTotalGasOverBlockLimit() async throws {
         let account = makeAccount(codeHash: data32(1), minAccumlateGas: Gas(0))
-        let state = try! GuaranteeingState(config: config, serviceAccounts: [7: account])
-        let extrinsic = try! makeExtrinsic(digests: [
+        let state = try GuaranteeingState(config: config, serviceAccounts: [7: account])
+        let extrinsic = try makeExtrinsic(digests: [
             makeDigest(
                 serviceIndex: 7,
                 codeHash: data32(1),
@@ -163,7 +163,7 @@ private struct GuaranteeingState: Guaranteeing {
     var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
-        ProtocolConfig.TotalNumberOfCores
+        ProtocolConfig.TotalNumberOfCores,
     >
     var recentHistory: RecentHistory
     var offenders: Set<Ed25519PublicKey>

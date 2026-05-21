@@ -1,6 +1,6 @@
 #if os(Linux)
-    import Glibc
     import Foundation
+    import Glibc
 
     /// Block SIGPIPE at module load time to prevent test process termination
     /// on broken pipe errors during IPC communication with sandbox processes.

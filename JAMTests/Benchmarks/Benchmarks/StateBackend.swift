@@ -51,7 +51,7 @@ func stateBackendBenchmarks() {
         var checksum: UInt64 = 0
 
         benchmark.startMeasurement()
-        for i in 0 ..< 10_000 {
+        for i in 0 ..< 10000 {
             state.timeslot = TimeslotIndex(i)
             checksum &+= UInt64(state.timeslot)
         }

@@ -36,7 +36,7 @@ public class IPCServer {
     /// Run the IPC server loop
     public func run(
         singleShot: Bool = false,
-        handler: @escaping @Sendable (IPCExecuteRequest) async throws -> IPCExecuteResponse
+        handler: @escaping @Sendable (IPCExecuteRequest) async throws -> IPCExecuteResponse,
     ) async {
         guard let fd = fileDescriptor else {
             logger.error("No file descriptor set")

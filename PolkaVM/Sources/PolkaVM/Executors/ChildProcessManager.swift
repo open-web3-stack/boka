@@ -18,7 +18,7 @@ struct ProcessHandle {
 actor ChildProcessManager {
     private var activeProcesses: [pid_t: ProcessHandle] = [:]
     private let defaultTimeout: TimeInterval
-    private var openFDs: Set<Int32> = []  // Track open FDs to prevent double-close
+    private var openFDs: Set<Int32> = [] // Track open FDs to prevent double-close
 
     init(defaultTimeout: TimeInterval = 30.0) {
         self.defaultTimeout = defaultTimeout
@@ -58,7 +58,7 @@ actor ChildProcessManager {
 
         var remaining = timespec(
             tv_sec: milliseconds / 1000,
-            tv_nsec: (milliseconds % 1000) * 1_000_000
+            tv_nsec: (milliseconds % 1000) * 1_000_000,
         )
 
         while true {
@@ -210,7 +210,7 @@ actor ChildProcessManager {
     /// - Throws: IPCError if spawning fails
     func spawnChildProcess(
         executablePath: String,
-        arguments: [String] = []
+        arguments: [String] = [],
     ) async throws -> (handle: ProcessHandle, clientFD: Int32) {
         // Clean up any zombie processes from previous runs before spawning new ones
         reapZombies()
@@ -565,7 +565,7 @@ actor ChildProcessManager {
                 logger.debug("Child process \(handle.pid) exited gracefully after SIGTERM")
                 gracefulExit = true
                 break
-            } else if result < 0 && errno == ECHILD {
+            } else if result < 0, errno == ECHILD {
                 // Already reaped
                 logger.debug("Child process \(handle.pid) reaped after SIGTERM")
                 gracefulExit = true
@@ -594,7 +594,7 @@ actor ChildProcessManager {
             // Never block indefinitely here. In CI we observed rare hangs where a blocking
             // waitpid(2) after SIGKILL could pin the whole job until workflow timeout.
             var reapedAfterSIGKILL = false
-            for _ in 0 ..< 50 {  // 5 seconds max
+            for _ in 0 ..< 50 { // 5 seconds max
                 var status: Int32 = 0
                 #if canImport(Glibc)
                     let result = Glibc.waitpid(handle.pid, &status, WNOHANG)

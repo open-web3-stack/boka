@@ -141,7 +141,7 @@ private struct PreimageState: Preimages {
         for update in postState.updates {
             preimageData[update.serviceIndex, default: [:]][update.hash] = update.data
             requests[update.serviceIndex, default: [:]][
-                HashAndLength(hash: update.hash, length: update.length)
+                HashAndLength(hash: update.hash, length: update.length),
             ] = [update.timeslot]
         }
     }
@@ -159,4 +159,3 @@ private func samePreimagesError(_ lhs: PreimagesError, _ rhs: PreimagesError) ->
         false
     }
 }
-

@@ -96,7 +96,7 @@ public class FuzzingTarget {
                 try await handleFuzzer(connection: connection)
 
                 logger.info("Connection closed, waiting for next connection")
-            } catch FuzzingTargetError.protocolViolation(let reason) {
+            } catch let FuzzingTargetError.protocolViolation(reason) {
                 logger.warning("Connection closed due to protocol violation: \(reason)")
             } catch {
                 logger.error("Error handling connection: \(error)")
