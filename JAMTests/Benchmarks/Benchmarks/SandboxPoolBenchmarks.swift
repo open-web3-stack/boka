@@ -31,6 +31,7 @@ func sandboxPoolBenchmarks() {
     registerThroughputBenchmarks(fibonacciProgram: fibonacciProgram)
     registerMemoryBenchmarks(sumToNProgram: sumToNProgram)
     registerQueueDepthBenchmarks(emptyProgram: emptyProgram)
+    registerQueueWaitBenchmarks(fibonacciProgram: fibonacciProgram)
 }
 
 private func benchmarkPoolConfig(_ base: SandboxPoolConfiguration) -> SandboxPoolConfiguration {
@@ -554,5 +555,55 @@ private func registerQueueDepthBenchmarks(emptyProgram: Data) {
         )
         benchmark.stopMeasurement()
         blackHole(result)
+    }
+}
+
+private func registerQueueWaitBenchmarks(fibonacciProgram: Data) {
+    Benchmark("pool.queue.wait.contention", configuration: BokaBenchmark.milliseconds) { benchmark in
+        var config = SandboxPoolConfiguration.throughputOptimized
+        config.poolSize = 1
+        config.maxQueueDepth = 16
+        config.workerWaitTimeout = 5
+        config.executionTimeout = 30
+        config.enableWorkerRecycling = false
+        config.healthCheckInterval = 0
+        config.allowOverflowWorkers = false
+        config.maxOverflowWorkers = 0
+        config.exhaustionPolicy = .queue
+        config = benchmarkPoolConfig(config)
+
+        let executor = Executor.pooled(
+            mode: .sandboxed,
+            config: DefaultPvmConfig(),
+            poolConfig: config,
+        )
+        let requestCount = BokaBenchmark.operationCount(6, ciFastCount: 3)
+
+        benchmark.startMeasurement()
+
+        let successfulExecutions = await withTaskGroup(of: Bool.self, returning: Int.self) { group in
+            let exec = executor
+            for _ in 0 ..< requestCount {
+                group.addTask {
+                    let result = await exec.execute(
+                        blob: fibonacciProgram,
+                        pc: 0,
+                        gas: Gas(1_000_000),
+                        argumentData: Data([12]),
+                        ctx: nil,
+                    )
+                    return result.exitReason == .halt
+                }
+            }
+
+            var successCount = 0
+            for await succeeded in group where succeeded {
+                successCount += 1
+            }
+            return successCount
+        }
+
+        benchmark.stopMeasurement()
+        blackHole(successfulExecutions)
     }
 }

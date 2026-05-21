@@ -92,6 +92,18 @@ public enum ErasureCoding {
         return result
     }
 
+    private static func paddedSlice(data: Data, start: Int, count: Int) -> Data {
+        var result = Data(capacity: count)
+        if start < data.count {
+            let end = min(start + count, data.count)
+            result.append(data[relative: start ..< end])
+        }
+        if result.count < count {
+            result.append(contentsOf: repeatElement(0, count: count - result.count))
+        }
+        return result
+    }
+
     private static func withDataPointers<R>(_ data: [Data], _ body: ([UnsafePointer<UInt8>?]) throws -> R) throws -> R {
         var pointers: [UnsafePointer<UInt8>?] = []
         pointers.reserveCapacity(data.count)
@@ -311,30 +323,34 @@ public enum ErasureCoding {
         guard basicSize % 2 == 0 else { throw Error.invalidBasicSize(basicSize) }
         guard !data.isEmpty else { return [] }
 
+        let originalCount = basicSize / Constants.INNER_SHARD_SIZE
+        guard recoveryCount >= originalCount else { throw Error.invalidShardsCount }
+
         let k = (data.count + basicSize - 1) / basicSize
-        let paddedLength = k * basicSize
-        var padded = data
-        if padded.count < paddedLength {
-            padded.append(contentsOf: repeatElement(0, count: paddedLength - padded.count))
+        let shardSize = k * Constants.INNER_SHARD_SIZE
+        var result: [Data] = []
+        result.reserveCapacity(recoveryCount)
+        for _ in 0 ..< recoveryCount {
+            result.append(Data(capacity: shardSize))
         }
 
-        let splitted = split(data: padded, n: 2 * k)
+        var original: [Data] = []
+        original.reserveCapacity(originalCount)
+        for innerShardIndex in 0 ..< k {
+            original.removeAll(keepingCapacity: true)
 
-        let splitted2 = splitted.map { split(data: $0, n: Constants.INNER_SHARD_SIZE) }
+            for originalIndex in 0 ..< originalCount {
+                let start = originalIndex * shardSize + innerShardIndex * Constants.INNER_SHARD_SIZE
+                original.append(paddedSlice(data: data, start: start, count: Constants.INNER_SHARD_SIZE))
+            }
 
-        let originalShards = transpose(splitted2)
-
-        var result2d: [[Data]] = []
-        result2d.reserveCapacity(originalShards.count)
-
-        for original in originalShards {
             let codeword = try encode(original: original, recoveryCount: recoveryCount)
-            result2d.append(codeword)
+            for index in 0 ..< recoveryCount {
+                result[index].append(codeword[index])
+            }
         }
 
-        let transposed = transpose(result2d)
-
-        return transposed.map { join(arr: $0) }
+        return result
     }
 
     /// R_k: erasure-code reconstruction function (eq H.5)
