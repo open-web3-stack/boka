@@ -202,6 +202,31 @@ func createShards(from data: Data, count: Int) -> [Data] {
         #expect(recovered == originalData)
     }
 
+    @Test func reconstructMixedOriginalAndParityShards() throws {
+        let basicSize = 12
+        let originalCount = basicSize / 2
+        let recoveryCount = 18
+        let originalData = Data((0 ..< 4104).map { UInt8(($0 * 23) % 256) })
+        let recovery = try ErasureCoding.chunk(data: originalData, basicSize: basicSize, recoveryCount: recoveryCount)
+
+        let originalShards = recovery.prefix(originalCount / 2).enumerated().map { index, data in
+            ErasureCoding.Shard(data: data, index: UInt32(index))
+        }
+        let parityShards = recovery[originalCount ..< originalCount + originalCount / 2].enumerated().map { index, data in
+            ErasureCoding.Shard(data: data, index: UInt32(originalCount + index))
+        }
+
+        let recovered = try ErasureCoding.reconstruct(
+            shards: originalShards + parityShards,
+            basicSize: basicSize,
+            originalCount: originalCount,
+            recoveryCount: recoveryCount,
+            originalLength: originalData.count,
+        )
+
+        #expect(recovered == originalData)
+    }
+
     @Test func recoverWithParityOnly() throws {
         let dataLength = 32
         let originalCount = 2

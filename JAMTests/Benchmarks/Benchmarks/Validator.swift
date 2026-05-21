@@ -213,6 +213,36 @@ func validatorBenchmarks() {
         blackHole(reconstructed.count)
     }
 
+    Benchmark("erasure.full.reconstruct.recoveryPath", configuration: BokaBenchmark.milliseconds) { benchmark in
+        let config = ProtocolConfigRef.mainnet
+        let originalData = Data((0 ..< config.value.segmentSize).map { UInt8($0 & 0xFF) })
+        let basicSize = config.value.erasureCodedPieceSize
+        let recoveryCount = config.value.totalNumberOfValidators
+        let originalCount = basicSize / 2
+        let originalShardCount = originalCount / 2
+        let parityShardCount = originalCount - originalShardCount
+
+        let shardsData = try ErasureCoding.chunk(data: originalData, basicSize: basicSize, recoveryCount: recoveryCount)
+        let originalShards = shardsData.prefix(originalShardCount).enumerated().map { index, data in
+            ErasureCoding.Shard(data: data, index: UInt32(index))
+        }
+        let parityShards = shardsData[originalCount ..< originalCount + parityShardCount].enumerated().map { index, data in
+            ErasureCoding.Shard(data: data, index: UInt32(originalCount + index))
+        }
+        let shards = originalShards + parityShards
+
+        benchmark.startMeasurement()
+        let reconstructed = try ErasureCoding.reconstruct(
+            shards: shards,
+            basicSize: basicSize,
+            originalCount: originalCount,
+            recoveryCount: recoveryCount,
+            originalLength: originalData.count,
+        )
+        benchmark.stopMeasurement()
+        blackHole(reconstructed.count)
+    }
+
     // MARK: - Validator committee operations
 
     Benchmark("validator.committee", configuration: BokaBenchmark.scaledNano) { benchmark in
