@@ -60,6 +60,28 @@ struct SortedArrayTests {
     }
 
     @Test
+    func removeAll() {
+        var sorted = SortedArray([1, 2, 3])
+        sorted.removeAll()
+        #expect(sorted.array == [])
+        #expect(sorted.count == 0)
+    }
+
+    @Test
+    func removeWhere() {
+        var sorted = SortedArray([1, 2, 3, 4, 5, 6])
+        sorted.remove { $0.isMultiple(of: 2) }
+        #expect(sorted.array == [1, 3, 5])
+    }
+
+    @Test
+    func unsafeArrayAccessMutatesBackingStorage() {
+        var sorted = SortedArray([1, 2, 3])
+        sorted.unsafeArrayAccess.append(4)
+        #expect(sorted.array == [1, 2, 3, 4])
+    }
+
+    @Test
     func countProperty() {
         let sorted = SortedArray([1, 2, 3, 4, 5])
         #expect(sorted.count == 5)
@@ -74,6 +96,16 @@ struct SortedArrayTests {
         let decoded = try decoder.decode(SortedArray<Int>.self)
 
         #expect(original.array == decoded.array)
+    }
+
+    @Test
+    func decodingRejectsUnsortedData() throws {
+        let encoded = try JamEncoder.encode([3, 1, 2])
+        let decoder = JamDecoder(data: encoded)
+
+        #expect(throws: SortedContainerError.invalidData) {
+            try decoder.decode(SortedArray<Int>.self)
+        }
     }
 
     @Test

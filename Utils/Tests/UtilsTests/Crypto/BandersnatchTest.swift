@@ -37,6 +37,18 @@ import Testing
         #expect(publicKey.data == secret.publicKey.data)
     }
 
+    @Test func publicKeyInitializationRejectsInvalidCompressedData() throws {
+        let invalid = try #require(Data32(Data(repeating: 0, count: 32)))
+
+        do {
+            _ = try Bandersnatch.PublicKey(data: invalid)
+            Issue.record("Expected invalid compressed public key data to be rejected")
+        } catch Bandersnatch.Error.createPublicKeyFailed(2) {
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
     @Test func encodingAndDecoding() throws {
         let secret = try Bandersnatch.SecretKey(from: Data32.random())
 

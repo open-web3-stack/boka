@@ -1,4 +1,3 @@
-// TODO: add tests
 public struct SortedArray<T: Comparable>: SortedContainer {
     public private(set) var array: [T]
 

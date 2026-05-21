@@ -19,6 +19,14 @@ struct MinLength3: ReadInt {
     }
 }
 
+struct MinLength0: ReadInt {
+    typealias TConfig = Int
+
+    static func read(config _: Int) -> Int {
+        0
+    }
+}
+
 struct MaxLength5: ReadInt {
     typealias TConfig = Int
 
@@ -52,6 +60,17 @@ struct ConfigLimitedSizeArrayTests {
         let array = try ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>(config: config, array: [1, 2, 3])
         #expect(array.array == [1, 2, 3])
         #expect(array.count == 3)
+    }
+
+    @Test func initWithoutDefaultValueRequiresZeroMinLength() throws {
+        let config = 0
+        let array = try ConfigLimitedSizeArray<Int, MinLength0, MaxLength5>(config: config)
+        #expect(array.array == [])
+        #expect(array.count == 0)
+
+        #expect(throws: ConfigLimitedSizeArrayError.tooFewElements) {
+            _ = try ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>(config: config)
+        }
     }
 
     @Test func initWithArrayOutOfBounds() throws {
@@ -139,6 +158,26 @@ struct ConfigLimitedSizeArrayTests {
 
         #expect(throws: ConfigLimitedSizeArrayError.invalidIndex) {
             _ = try array.remove(at: 10)
+        }
+    }
+
+    @Test func mutateValidatesBoundsAndReturnsClosureResult() throws {
+        let config = 0
+        var array = try ConfigLimitedSizeArray<Int, MinLength3, MaxLength5>(config: config, array: [1, 2, 3])
+
+        let count = try array.mutate { storage in
+            storage.append(4)
+            return storage.count
+        }
+
+        #expect(count == 4)
+        #expect(array.array == [1, 2, 3, 4])
+
+        #expect(throws: ConfigLimitedSizeArrayError.tooManyElements) {
+            _ = try array.mutate { storage in
+                storage.append(contentsOf: [5, 6])
+                return storage.count
+            }
         }
     }
 
