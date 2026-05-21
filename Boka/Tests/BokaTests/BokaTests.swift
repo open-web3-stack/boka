@@ -1,3 +1,4 @@
+import ArgumentParser
 import Blockchain
 @testable import Boka
 import Foundation
@@ -60,6 +61,28 @@ struct BokaTests {
         #expect(command.devSeed == 7)
         #expect(command.name == "coverage-node")
         #expect(command.local)
+    }
+
+    @Test func maybeEnabledArgumentCoversEnabledDisabledAndInvalidValues() throws {
+        let enabled = try #require(MaybeEnabled<TestArgument>(argument: "value"))
+        switch enabled {
+        case let .enabled(value):
+            #expect(value.rawValue == "value")
+        case .disabled:
+            Issue.record("Expected enabled argument")
+        }
+        #expect(enabled.asOptional == TestArgument(rawValue: "value"))
+
+        let disabled = try #require(MaybeEnabled<TestArgument>(argument: "NO"))
+        switch disabled {
+        case .enabled:
+            Issue.record("Expected disabled argument")
+        case .disabled:
+            break
+        }
+        #expect(disabled.asOptional == nil)
+
+        #expect(MaybeEnabled<TestArgument>(argument: "invalid") == nil)
     }
 
     @Test func fuzzSubcommandsParseDefaultsAndOptions() throws {
@@ -291,6 +314,36 @@ struct BokaTests {
         }
     }
 
+    @Test func fuzzEnvironmentRejectsUnwritableDataDirectory() throws {
+        let root = try makeTemporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let dataPath = root.appendingPathComponent("readonly", isDirectory: true).path
+        try FileManager.default.createDirectory(atPath: dataPath, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: dataPath)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dataPath)
+        }
+
+        let launch = FuzzEnvironmentLaunch(
+            socketPath: root.appendingPathComponent("fuzz.sock").path,
+            spec: .tiny,
+            dataPath: dataPath,
+            logLevel: .info,
+        )
+
+        do {
+            try launch.prepareFilesystem()
+            Issue.record("Expected unwritable data path to be rejected")
+        } catch let error as FuzzEnvironmentLaunch.Error {
+            #expect(error == .pathIsNotWritable(variable: "JAM_FUZZ_DATA_PATH", path: dataPath))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
     private func expectFuzzEnvironmentError(
         _ expected: FuzzEnvironmentLaunch.Error,
         environment: [String: String],
@@ -330,5 +383,20 @@ struct BokaTests {
             .appendingPathComponent("boka-test-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         return root
+    }
+}
+
+private struct TestArgument: ExpressibleByArgument, Equatable {
+    let rawValue: String
+
+    init?(argument: String) {
+        guard argument != "invalid" else {
+            return nil
+        }
+        rawValue = argument
+    }
+
+    init(rawValue: String) {
+        self.rawValue = rawValue
     }
 }

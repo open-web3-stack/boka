@@ -74,7 +74,6 @@ public enum Tracing {
 
         LoggingSystem.bootstrap({ label, metadataProvider in
             BokaLogger(
-                // fragment: LogFragment(),
                 fragment: timestampDefaultLoggerFragment(),
                 label: label,
                 level: resolvedMinimalLevel,
