@@ -11,6 +11,72 @@ public enum Justification: Sendable, Equatable {
 public enum JustificationStep: Sendable, Equatable, Codable {
     case left(Data32)
     case right(Data32)
+
+    enum CodingKeys: String, CodingKey {
+        case left
+        case right
+    }
+
+    public init(from decoder: Decoder) throws {
+        if decoder.isJamCodec {
+            var container = try decoder.unkeyedContainer()
+            let variant = try container.decode(UInt8.self)
+            let hash = try container.decode(Data32.self)
+
+            switch variant {
+            case 0:
+                self = .left(hash)
+            case 1:
+                self = .right(hash)
+            default:
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: decoder.codingPath,
+                        debugDescription: "Invalid JustificationStep variant: \(variant)",
+                    ),
+                )
+            }
+        } else {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            if let left = try container.decodeIfPresent(Data32.self, forKey: .left) {
+                self = .left(left)
+            } else if let right = try container.decodeIfPresent(Data32.self, forKey: .right) {
+                self = .right(right)
+            } else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: container.codingPath,
+                        debugDescription: "Could not decode JustificationStep",
+                    ),
+                )
+            }
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        if encoder.isJamCodec {
+            var container = encoder.unkeyedContainer()
+
+            switch self {
+            case let .left(hash):
+                try container.encode(UInt8(0))
+                try container.encode(hash)
+            case let .right(hash):
+                try container.encode(UInt8(1))
+                try container.encode(hash)
+            }
+        } else {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .left(hash):
+                try container.encode(hash, forKey: .left)
+            case let .right(hash):
+                try container.encode(hash, forKey: .right)
+            }
+        }
+    }
 }
 
 extension Justification: Codable {
