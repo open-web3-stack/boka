@@ -10,7 +10,13 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
 
         enum CodingKeys: String, CodingKey {
             case root
+            case rootKind
             case index
+        }
+
+        private enum RootKind: String, Codable {
+            case segmentRoot
+            case workPackageHash
         }
 
         public var root: DataSegmentRootKind
@@ -39,8 +45,10 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
                 switch root {
                 case let .segmentRoot(root):
                     try container.encode(root, forKey: .root)
+                    try container.encode(RootKind.segmentRoot, forKey: .rootKind)
                 case let .workPackageHash(hash):
                     try container.encode(hash, forKey: .root)
+                    try container.encode(RootKind.workPackageHash, forKey: .rootKind)
                 }
                 try container.encode(index, forKey: .index)
             }
@@ -48,16 +56,30 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
 
         /// Decodable
         public init(from decoder: Decoder) throws {
-            var container = try decoder.unkeyedContainer()
-            let root = try container.decode(Data32.self)
-            let index = try container.decode(UInt16.self)
-            let flag = index >> 15
-            if flag == 0 {
-                self.root = .segmentRoot(root)
-                self.index = index
+            if decoder.isJamCodec {
+                var container = try decoder.unkeyedContainer()
+                let root = try container.decode(Data32.self)
+                let index = try container.decode(UInt16.self)
+                let flag = index >> 15
+                if flag == 0 {
+                    self.root = .segmentRoot(root)
+                    self.index = index
+                } else {
+                    self.root = .workPackageHash(root)
+                    self.index = index & 0x7FFF
+                }
             } else {
-                self.root = .workPackageHash(root)
-                self.index = index & 0x7FFF
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                let root = try container.decode(Data32.self, forKey: .root)
+                let index = try container.decode(UInt16.self, forKey: .index)
+                let rootKind = try container.decodeIfPresent(RootKind.self, forKey: .rootKind) ?? .segmentRoot
+                switch rootKind {
+                case .segmentRoot:
+                    self.root = .segmentRoot(root)
+                case .workPackageHash:
+                    self.root = .workPackageHash(root)
+                }
+                self.index = index
             }
         }
     }
