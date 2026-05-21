@@ -7,6 +7,13 @@ on:
     tags:
       - '*'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   docker:
     runs-on: [self-hosted, linux]
@@ -27,7 +34,6 @@ jobs:
           images: acala/${{ github.event.repository.name }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
             type=ref,event=tag
             type=sha
             type=sha,format=long
