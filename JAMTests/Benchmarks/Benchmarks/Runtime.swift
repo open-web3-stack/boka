@@ -141,4 +141,139 @@ func runtimeBenchmarks() {
         }
         benchmark.stopMeasurement()
     }
+
+    // MARK: - Guaranteeing runtime protocol operations
+
+    Benchmark("runtime.guaranteeing.requiredStorageKeys.duplicates", configuration: BokaBenchmark.configuration()) { benchmark in
+        let state = try RuntimeGuaranteeingBenchmarkState(config: config)
+        let extrinsic = try runtimeGuaranteingExtrinsic(
+            config: config,
+            serviceIndices: Array(repeating: 7, count: config.value.maxWorkItems),
+            codeHash: runtimeData32(1),
+            gasLimit: Gas(10),
+        )
+
+        benchmark.startMeasurement()
+        for _ in benchmark.scaledIterations {
+            let keys = state.requiredStorageKeys(extrinsic: extrinsic)
+            blackHole(keys)
+        }
+        benchmark.stopMeasurement()
+    }
+
+    Benchmark("runtime.guaranteeing.validate.repeatedService", configuration: BokaBenchmark.configuration()) { benchmark in
+        let account = runtimeServiceAccount(codeHash: runtimeData32(1), minAccumlateGas: Gas(10), config: config)
+        let state = try RuntimeGuaranteeingBenchmarkState(config: config, serviceAccounts: [7: account])
+        let extrinsic = try runtimeGuaranteingExtrinsic(
+            config: config,
+            serviceIndices: Array(repeating: 7, count: config.value.maxWorkItems),
+            codeHash: runtimeData32(1),
+            gasLimit: Gas(10),
+        )
+
+        benchmark.startMeasurement()
+        for _ in benchmark.scaledIterations {
+            try await state.validateGuarantees(config: config, extrinsic: extrinsic)
+        }
+        benchmark.stopMeasurement()
+    }
+}
+
+private struct RuntimeGuaranteeingBenchmarkState: Guaranteeing {
+    var entropyPool: EntropyPool
+    var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var previousValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
+    var coreAuthorizationPool: ConfigFixedSizeArray<
+        ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
+        ProtocolConfig.TotalNumberOfCores
+    >
+    var recentHistory: RecentHistory
+    var offenders: Set<Ed25519PublicKey>
+    var accumulationQueue: ConfigFixedSizeArray<[AccumulationQueueItem], ProtocolConfig.EpochLength>
+    var accumulationHistory: ConfigFixedSizeArray<SortedUniqueArray<Data32>, ProtocolConfig.EpochLength>
+    var serviceAccounts: [ServiceIndex: ServiceAccountDetails]
+
+    init(
+        config: ProtocolConfigRef,
+        serviceAccounts: [ServiceIndex: ServiceAccountDetails] = [:],
+    ) throws {
+        entropyPool = EntropyPool((Data32(), Data32(), Data32(), Data32()))
+        currentValidators = try ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey())
+        previousValidators = try ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey())
+        reports = try ConfigFixedSizeArray(
+            config: config,
+            array: Array(repeating: nil, count: config.value.totalNumberOfCores),
+        )
+        coreAuthorizationPool = try ConfigFixedSizeArray(
+            config: config,
+            defaultValue: ConfigLimitedSizeArray(config: config),
+        )
+        recentHistory = RecentHistory.dummy(config: config)
+        offenders = []
+        accumulationQueue = try ConfigFixedSizeArray(config: config, defaultValue: [])
+        accumulationHistory = try ConfigFixedSizeArray(
+            config: config,
+            defaultValue: SortedUniqueArray<Data32>(sortedUnchecked: []),
+        )
+        self.serviceAccounts = serviceAccounts
+    }
+
+    func serviceAccount(index: ServiceIndex) async throws -> ServiceAccountDetails? {
+        serviceAccounts[index]
+    }
+}
+
+private func runtimeGuaranteingExtrinsic(
+    config: ProtocolConfigRef,
+    serviceIndices: [ServiceIndex],
+    codeHash: Data32,
+    gasLimit: Gas,
+) throws -> ExtrinsicGuarantees {
+    let digests = serviceIndices.map {
+        WorkDigest(
+            serviceIndex: $0,
+            codeHash: codeHash,
+            payloadHash: runtimeData32(2),
+            gasLimit: gasLimit,
+            result: WorkResult(.success(Data())),
+            gasUsed: 0,
+            importsCount: 0,
+            exportsCount: 0,
+            extrinsicsCount: 0,
+            extrinsicsSize: 0,
+        )
+    }
+
+    var report = WorkReport.dummy(config: config)
+    report.digests = try ConfigLimitedSizeArray(config: config, array: digests)
+
+    let guarantee = ExtrinsicGuarantees.GuaranteeItem(
+        workReport: report,
+        timeslot: 0,
+        credential: [
+            .init(index: 0, signature: runtimeData64(1)),
+            .init(index: 1, signature: runtimeData64(2)),
+        ],
+    )
+    return try ExtrinsicGuarantees(guarantees: ConfigLimitedSizeArray(config: config, array: [guarantee]))
+}
+
+private func runtimeServiceAccount(
+    codeHash: Data32,
+    minAccumlateGas: Gas,
+    config: ProtocolConfigRef,
+) -> ServiceAccountDetails {
+    var account = ServiceAccount.dummy(config: config).toDetails()
+    account.codeHash = codeHash
+    account.minAccumlateGas = minAccumlateGas
+    return account
+}
+
+private func runtimeData32(_ byte: UInt8) -> Data32 {
+    Data32(Data(repeating: byte, count: 32))!
+}
+
+private func runtimeData64(_ byte: UInt8) -> Data64 {
+    Data64(Data(repeating: byte, count: 64))!
 }

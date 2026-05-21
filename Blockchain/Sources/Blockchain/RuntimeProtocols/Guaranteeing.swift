@@ -1,6 +1,11 @@
 import Codec
 import Utils
 
+private struct AncestryLookupKey: Hashable {
+    let timeslot: TimeslotIndex
+    let headerHash: Data32
+}
+
 public enum GuaranteeingError: Error {
     case invalidGuaranteeSignature
     case invalidGuaranteeCore
@@ -81,15 +86,50 @@ extension Guaranteeing {
     }
 
     public func requiredStorageKeys(extrinsic: ExtrinsicGuarantees) -> [any StateKey] {
-        extrinsic.guarantees
-            .flatMap(\.workReport.digests)
-            .map { StateKeys.ServiceAccountKey(index: $0.serviceIndex) }
+        var serviceIndices: [ServiceIndex] = []
+        serviceIndices.reserveCapacity(extrinsic.guarantees.reduce(0) { $0 + $1.workReport.digests.count })
+
+        for guarantee in extrinsic.guarantees {
+            for digest in guarantee.workReport.digests where !serviceIndices.contains(digest.serviceIndex) {
+                serviceIndices.append(digest.serviceIndex)
+            }
+        }
+
+        var keys: [any StateKey] = []
+        keys.reserveCapacity(serviceIndices.count)
+        for serviceIndex in serviceIndices {
+            keys.append(StateKeys.ServiceAccountKey(index: serviceIndex))
+        }
+        return keys
+    }
+
+    private func pipelinedWorkReportHashes(recentWorkPackageHashes: Set<Data32>) -> Set<Data32> {
+        var hashes = recentWorkPackageHashes
+
+        for history in accumulationHistory {
+            hashes.formUnion(history.array)
+        }
+        for queue in accumulationQueue {
+            for item in queue {
+                hashes.formUnion(item.workReport.refinementContext.prerequisiteWorkPackages)
+            }
+        }
+        for report in reports {
+            if let report {
+                hashes.formUnion(report.workReport.refinementContext.prerequisiteWorkPackages)
+            }
+        }
+
+        return hashes
     }
 
     public func validateGuarantees(
         config: ProtocolConfigRef,
         extrinsic: ExtrinsicGuarantees,
     ) async throws(GuaranteeingError) {
+        var firstCachedAccount: (ServiceIndex, ServiceAccountDetails)?
+        var additionalCachedAccounts: [(ServiceIndex, ServiceAccountDetails)] = []
+
         for guarantee in extrinsic.guarantees {
             var totalGasUsage = Gas(0)
             let report = guarantee.workReport
@@ -99,8 +139,21 @@ extension Guaranteeing {
             }
 
             for digest in report.digests {
-                guard let acc = try? await serviceAccount(index: digest.serviceIndex) else {
-                    throw .invalidServiceIndex
+                let acc: ServiceAccountDetails
+                if let cached = firstCachedAccount, cached.0 == digest.serviceIndex {
+                    acc = cached.1
+                } else if let cached = additionalCachedAccounts.first(where: { $0.0 == digest.serviceIndex })?.1 {
+                    acc = cached
+                } else {
+                    guard let fetched = try? await serviceAccount(index: digest.serviceIndex) else {
+                        throw .invalidServiceIndex
+                    }
+                    if firstCachedAccount == nil {
+                        firstCachedAccount = (digest.serviceIndex, fetched)
+                    } else {
+                        additionalCachedAccounts.append((digest.serviceIndex, fetched))
+                    }
+                    acc = fetched
                 }
 
                 guard acc.codeHash == digest.codeHash else {
@@ -154,6 +207,18 @@ extension Guaranteeing {
         var oldLookups = [Data32: Data32]()
 
         var reporters = Set<Ed25519PublicKey>()
+        var recentHistoryByHeaderHash = [Data32: RecentHistory.HistoryItem]()
+
+        for item in recentHistory.items {
+            oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
+            if recentHistoryByHeaderHash[item.headerHash] == nil {
+                recentHistoryByHeaderHash[item.headerHash] = item
+            }
+        }
+
+        let ancestryLookup = ancestry.map {
+            Set($0.array.map { AncestryLookupKey(timeslot: $0.timeslot, headerHash: $0.headerHash) })
+        }
 
         for guarantee in extrinsic.guarantees {
             let report = guarantee.workReport
@@ -171,14 +236,16 @@ extension Guaranteeing {
             }
 
             oldLookups[report.packageSpecification.workPackageHash] = report.packageSpecification.segmentRoot
+            workPackageHashes.insert(report.packageSpecification.workPackageHash)
+
+            let isCurrent = (guarantee.timeslot / coreAssignmentRotationPeriod) == (timeslot / coreAssignmentRotationPeriod)
+            let keys = isCurrent ? currentCoreKeys : previousCoreKeys
+            let coreAssignment = isCurrent ? currentCoreAssignment : previousCoreAssignment
+            let reportHash = report.hash()
+            let payload = SigningContext.guarantee + reportHash.data
 
             for credential in guarantee.credential {
-                let isCurrent = (guarantee.timeslot / coreAssignmentRotationPeriod) == (timeslot / coreAssignmentRotationPeriod)
-                let keys = isCurrent ? currentCoreKeys : previousCoreKeys
                 let key = keys[Int(credential.index)]
-                let reportHash = report.hash()
-                workPackageHashes.insert(report.packageSpecification.workPackageHash)
-                let payload = SigningContext.guarantee + reportHash.data
                 let pubkey = try Result(catching: { try Ed25519.PublicKey(from: key) })
                     .mapError { _ in GuaranteeingError.invalidPublicKey }
                     .get()
@@ -186,7 +253,6 @@ extension Guaranteeing {
                     throw .invalidGuaranteeSignature
                 }
 
-                let coreAssignment = isCurrent ? currentCoreAssignment : previousCoreAssignment
                 // Verify credential's core index matches report's core index
                 // Note: This validation ensures the credential is for the correct core.
                 // Future consideration: Should this accept the last core index for edge cases?
@@ -211,24 +277,15 @@ extension Guaranteeing {
         }
 
         let recentWorkPackageHashes: Set<Data32> = Set(recentHistory.items.flatMap(\.lookup.keys))
-        let accumulateHistoryReports = Set(accumulationHistory.array.flatMap(\.array))
-        let accumulateQueueReports = Set(accumulationQueue.array.flatMap(\.self)
-            .flatMap(\.workReport.refinementContext.prerequisiteWorkPackages))
-        let pendingWorkReportHashes = Set(reports.array.flatMap { $0?.workReport.refinementContext.prerequisiteWorkPackages ?? [] })
-        let pipelinedWorkReportHashes = recentWorkPackageHashes.union(accumulateHistoryReports).union(accumulateQueueReports)
-            .union(pendingWorkReportHashes)
+        let pipelinedWorkReportHashes = pipelinedWorkReportHashes(recentWorkPackageHashes: recentWorkPackageHashes)
         guard pipelinedWorkReportHashes.isDisjoint(with: workPackageHashes) else {
             throw .duplicatedWorkPackage
-        }
-
-        for item in recentHistory.items {
-            oldLookups.merge(item.lookup, uniquingKeysWith: { _, new in new })
         }
 
         for guarantee in extrinsic.guarantees {
             let report = guarantee.workReport
             let context = report.refinementContext
-            let history = recentHistory.items.first { $0.headerHash == context.anchor.headerHash }
+            let history = recentHistoryByHeaderHash[context.anchor.headerHash]
             guard let history else {
                 throw .invalidContext
             }
@@ -242,13 +299,11 @@ extension Guaranteeing {
                 throw .invalidContext
             }
 
-            if let ancestry {
+            if let ancestryLookup {
                 let lookupTimeslot = UInt32(context.lookupAnchor.timeslot)
                 let lookupHeaderHash = context.lookupAnchor.headerHash
 
-                guard ancestry.array.contains(where: { item in
-                    item.timeslot == lookupTimeslot && item.headerHash == lookupHeaderHash
-                }) else {
+                guard ancestryLookup.contains(AncestryLookupKey(timeslot: lookupTimeslot, headerHash: lookupHeaderHash)) else {
                     throw .invalidContext
                 }
             }

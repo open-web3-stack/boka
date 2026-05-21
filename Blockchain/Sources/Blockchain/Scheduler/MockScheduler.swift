@@ -36,6 +36,7 @@ private final class SchedulerTask: Sendable, Comparable {
 
 private struct Storage: Sendable {
     fileprivate var tasks: SortedArray<SchedulerTask> = .init([])
+    fileprivate var cancelledTasks: Set<UniqueId> = []
 }
 
 public final class MockScheduler: Scheduler, Sendable {
@@ -69,6 +70,9 @@ public final class MockScheduler: Scheduler, Sendable {
         }
         return Cancellable {
             self.storage.write { storage in
+                guard storage.cancelledTasks.insert(id).inserted else {
+                    return
+                }
                 if let index = storage.tasks.array.firstIndex(where: { $0.id == id }) {
                     let task = storage.tasks.remove(at: index)
                     task.cancel?()
@@ -96,6 +100,21 @@ public final class MockScheduler: Scheduler, Sendable {
             mockTimeProvider.advance(to: task.scheduleTime)
             logger.debug("executing task \(task.id) at time \(task.scheduleTime)")
             await task.task()
+
+            if let repeatInterval = task.repeats, repeatInterval > 0 {
+                storage.write { storage in
+                    guard !storage.cancelledTasks.contains(task.id) else {
+                        return
+                    }
+                    storage.tasks.insert(SchedulerTask(
+                        id: task.id,
+                        scheduleTime: task.scheduleTime + repeatInterval,
+                        repeats: repeatInterval,
+                        task: task.task,
+                        cancel: task.cancel,
+                    ))
+                }
+            }
 
             return true
         }

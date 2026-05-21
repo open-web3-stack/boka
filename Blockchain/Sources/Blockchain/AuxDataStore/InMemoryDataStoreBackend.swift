@@ -42,7 +42,13 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
     }
 
     public func delete(erasureRoot: Data32) async throws {
-        erasureRootBySegmentRoot.removeValue(forKey: erasureRoot)
+        erasureRootBySegmentRoot = erasureRootBySegmentRoot.filter { $0.value != erasureRoot }
+        d3lErasureRootBySegmentsRoot = d3lErasureRootBySegmentsRoot.filter { $0.value != erasureRoot }
+        chunks.removeValue(forKey: erasureRoot)
+        timestamps.removeValue(forKey: erasureRoot)
+        pagedProofsMetadata.removeValue(forKey: erasureRoot)
+        auditEntries.removeValue(forKey: erasureRoot)
+        d3lEntries.removeValue(forKey: erasureRoot)
     }
 
     public func getD3LErasureRoot(forSegmentsRoot: Data32) async throws -> Data32? {
@@ -62,7 +68,7 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
     }
 
     public func delete(segmentRoot: Data32) async throws {
-        segmentRootByWorkPackageHash.removeValue(forKey: segmentRoot)
+        segmentRootByWorkPackageHash = segmentRootByWorkPackageHash.filter { $0.value != segmentRoot }
     }
 
     public func get(erasureRoot: Data32, index: UInt16) async throws -> Data? {
