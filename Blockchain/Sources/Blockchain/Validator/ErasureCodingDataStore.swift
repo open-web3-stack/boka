@@ -88,6 +88,7 @@ public actor ErasureCodingDataStore {
         )
         reconstructionService = ReconstructionService(
             dataStore: dataStore,
+            filesystemStore: filesystemStore,
             erasureCoding: erasureCoding,
         )
         auditBundleStore = AuditBundleStore(

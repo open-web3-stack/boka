@@ -78,14 +78,17 @@ public actor PagedProofsGenerator {
         // Per GP spec: depth 6 for 64 segments per page
         let merkleDepth: UInt8 = 6
 
-        // For each segment in the page, generate its Merkle justification path
+        // For each segment in the page, generate its Merkle justification path.
+        // The proof format stores fixed-size hashes, so trace the page's leaf
+        // hashes rather than raw 4,104-byte segment data.
+        let pageHashes = pageSegments.map { $0.data.blake2b256hash() }
         var justificationPaths: [[Data32]] = []
         for localIndex in pageSegments.indices {
             _ = pageIndex * 64 + localIndex
 
             // Generate Merkle proof path from segment to root
             let path = Merklization.trace(
-                pageSegments.map(\.data),
+                pageHashes.map(\.data),
                 index: localIndex,
                 hasher: Blake2b256.self,
             )
@@ -110,7 +113,6 @@ public actor PagedProofsGenerator {
 
         // Calculate the Merkle subtree page for this page
         // This is a Merkle tree of the 64 segments in the page
-        let pageHashes = pageSegments.map { $0.data.blake2b256hash() }
         let subtreeRoot = Merklization.binaryMerklize(pageHashes.map(\.data))
 
         // Encode page metadata:

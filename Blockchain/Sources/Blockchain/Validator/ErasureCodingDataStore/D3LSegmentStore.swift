@@ -126,8 +126,11 @@ public actor D3LSegmentStore {
 
         logger.debug("Retrieving \(indices.count) segments from erasureRoot=\(erasureRoot.toHexString())")
 
-        // Try to get available shard indices
-        let availableShardIndices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
+        // D3L shards are normally stored in the filesystem, while network-fetched
+        // shards may be persisted through the metadata store. Combine both.
+        let dataStoreShardIndices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
+        let filesystemShardIndices = try await filesystemStore.getAvailableShardIndices(erasureRoot: erasureRoot)
+        let availableShardIndices = Set(dataStoreShardIndices + filesystemShardIndices).sorted()
 
         // Check if we can reconstruct
         guard availableShardIndices.count >= cEcOriginalCount else {
@@ -137,11 +140,29 @@ public actor D3LSegmentStore {
             )
         }
 
-        // Get shards for reconstruction
-        let shardTuples = try await dataStore.getShards(
+        // Get shards for reconstruction from both stores.
+        let selectedShardIndices = Array(availableShardIndices.prefix(cEcOriginalCount))
+        let dataStoreShards = try await dataStore.getShards(
             erasureRoot: erasureRoot,
-            shardIndices: Array(availableShardIndices.prefix(cEcOriginalCount)),
+            shardIndices: selectedShardIndices,
         )
+        let dataStoreShardMap = Dictionary(uniqueKeysWithValues: dataStoreShards.map { ($0.index, $0.data) })
+
+        var shardTuples: [(index: UInt16, data: Data)] = []
+        shardTuples.reserveCapacity(selectedShardIndices.count)
+        for shardIndex in selectedShardIndices {
+            if let shardData = dataStoreShardMap[shardIndex] {
+                shardTuples.append((index: shardIndex, data: shardData))
+            } else if let shardData = try await filesystemStore.getD3LShard(erasureRoot: erasureRoot, shardIndex: shardIndex) {
+                shardTuples.append((index: shardIndex, data: shardData))
+            }
+        }
+        guard shardTuples.count >= cEcOriginalCount else {
+            throw ErasureCodingStoreError.insufficientShards(
+                available: shardTuples.count,
+                required: cEcOriginalCount,
+            )
+        }
 
         // Get segment count from metadata
         guard let d3lEntry = try await dataStore.getD3LEntry(erasureRoot: erasureRoot) else {
@@ -160,7 +181,7 @@ public actor D3LSegmentStore {
         // Split into individual segments
         var result: [Data4104] = []
         for index in indices {
-            guard index < segmentCount else {
+            guard index >= 0 && index < segmentCount else {
                 continue
             }
 

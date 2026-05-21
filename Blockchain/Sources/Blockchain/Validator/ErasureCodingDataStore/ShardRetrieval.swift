@@ -80,7 +80,8 @@ public actor ShardRetrieval {
     /// - Parameter erasureRoot: Erasure root identifying the data
     /// - Returns: Number of locally available shards
     public func getLocalShardCount(erasureRoot: Data32) async throws -> Int {
-        try await dataStore.getShardCount(erasureRoot: erasureRoot)
+        let indices = try await getLocalShardIndices(erasureRoot: erasureRoot)
+        return indices.count
     }
 
     /// Get indices of locally available shards
@@ -103,15 +104,7 @@ public actor ShardRetrieval {
     ///   - indices: Shard indices to retrieve
     /// - Returns: Array of shard data tuples
     public func getLocalShards(erasureRoot: Data32, indices: [UInt16]) async throws -> [(index: UInt16, data: Data)] {
-        var shards: [(index: UInt16, data: Data)] = []
-
-        for index in indices {
-            if let shardData = try await dataStore.getShard(erasureRoot: erasureRoot, shardIndex: index) {
-                shards.append((index: index, data: shardData))
-            }
-        }
-
-        return shards
+        try await getShards(erasureRoot: erasureRoot, shardIndices: indices)
     }
 
     // MARK: - Metadata Operations
