@@ -787,6 +787,7 @@ public enum ErasureCodingStoreError: Error {
     case tooManySegments(count: Int, max: Int)
     case insufficientShards(available: Int, required: Int)
     case metadataNotFound(erasureRoot: Data32)
+    case missingOriginalLength(erasureRoot: Data32)
     case reconstructionFailed(underlying: Error)
     case segmentNotFound
     case segmentsRootMismatch(calculated: Data32, expected: Data32)

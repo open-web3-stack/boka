@@ -83,6 +83,11 @@ public actor BatchOperations {
 
                 activeTasks += 1
                 group.addTask {
+                    guard let originalLength = originalLengths[erasureRoot] else {
+                        logger.warning("Missing original length for erasureRoot=\(erasureRoot.toHexString())")
+                        throw ErasureCodingStoreError.missingOriginalLength(erasureRoot: erasureRoot)
+                    }
+
                     // Check local availability first
                     let canReconstructLocally = try await self.reconstructionService.canReconstructLocally(erasureRoot: erasureRoot)
 
@@ -91,7 +96,7 @@ public actor BatchOperations {
                         do {
                             let data = try await self.reconstructionService.reconstructFromLocalShards(
                                 erasureRoot: erasureRoot,
-                                originalLength: originalLengths[erasureRoot] ?? 0,
+                                originalLength: originalLength,
                             )
                             return (erasureRoot, data)
                         } catch {
@@ -109,6 +114,7 @@ public actor BatchOperations {
                             logger.info("Attempting network fallback for erasureRoot=\(erasureRoot.toHexString())")
 
                             let missingShards = try await self.reconstructionService.getMissingShardIndices(erasureRoot: erasureRoot)
+                            let localShardCount = try await self.shardRetrieval.getLocalShardCount(erasureRoot: erasureRoot)
 
                             // Fetch missing shards from network
                             let fetchedShards = try await client.fetchFromValidatorsConcurrently(
@@ -117,10 +123,7 @@ public actor BatchOperations {
                                 validators: validatorAddrs,
                                 coreIndex: coreIndex,
                                 totalValidators: totalValidators,
-                                requiredShards: max(
-                                    0,
-                                    cEcOriginalCount - (self.shardRetrieval.getLocalShardCount(erasureRoot: erasureRoot)),
-                                ),
+                                requiredShards: max(0, cEcOriginalCount - localShardCount),
                             )
 
                             // Store fetched shards locally
@@ -144,7 +147,7 @@ public actor BatchOperations {
                             // Now reconstruct with combined local + fetched shards
                             let data = try await self.reconstructionService.reconstructFromLocalShards(
                                 erasureRoot: erasureRoot,
-                                originalLength: originalLengths[erasureRoot] ?? 0,
+                                originalLength: originalLength,
                             )
 
                             logger.info("Successfully reconstructed erasureRoot=\(erasureRoot.toHexString()) with network fallback")
