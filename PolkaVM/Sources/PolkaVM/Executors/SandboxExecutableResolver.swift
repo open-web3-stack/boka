@@ -79,14 +79,15 @@ enum SandboxExecutableResolver {
         let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         roots.append(contentsOf: urlsWithAncestors(start: cwd, levels: 3))
 
-        let testExecutablePath = CommandLine.arguments.first ?? ""
-        if !testExecutablePath.isEmpty {
-            let testExecutableDirectory = URL(fileURLWithPath: testExecutablePath).standardizedFileURL.deletingLastPathComponent()
-            roots.append(contentsOf: urlsWithAncestors(start: testExecutableDirectory, levels: 4))
+        for argument in CommandLine.arguments where argument.contains("/") {
+            let argumentURL = URL(fileURLWithPath: argument).standardizedFileURL
+            let argumentDirectory = directoryRoot(for: argumentURL)
+            roots.append(contentsOf: urlsWithAncestors(start: argumentDirectory, levels: 4))
         }
 
         let packageRoot = packageRootFromSource()
         roots.append(contentsOf: urlsWithAncestors(start: packageRoot, levels: 2))
+        roots.append(contentsOf: swiftPMBuildRoots(packageRoot: packageRoot))
 
         var expanded: [URL] = []
         for root in uniqueURLs(roots) {
@@ -95,6 +96,23 @@ enum SandboxExecutableResolver {
         }
 
         return uniqueURLs(expanded)
+    }
+
+    private static func directoryRoot(for url: URL) -> URL {
+        var isDirectory = ObjCBool(false)
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue {
+            return url
+        }
+
+        return url.deletingLastPathComponent()
+    }
+
+    private static func swiftPMBuildRoots(packageRoot: URL) -> [URL] {
+        let buildRoot = packageRoot.appendingPathComponent(".build", isDirectory: true)
+        return [
+            buildRoot.appendingPathComponent("debug", isDirectory: true),
+            buildRoot.appendingPathComponent("release", isDirectory: true),
+        ]
     }
 
     private static func urlsWithAncestors(start: URL, levels: Int) -> [URL] {
