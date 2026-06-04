@@ -13,10 +13,6 @@ let package = Package(
             name: "PolkaVM",
             targets: ["PolkaVM"],
         ),
-        .executable(
-            name: "boka-sandbox",
-            targets: ["Sandbox"],
-        ),
     ],
     dependencies: [
         .package(path: "../Utils"),
@@ -37,30 +33,6 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx),
-            ],
-        ),
-        .target(
-            name: "MacOSSandboxSupport",
-            path: "Sources/MacOSSandboxSupport",
-            publicHeadersPath: "include",
-        ),
-        .executableTarget(
-            name: "Sandbox",
-            dependencies: [
-                "PolkaVM",
-                "Utils",
-                "TracingUtils",
-                "MacOSSandboxSupport",
-                .product(name: "Logging", package: "swift-log"),
-            ],
-            sources: ["main.swift"],
-            swiftSettings: [
-                .interoperabilityMode(.Cxx),
-            ],
-            linkerSettings: [
-                // Rust staticlibs can export duplicate runtime symbols (e.g. rust_eh_personality)
-                // across archives; GNU ld rejects these by default.
-                .unsafeFlags(["-Xlinker", "--allow-multiple-definition"], .when(platforms: [.linux])),
             ],
         ),
         .testTarget(

@@ -2,22 +2,12 @@ import Foundation
 import Utils
 
 public final class Executor: @unchecked Sendable {
-    let mode: ExecutionMode
     let config: PvmConfig
-    let sandboxPath: String
+    let backend: ExecutorBackendJIT
 
-    var frontend: ExecutorFrontend
-
-    public init(mode: ExecutionMode, config: PvmConfig) {
-        self.mode = mode
+    public init(config: PvmConfig) {
         self.config = config
-        sandboxPath = SandboxExecutableResolver.resolve().path
-
-        if mode.contains(.sandboxed) {
-            frontend = ExecutorFrontendSandboxed(mode: mode)
-        } else {
-            frontend = ExecutorFrontendInProcess(mode: mode)
-        }
+        backend = ExecutorBackendJIT()
     }
 
     public func execute(
@@ -27,7 +17,7 @@ public final class Executor: @unchecked Sendable {
         argumentData: Data?,
         ctx: (any InvocationContext)?,
     ) async -> VMExecutionResult {
-        await frontend.execute(
+        await backend.execute(
             config: config,
             blob: blob,
             pc: pc,
@@ -35,20 +25,5 @@ public final class Executor: @unchecked Sendable {
             argumentData: argumentData,
             ctx: ctx,
         )
-    }
-
-    /// Shutdown the executor and clean up resources
-    /// For pooled executors, this terminates all worker processes
-    public func shutdown() async {
-        // If using pooled sandbox frontend, shut down the pool
-        if let pooledFrontend = frontend as? ExecutorFrontendSandboxedWithPool {
-            await pooledFrontend.shutdown()
-        }
-    }
-
-    deinit {
-        // Note: Can't call async shutdown() from deinit
-        // Resources will be cleaned up via deinits of child actors
-        // Tests should explicitly call shutdown() for clean cleanup
     }
 }

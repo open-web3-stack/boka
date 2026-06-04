@@ -3,8 +3,8 @@ import Foundation
 import PolkaVM
 import Utils
 
-/// Benchmarks for JIT and Sandbox performance comparisons
-func jITSandboxPerformanceBenchmarks() {
+/// Benchmarks for JIT performance comparisons
+func jitPerformanceBenchmarks() {
     Benchmark.defaultConfiguration.timeUnits = BenchmarkTimeUnits.microseconds
 
     let config = DefaultPvmConfig()
@@ -63,40 +63,6 @@ func jITSandboxPerformanceBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("jitperf.mode.sandbox", configuration: BokaBenchmark.milliseconds) { benchmark in
-        benchmark.startMeasurement()
-        for _ in 0 ..< modeIterations {
-            let (exitReason, _, _) = await invokePVM(
-                config: config,
-                executionMode: .sandboxed,
-                blob: sumToNProgram,
-                pc: 0,
-                gas: Gas(1_000_000),
-                argumentData: Data([25]),
-                ctx: nil,
-            )
-            blackHole(exitReason)
-        }
-        benchmark.stopMeasurement()
-    }
-
-    Benchmark("jitperf.mode.jitSandbox", configuration: BokaBenchmark.milliseconds) { benchmark in
-        benchmark.startMeasurement()
-        for _ in 0 ..< modeIterations {
-            let (exitReason, _, _) = await invokePVM(
-                config: config,
-                executionMode: [.jit, .sandboxed],
-                blob: sumToNProgram,
-                pc: 0,
-                gas: Gas(1_000_000),
-                argumentData: Data([25]),
-                ctx: nil,
-            )
-            blackHole(exitReason)
-        }
-        benchmark.stopMeasurement()
-    }
-
     // MARK: - Stress Test (Massive Iterations)
 
     Benchmark("jitperf.stress.jit", configuration: BokaBenchmark.milliseconds) { benchmark in
@@ -116,23 +82,6 @@ func jITSandboxPerformanceBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("jitperf.stress.jitSandbox", configuration: BokaBenchmark.milliseconds) { benchmark in
-        benchmark.startMeasurement()
-        for _ in 0 ..< stressIterations {
-            let (exitReason, _, _) = await invokePVM(
-                config: config,
-                executionMode: [.jit, .sandboxed],
-                blob: sumToNProgram,
-                pc: 0,
-                gas: Gas(1_000_000),
-                argumentData: Data([30]),
-                ctx: nil,
-            )
-            blackHole(exitReason)
-        }
-        benchmark.stopMeasurement()
-    }
-
     // MARK: - Minimal Program Comparisons
 
     Benchmark("jitperf.minimal.jit") { benchmark in
@@ -141,23 +90,6 @@ func jITSandboxPerformanceBenchmarks() {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
                 executionMode: .jit,
-                blob: haltProgram,
-                pc: 0,
-                gas: Gas(1_000_000),
-                argumentData: nil,
-                ctx: nil,
-            )
-            blackHole(exitReason)
-        }
-        benchmark.stopMeasurement()
-    }
-
-    Benchmark("jitperf.minimal.jitSandbox") { benchmark in
-        benchmark.startMeasurement()
-        for _ in 0 ..< minimalIterations {
-            let (exitReason, _, _) = await invokePVM(
-                config: config,
-                executionMode: [.jit, .sandboxed],
                 blob: haltProgram,
                 pc: 0,
                 gas: Gas(1_000_000),

@@ -34,8 +34,7 @@ let benchmarks: @Sendable () -> Void = {
     rocksdbProfilingBenchmarks()
     polkaVMBenchmarks()
     polkaVMExecutionModeBenchmarks()
-    jITSandboxPerformanceBenchmarks()
-    sandboxPoolBenchmarks()
+    jitPerformanceBenchmarks()
     validatorBenchmarks()
     testVectorsBenchmarks()
 }

@@ -198,8 +198,8 @@ final class VMStateJIT: VMState, @unchecked Sendable {
 
     func sbrk(_: UInt32) throws -> UInt32 {
         // In JIT mode, memory allocation would need to be handled by the JIT runtime
-        // This would require coordination with the memory sandbox mechanism
-        // TODO: Implement proper memory allocation that works with JIT sandbox
+        // This requires coordination with JIT memory bounds and emitted access checks.
+        // TODO: Implement proper memory allocation for JIT execution.
         logger.error("sbrk not implemented in JIT mode")
         throw VMError.invalidInstructionMemoryAccess
     }

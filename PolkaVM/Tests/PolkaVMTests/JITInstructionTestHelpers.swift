@@ -8,47 +8,12 @@ import Foundation
 import Testing
 import TracingUtils
 import Utils
-#if canImport(Glibc)
-    import Glibc
-#elseif canImport(Darwin)
-    import Darwin
-#endif
 
 typealias CppHelperInstructions = CppHelper.Instructions
 
 // MARK: - Logger
 
 private let logger = Logger(label: "JITInstructionTestHelpers")
-
-private func sandboxExecutableSiblingToTestBinary() -> String? {
-    guard let testExecutablePath = CommandLine.arguments.first, !testExecutablePath.isEmpty else {
-        return nil
-    }
-
-    let siblingSandboxPath = URL(fileURLWithPath: testExecutablePath)
-        .deletingLastPathComponent()
-        .appendingPathComponent("boka-sandbox")
-        .path
-    return FileManager.default.isExecutableFile(atPath: siblingSandboxPath) ? siblingSandboxPath : nil
-}
-
-private func ensureSandboxPathConfigured() {
-    let key = "BOKA_SANDBOX_PATH"
-    if let path = ProcessInfo.processInfo.environment[key], !path.isEmpty {
-        return
-    }
-
-    if let siblingSandboxPath = sandboxExecutableSiblingToTestBinary() {
-        _ = setenv(key, siblingSandboxPath, 1)
-        return
-    }
-
-    let resolution = SandboxExecutableResolver.resolve()
-    guard SandboxExecutableResolver.isExecutableAvailable(at: resolution.path) else {
-        return
-    }
-    _ = setenv(key, resolution.path, 1)
-}
 
 // MARK: - JIT Test Result
 
@@ -578,7 +543,7 @@ enum JITInstructionExecutor {
         // CRITICAL: We don't use invokePVM here because it doesn't return register state
         // Instead we call Executor.execute() directly which returns VMExecutionResult with registers
         let executionMode: ExecutionMode = .jit
-        let executor = Executor(mode: executionMode, config: config)
+        let executor = Executor(config: config)
         let result = await executor.execute(
             blob: blob,
             pc: pc,
@@ -647,11 +612,11 @@ enum JITInstructionExecutor {
     }
 }
 
-// MARK: - Sandboxed JIT vs Interpreter Comparison
+// MARK: - JIT vs Interpreter Comparison
 
-/// Helper to compare interpreter vs sandboxed JIT execution
+/// Helper to compare interpreter vs JIT execution
 enum JITParityComparator {
-    /// Compare interpreter vs sandboxed JIT execution for a program.
+    /// Compare interpreter vs JIT execution for a program.
     ///
     /// - Parameters:
     ///   - blob: Program blob to execute
@@ -659,7 +624,7 @@ enum JITParityComparator {
     ///   - gas: Initial gas limit
     ///   - argumentData: Optional argument data
     ///   - gasTolerance: Optional symmetric tolerance for gas-used delta
-    /// - Returns: Tuple of (interpreterResult, sandboxedJitResult, differences)
+    /// - Returns: Tuple of (interpreterResult, jitResult, differences)
     static func compare(
         blob: Data,
         testName: String,
@@ -668,7 +633,6 @@ enum JITParityComparator {
         gasTolerance: Gas? = nil,
     ) async -> (interpreterResult: JITTestResult, jitResult: JITTestResult, differences: String?) {
         let config = DefaultPvmConfig()
-        ensureSandboxPathConfigured()
 
         // Execute in interpreter mode
         let (exitReasonInterpreter, gasUsedInterpreter, outputInterpreter) = await invokePVM(
@@ -681,11 +645,11 @@ enum JITParityComparator {
             ctx: nil,
         )
 
-        // Execute in sandboxed JIT mode.
+        // Execute in JIT mode.
         // invokePVM is used for both sides so we compare the externally observable behavior.
-        let (exitReasonSandboxedJIT, gasUsedSandboxedJIT, outputSandboxedJIT) = await invokePVM(
+        let (exitReasonJIT, gasUsedJIT, outputJIT) = await invokePVM(
             config: config,
-            executionMode: [.jit, .sandboxed],
+            executionMode: .jit,
             blob: blob,
             pc: 0,
             gas: gas,
@@ -693,8 +657,8 @@ enum JITParityComparator {
             ctx: nil,
         )
 
-        // Sandboxed execution does not expose internal registers/PC through IPC responses,
-        // so parity checks focus on externally visible behavior (exit reason/output/gas).
+        // The invokePVM path does not expose final registers/PC for executor-backed modes,
+        // so parity checks focus on externally visible behavior.
         let interpreterRegisters = Registers()
         let interpreterPC: UInt32 = 0
 
@@ -708,35 +672,35 @@ enum JITParityComparator {
         )
 
         let jitResult = JITTestResult(
-            exitReason: exitReasonSandboxedJIT,
-            finalGas: gas - gasUsedSandboxedJIT,
-            outputData: outputSandboxedJIT,
+            exitReason: exitReasonJIT,
+            finalGas: gas - gasUsedJIT,
+            outputData: outputJIT,
             finalRegisters: Registers(),
             finalPC: 0,
-            executionMode: [.jit, .sandboxed],
+            executionMode: .jit,
         )
 
         // Compare results
         var differences: [String] = []
 
-        if exitReasonInterpreter != exitReasonSandboxedJIT {
+        if exitReasonInterpreter != exitReasonJIT {
             differences.append(
-                "(\(testName)) Exit reason: interpreter=\(exitReasonInterpreter), sandboxed+jit=\(exitReasonSandboxedJIT)",
+                "(\(testName)) Exit reason: interpreter=\(exitReasonInterpreter), jit=\(exitReasonJIT)",
             )
         }
 
         if let gasTolerance {
-            let gasDiff = abs(Int64(gasUsedInterpreter.value) - Int64(gasUsedSandboxedJIT.value))
+            let gasDiff = abs(Int64(gasUsedInterpreter.value) - Int64(gasUsedJIT.value))
             if gasDiff > Int64(gasTolerance.value) {
                 differences.append(
-                    "(\(testName)) Gas used: interpreter=\(gasUsedInterpreter), sandboxed+jit=\(gasUsedSandboxedJIT) (diff=\(gasDiff), tolerance=\(gasTolerance.value))",
+                    "(\(testName)) Gas used: interpreter=\(gasUsedInterpreter), jit=\(gasUsedJIT) (diff=\(gasDiff), tolerance=\(gasTolerance.value))",
                 )
             }
         }
 
-        if outputInterpreter != outputSandboxedJIT {
+        if outputInterpreter != outputJIT {
             differences.append(
-                "(\(testName)) Output: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), sandboxed+jit=\(outputSandboxedJIT?.toHexString() ?? "nil")",
+                "(\(testName)) Output: interpreter=\(outputInterpreter?.toHexString() ?? "nil"), jit=\(outputJIT?.toHexString() ?? "nil")",
             )
         }
 

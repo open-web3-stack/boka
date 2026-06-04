@@ -118,7 +118,7 @@ struct JITControlFlowTests {
     @Test
     func jitJumpParity() async {
         // Jump forward directly to a trap so both engines exercise Jump semantics
-        // without relying on a long-running self-loop in the sandboxed path.
+        // without relying on a long-running self-loop in the JIT path.
         let jumpOffset = Int32(5)
         let jumpInst: [UInt8] = [
             0x28, // Jump opcode

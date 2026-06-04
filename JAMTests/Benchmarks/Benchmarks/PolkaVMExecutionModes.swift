@@ -3,11 +3,11 @@ import Foundation
 import PolkaVM
 import Utils
 
-/// Benchmarks comparing PolkaVM execution modes: Interpreter vs Sandbox
+/// Benchmarks comparing PolkaVM execution modes: Interpreter vs JIT
 ///
 /// These benchmarks measure the performance difference between:
 /// - Interpreter mode: Direct execution using VMStateInterpreter + Engine
-/// - Sandbox mode: Execution in child process with isolation
+/// - JIT mode: In-process compiled execution through the executor backend
 func polkaVMExecutionModeBenchmarks() {
     Benchmark.defaultConfiguration.timeUnits = BenchmarkTimeUnits.microseconds
 
@@ -85,13 +85,13 @@ func polkaVMExecutionModeBenchmarks() {
         blackHole(exitReason)
     }
 
-    // MARK: - Sandbox Mode Benchmarks
+    // MARK: - JIT Mode Benchmarks
 
-    Benchmark("vm.mode.sandbox.empty") { benchmark in
+    Benchmark("vm.mode.jit.empty") { benchmark in
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(
             config: config,
-            executionMode: .sandboxed, // Sandbox mode
+            executionMode: .jit, // JIT mode
             blob: emptyProgram,
             pc: 0,
             gas: Gas(1_000_000),
@@ -102,11 +102,11 @@ func polkaVMExecutionModeBenchmarks() {
         blackHole(exitReason)
     }
 
-    Benchmark("vm.mode.sandbox.fibonacci") { benchmark in
+    Benchmark("vm.mode.jit.fibonacci") { benchmark in
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(
             config: config,
-            executionMode: .sandboxed, // Sandbox mode
+            executionMode: .jit, // JIT mode
             blob: fibonacciProgram,
             pc: 0,
             gas: Gas(1_000_000),
@@ -117,11 +117,11 @@ func polkaVMExecutionModeBenchmarks() {
         blackHole(exitReason)
     }
 
-    Benchmark("vm.mode.sandbox.sumToN") { benchmark in
+    Benchmark("vm.mode.jit.sumToN") { benchmark in
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(
             config: config,
-            executionMode: .sandboxed, // Sandbox mode
+            executionMode: .jit, // JIT mode
             blob: sumToNProgram,
             pc: 0,
             gas: Gas(1_000_000),
@@ -151,12 +151,12 @@ func polkaVMExecutionModeBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("vm.mode.sandbox.batch100") { benchmark in
+    Benchmark("vm.mode.jit.batch100") { benchmark in
         benchmark.startMeasurement()
         for _ in 0 ..< batchIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
-                executionMode: .sandboxed, // Sandbox mode
+                executionMode: .jit, // JIT mode
                 blob: emptyProgram,
                 pc: 0,
                 gas: Gas(1_000_000),
@@ -185,11 +185,11 @@ func polkaVMExecutionModeBenchmarks() {
         blackHole(exitReason)
     }
 
-    Benchmark("vm.mode.sandbox.heavyFibonacci", configuration: BokaBenchmark.milliseconds) { benchmark in
+    Benchmark("vm.mode.jit.heavyFibonacci", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(
             config: config,
-            executionMode: .sandboxed, // Sandbox mode
+            executionMode: .jit, // JIT mode
             blob: fibonacciProgram,
             pc: 0,
             gas: Gas(10_000_000),
@@ -217,11 +217,11 @@ func polkaVMExecutionModeBenchmarks() {
         blackHole(exitReason)
     }
 
-    Benchmark("vm.mode.sandbox.memoryIntensive") { benchmark in
+    Benchmark("vm.mode.jit.memoryIntensive") { benchmark in
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(
             config: config,
-            executionMode: .sandboxed, // Sandbox mode
+            executionMode: .jit, // JIT mode
             blob: sumToNProgram,
             pc: 0,
             gas: Gas(1_000_000),
@@ -251,12 +251,12 @@ func polkaVMExecutionModeBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("vm.mode.sandbox.repeated") { benchmark in
+    Benchmark("vm.mode.jit.repeated") { benchmark in
         benchmark.startMeasurement()
         for i in 0 ..< repeatedIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
-                executionMode: .sandboxed, // Sandbox mode
+                executionMode: .jit, // JIT mode
                 blob: sumToNProgram,
                 pc: 0,
                 gas: Gas(1_000_000),
@@ -287,12 +287,12 @@ func polkaVMExecutionModeBenchmarks() {
         benchmark.stopMeasurement()
     }
 
-    Benchmark("vm.mode.sandbox.throughput", configuration: BokaBenchmark.milliseconds) { benchmark in
+    Benchmark("vm.mode.jit.throughput", configuration: BokaBenchmark.milliseconds) { benchmark in
         benchmark.startMeasurement()
         for _ in 0 ..< throughputIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
-                executionMode: .sandboxed, // Sandbox mode
+                executionMode: .jit, // JIT mode
                 blob: fibonacciProgram,
                 pc: 0,
                 gas: Gas(1_000_000),

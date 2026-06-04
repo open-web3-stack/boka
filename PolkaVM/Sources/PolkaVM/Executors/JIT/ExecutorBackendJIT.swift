@@ -328,7 +328,7 @@ private final class JITExecutionContext {
 /// Each ExecutorBackendJIT instance owns a JITCompiler with its own RuntimeContext
 /// Multiple instances can execute concurrently with no shared state and no locks
 /// C++ code is completely thread-agnostic - it receives context as parameter
-final class ExecutorBackendJIT: ExecutorBackend {
+final class ExecutorBackendJIT {
     private let logger = Logger(label: "ExecutorBackendJIT")
 
     // Each instance has its own JITCompiler with its own RuntimeContext

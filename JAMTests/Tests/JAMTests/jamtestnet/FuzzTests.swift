@@ -51,29 +51,7 @@ struct FuzzTests {
         ignore: [
         ],
     ))
-    func v072_sandbox(input: Testcase) async throws {
-        try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .sandboxed)
-    }
-
-    @Test(arguments: try loadTests(
-        version: "0.7.2",
-        filters: [
-        ],
-        ignore: [
-        ],
-    ))
     func v072_jit(input: Testcase) async throws {
         try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: .jit)
-    }
-
-    @Test(arguments: try loadTests(
-        version: "0.7.2",
-        filters: [
-        ],
-        ignore: [
-        ],
-    ))
-    func v072_jit_sandbox(input: Testcase) async throws {
-        try await TraceTest.test(input, config: TestVariants.tiny.config, executionMode: [.jit, .sandboxed])
     }
 }
