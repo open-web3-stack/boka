@@ -37,10 +37,12 @@ public class ProgramCode {
     }
 
     private var instCache: [InstRef?] = []
+    private var skipCache: [UInt8] = []
 
     private var blockGasCosts: [UInt32: Gas] = [:]
 
     private static let cachedTrapInst = CppHelper.Instructions.Trap()
+    private static let uncachedSkip = UInt8.max
     private static let logger = Logger(label: "ProgramCode")
 
     public init(_ blob: Data) throws(Error) {
@@ -111,6 +113,7 @@ public class ProgramCode {
         }
         bitmask = bitmaskData
 
+        skipCache = Array(repeating: Self.uncachedSkip, count: code.count)
         try buildMetadata()
 
         instCache = Array(repeating: nil, count: code.count)
@@ -124,6 +127,7 @@ public class ProgramCode {
 
         while i < code.count {
             let skip = ProgramCode.skip(start: i, bitmask: bitmask)
+            skipCache[Int(i)] = UInt8(skip)
 
             let opcode = code[relative: Int(i)]
             currentBlockGasCost += gasFromOpcode(opcode)
@@ -190,7 +194,14 @@ public class ProgramCode {
     }
 
     public func skip(_ pc: UInt32) -> UInt32 {
-        ProgramCode.skip(start: pc, bitmask: bitmask)
+        let pcIndex = Int(pc)
+        if pcIndex < skipCache.count {
+            let cached = skipCache[pcIndex]
+            if cached != Self.uncachedSkip {
+                return UInt32(cached)
+            }
+        }
+        return ProgramCode.skip(start: pc, bitmask: bitmask)
     }
 
     /// Extract all skip values as an array for JIT compilation

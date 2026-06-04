@@ -1,4 +1,5 @@
 import Benchmark
+import Blockchain
 import Codec
 import Foundation
 import JAMTests
@@ -98,5 +99,127 @@ func testVectorsBenchmarks() {
                 }
             }
         }
+    }
+
+    if let traces = try? JamTestnet.loadTests(path: "traces/storage", src: .w3f) {
+        let config = TestVariants.tiny.config
+        let decodedTraces = traces.compactMap { try? JamTestnet.decodeTestcase($0, config: config) }
+        let validatedTraces = decodedTraces.compactMap { testcase -> (testcase: JamTestnetTestcase, block: Validated<BlockRef>)? in
+            guard let validatedBlock = try? testcase.block.asRef().toValidated(config: config) else {
+                return nil
+            }
+            return (testcase: testcase, block: validatedBlock)
+        }
+
+        Benchmark("w3f.traces.storage.setupState") { benchmark in
+            for testcase in decodedTraces {
+                benchmark.startMeasurement()
+                let state = try? await testcase.preState.toState(config: config)
+                benchmark.stopMeasurement()
+
+                blackHole(state)
+            }
+        }
+
+        Benchmark("w3f.traces.storage.applyOnly") { benchmark in
+            let runtime = Runtime(config: config, ancestry: nil)
+            for testcase in decodedTraces {
+                let blockRef = testcase.block.asRef()
+                guard let stateRef = try? await testcase.preState.toState(config: config).asRef() else {
+                    continue
+                }
+
+                benchmark.startMeasurement()
+                let result = try? await runtime.apply(block: blockRef, state: stateRef)
+                benchmark.stopMeasurement()
+
+                if let stateRef = result {
+                    blackHole(await stateRef.value.stateRoot)
+                } else {
+                    blackHole(testcase.block.hash)
+                }
+            }
+        }
+
+        Benchmark("w3f.traces.storage.applyValidated") { benchmark in
+            let runtime = Runtime(config: config, ancestry: nil)
+            for trace in validatedTraces {
+                guard let stateRef = try? await trace.testcase.preState.toState(config: config).asRef() else {
+                    continue
+                }
+
+                benchmark.startMeasurement()
+                let result = try? await runtime.apply(block: trace.block, state: stateRef)
+                benchmark.stopMeasurement()
+
+                if let stateRef = result {
+                    blackHole(await stateRef.value.stateRoot)
+                } else {
+                    blackHole(trace.testcase.block.hash)
+                }
+            }
+        }
+
+        Benchmark("w3f.traces.storage.updateSafrole") { benchmark in
+            let runtime = Runtime(config: config, ancestry: nil)
+            for trace in validatedTraces {
+                guard var state = try? await trace.testcase.preState.toState(config: config) else {
+                    continue
+                }
+
+                benchmark.startMeasurement()
+                try? runtime.updateSafrole(block: trace.testcase.block.asRef(), state: &state)
+                benchmark.stopMeasurement()
+
+                blackHole(state.safroleState)
+            }
+        }
+
+        Benchmark("w3f.traces.storage.validateHeaderSeal") { benchmark in
+            let runtime = Runtime(config: config, ancestry: nil)
+            for trace in validatedTraces {
+                guard var state = try? await trace.testcase.preState.toState(config: config) else {
+                    continue
+                }
+                try? runtime.updateSafrole(block: trace.testcase.block.asRef(), state: &state)
+
+                benchmark.startMeasurement()
+                try? runtime.validateHeaderSeal(block: trace.testcase.block.asRef(), state: state)
+                benchmark.stopMeasurement()
+
+                blackHole(state.safroleState)
+            }
+        }
+
+        Benchmark("w3f.traces.storage.accumulate") { benchmark in
+            let runtime = Runtime(config: config, ancestry: nil)
+            for trace in validatedTraces {
+                guard var state = try? await trace.testcase.preState.toState(config: config) else {
+                    continue
+                }
+                let block = trace.testcase.block.asRef()
+                let prevTimeslot = state.timeslot
+
+                try? runtime.updateSafrole(block: block, state: &state)
+                try? runtime.validateHeaderSeal(block: block, state: state)
+                try? runtime.updateDisputes(block: block, state: &state)
+                guard let availableReports = try? await runtime.updateAssurances(block: block, state: &state) else {
+                    continue
+                }
+
+                benchmark.startMeasurement()
+                let result = try? await state.update(
+                    config: config,
+                    availableReports: availableReports,
+                    timeslot: block.value.header.timeslot,
+                    prevTimeslot: prevTimeslot,
+                    entropy: state.entropyPool.t0,
+                )
+                benchmark.stopMeasurement()
+
+                blackHole(result?.root)
+            }
+        }
+
     }
 }
