@@ -24,6 +24,15 @@ public final class StateBackend: Sendable {
         }
     }
 
+    /// Create an independent trie view at the current root while sharing the same immutable node store.
+    ///
+    /// Writes through the returned backend advance only that backend's trie root. The underlying store
+    /// may receive additional immutable trie nodes, but this backend keeps reading from its original root.
+    public func snapshot() async -> StateBackend {
+        let currentRootHash = await rootHash
+        return StateBackend(impl, config: config, rootHash: currentRootHash)
+    }
+
     public func read<Key: StateKey>(_ key: Key) async throws -> Key.Value? {
         let encodedKey = key.encode()
         if let ret = try await trie.read(key: encodedKey) {

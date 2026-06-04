@@ -215,9 +215,7 @@ public class FuzzingTarget {
     }
 
     private func createStateCopy(from stateRef: StateRef) async throws -> StateRef {
-        let keyValuePairs = try await stateRef.value.backend.getKeys(nil, nil, nil)
-        let newBackend = StateBackend(InMemoryBackend(), config: config, rootHash: Data32())
-        try await newBackend.writeRaw(keyValuePairs.map { (key: Data31($0.key)!, value: $0.value as Data?) })
+        let newBackend = await stateRef.value.backend.snapshot()
         let newState = try await State(backend: newBackend)
         return newState.asRef()
     }

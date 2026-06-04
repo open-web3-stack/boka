@@ -11,6 +11,30 @@ private func stateKey(_ first: UInt8, _ second: UInt8 = 0) -> Data31 {
 }
 
 struct StateBackendGetKeysTests {
+    @Test("snapshot gives independent trie roots over shared storage")
+    func snapshotSharesStorageWithoutMovingOriginalRoot() async throws {
+        let backend = InMemoryBackend()
+        let original = StateBackend(backend, config: ProtocolConfigRef.dev, rootHash: Data32())
+        let key = stateKey(10)
+        let otherKey = stateKey(11)
+
+        try await original.writeRaw([(key: key, value: Data([1]))])
+        let originalRoot = await original.rootHash
+
+        let snapshot = await original.snapshot()
+        try await snapshot.writeRaw([
+            (key: key, value: Data([2])),
+            (key: otherKey, value: Data([3])),
+        ])
+
+        #expect(await original.rootHash == originalRoot)
+        #expect(try await original.readRaw(key) == Data([1]))
+        #expect(try await original.readRaw(otherKey) == nil)
+        #expect(try await snapshot.readRaw(key) == Data([2]))
+        #expect(try await snapshot.readRaw(otherKey) == Data([3]))
+        #expect(await snapshot.rootHash != originalRoot)
+    }
+
     @Test("getKeys applies startKey and limit during trie traversal")
     func getKeysStartKeyAndLimit() async throws {
         let backend = InMemoryBackend()

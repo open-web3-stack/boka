@@ -28,6 +28,7 @@ let benchmarks: @Sendable () -> Void = {
     // Call all benchmark registration functions
     merkleTrieBenchmarks()
     stateBackendBenchmarks()
+    fuzzingStateCopyBenchmarks()
     runtimeBenchmarks()
     blockchainBenchmarks()
     rocksdbBenchmarks()
