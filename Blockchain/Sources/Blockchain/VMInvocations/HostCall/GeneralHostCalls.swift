@@ -356,33 +356,38 @@ public class Write: HostCall {
             throw VMInvocationsError.panic
         }
 
+        let newValue: Data?
+        if regs[3] == 0 {
+            newValue = nil
+        } else {
+            newValue = try state.readMemory(address: regs[2], length: Int(regs[3]))
+        }
+
         // update footprint for threshold balance check
         let oldValue = try await serviceAccounts.value.get(serviceAccount: serviceIndex, storageKey: key)
-        if regs[3] == 0 {
-            accountDetails.updateFootprintStorage(key: key, oldValue: oldValue, newValue: nil)
-        } else {
-            let value = try state.readMemory(address: regs[2], length: Int(regs[3]))
-            accountDetails.updateFootprintStorage(key: key, oldValue: oldValue, newValue: value)
-        }
+        accountDetails.updateFootprintStorage(key: key, oldValue: oldValue, newValue: newValue)
 
         if accountDetails.thresholdBalance(config: config) > accountDetails.balance {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
-            let l = if let value = try await serviceAccounts.value.get(serviceAccount: serviceIndex, storageKey: key) {
+            let l = if let value = oldValue {
                 UInt64(value.count)
             } else {
                 HostCallResultCode.NONE.rawValue
             }
             logger.debug("l: \(l), is none: \(l == HostCallResultCode.NONE.rawValue)")
             state.writeRegister(Registers.Index(raw: 7), l)
-            if regs[3] == 0 {
-                logger.debug("deleting key: \(key.toDebugHexString())")
-                try await serviceAccounts.set(serviceAccount: serviceIndex, storageKey: key, value: nil)
+            if let newValue {
+                logger.debug("writing key: \(key.toDebugHexString()), val: \(newValue.toDebugHexString()), len: \(newValue.count)")
             } else {
-                let value = try state.readMemory(address: regs[2], length: Int(regs[3]))
-                logger.debug("writing key: \(key.toDebugHexString()), val: \(value.toDebugHexString()), len: \(value.count)")
-                try await serviceAccounts.set(serviceAccount: serviceIndex, storageKey: key, value: value)
+                logger.debug("deleting key: \(key.toDebugHexString())")
             }
+            serviceAccounts.set(
+                serviceAccount: serviceIndex,
+                storageKey: key,
+                value: newValue,
+                updatedAccount: accountDetails,
+            )
         }
     }
 }

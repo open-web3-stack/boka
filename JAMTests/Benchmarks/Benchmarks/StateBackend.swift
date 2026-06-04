@@ -1,7 +1,154 @@
 import Benchmark
 import Blockchain
 import Foundation
+import PolkaVM
 import Utils
+
+private enum StorageWriteBenchmarkError: Error {
+    case invalidMemoryRead
+}
+
+private final class StorageWriteBenchmarkVMState: VMState {
+    private static let keyAddress = UInt32(0x1_0000)
+    private static let valueAddress = UInt32(0x2_0000)
+
+    private let key: Data
+    private let value: Data
+    private var resultRegister = UInt64(0)
+
+    var program: ProgramCode {
+        fatalError("StorageWriteBenchmarkVMState does not execute program code")
+    }
+
+    var pc: UInt32 { 0 }
+
+    init(key: Data, value: Data) {
+        self.key = key
+        self.value = value
+    }
+
+    func getRegisters() -> Registers {
+        var registers = Registers()
+        registers[Registers.Index(raw: 7)] = UInt64(Self.keyAddress)
+        registers[Registers.Index(raw: 8)] = UInt64(key.count)
+        registers[Registers.Index(raw: 9)] = UInt64(Self.valueAddress)
+        registers[Registers.Index(raw: 10)] = UInt64(value.count)
+        return registers
+    }
+
+    func readRegister<T: FixedWidthInteger>(_ index: Registers.Index) -> T {
+        if index.value == 7 {
+            return T(truncatingIfNeeded: resultRegister)
+        }
+        return registerValue(raw: UInt8(index.value))
+    }
+
+    func readRegister<T: FixedWidthInteger>(_ index: Registers.Index, _ index2: Registers.Index) -> (T, T) {
+        (readRegister(index), readRegister(index2))
+    }
+
+    func readRegisters<T: FixedWidthInteger>(in range: Range<UInt8>) -> [T] {
+        range.map { registerValue(raw: $0) }
+    }
+
+    func writeRegister(_ index: Registers.Index, _ value: some FixedWidthInteger) {
+        if index.value == 7 {
+            resultRegister = UInt64(truncatingIfNeeded: value)
+        }
+    }
+
+    func getMemory() -> ReadonlyMemory {
+        fatalError("StorageWriteBenchmarkVMState does not expose full memory")
+    }
+
+    func getMemoryUnsafe() -> GeneralMemory {
+        fatalError("StorageWriteBenchmarkVMState does not expose full memory")
+    }
+
+    func isMemoryReadable(address: some FixedWidthInteger, length: Int) -> Bool {
+        memorySlice(address: UInt32(truncatingIfNeeded: address), length: length) != nil
+    }
+
+    func isMemoryWritable(address _: some FixedWidthInteger, length _: Int) -> Bool {
+        false
+    }
+
+    func readMemory(address: some FixedWidthInteger) throws -> UInt8 {
+        guard let byte = memorySlice(address: UInt32(truncatingIfNeeded: address), length: 1)?.first else {
+            throw StorageWriteBenchmarkError.invalidMemoryRead
+        }
+        return byte
+    }
+
+    func readMemory(address: some FixedWidthInteger, length: Int) throws -> Data {
+        guard let data = memorySlice(address: UInt32(truncatingIfNeeded: address), length: length) else {
+            throw StorageWriteBenchmarkError.invalidMemoryRead
+        }
+        return data
+    }
+
+    func writeMemory(address _: some FixedWidthInteger, value _: UInt8) throws {
+        fatalError("StorageWriteBenchmarkVMState is read-only")
+    }
+
+    func writeMemory(address _: some FixedWidthInteger, values _: some Sequence<UInt8>) throws {
+        fatalError("StorageWriteBenchmarkVMState is read-only")
+    }
+
+    func writeMemory(address _: some FixedWidthInteger, values _: Data) throws {
+        fatalError("StorageWriteBenchmarkVMState is read-only")
+    }
+
+    func sbrk(_: UInt32) throws -> UInt32 {
+        fatalError("StorageWriteBenchmarkVMState does not allocate memory")
+    }
+
+    func getGas() -> GasInt {
+        GasInt(0)
+    }
+
+    func consumeGas(_: Gas) {}
+
+    func increasePC(_: UInt32) {}
+
+    func updatePC(_: UInt32) {}
+
+    func withExecutingInst<R>(_ block: () throws -> R) rethrows -> R {
+        try block()
+    }
+
+    private func registerValue<T: FixedWidthInteger>(raw: UInt8) -> T {
+        switch raw {
+        case 7:
+            T(truncatingIfNeeded: Self.keyAddress)
+        case 8:
+            T(truncatingIfNeeded: key.count)
+        case 9:
+            T(truncatingIfNeeded: Self.valueAddress)
+        case 10:
+            T(truncatingIfNeeded: value.count)
+        default:
+            T(0)
+        }
+    }
+
+    private func memorySlice(address: UInt32, length: Int) -> Data? {
+        guard length >= 0 else { return nil }
+        if let data = memorySlice(in: key, baseAddress: Self.keyAddress, address: address, length: length) {
+            return data
+        }
+        return memorySlice(in: value, baseAddress: Self.valueAddress, address: address, length: length)
+    }
+
+    private func memorySlice(in data: Data, baseAddress: UInt32, address: UInt32, length: Int) -> Data? {
+        let endAddress = address &+ UInt32(length)
+        guard address >= baseAddress, endAddress >= address, endAddress <= baseAddress + UInt32(data.count) else {
+            return nil
+        }
+        let offset = Int(address - baseAddress)
+        return Data(data[offset ..< offset + length])
+    }
+}
 
 func stateBackendBenchmarks() {
     Benchmark.defaultConfiguration.timeUnits = BenchmarkTimeUnits.microseconds
@@ -44,6 +191,30 @@ func stateBackendBenchmarks() {
         }
     }
 
+    func createServiceStorageWrites(count: Int) -> [(key: Data, oldValue: Data, newValue: Data)] {
+        (0 ..< count).map { i in
+            let key = Data([UInt8(i % 256), UInt8((i / 256) % 256), UInt8((i / 65536) % 256)])
+            let oldValue = Data(repeating: UInt8(i % 251), count: 64)
+            let newValue = Data(repeating: UInt8((i + 1) % 251), count: 96)
+            return (key: key, oldValue: oldValue, newValue: newValue)
+        }
+    }
+
+    func createServiceAccountsWithStorage(
+        config: ProtocolConfigRef,
+        serviceIndex: ServiceIndex,
+        writes: [(key: Data, oldValue: Data, newValue: Data)]
+    ) async throws -> ServiceAccountsMutRef {
+        var state = State.dummy(config: config)
+        var account = ServiceAccount.dummy(config: config).toDetails()
+        account.balance = Balance(UInt64.max)
+        state.set(serviceAccount: serviceIndex, account: account)
+        for write in writes {
+            try await state.set(serviceAccount: serviceIndex, storageKey: write.key, value: write.oldValue)
+        }
+        return ServiceAccountsMutRef(state)
+    }
+
     // MARK: - State Layer Operations
 
     Benchmark("statelayer.fixedKeys.getset", configuration: BokaBenchmark.milliseconds) { benchmark in
@@ -77,6 +248,27 @@ func stateBackendBenchmarks() {
         benchmark.stopMeasurement()
 
         blackHole(checksum)
+    }
+
+    Benchmark("serviceaccounts.storage.hostWrite.batch", configuration: BokaBenchmark.milliseconds) { benchmark in
+        let config = ProtocolConfigRef.dev
+        let serviceIndex = ServiceIndex(100)
+        let writes = createServiceStorageWrites(count: 1000)
+        let accounts = try await createServiceAccountsWithStorage(
+            config: config,
+            serviceIndex: serviceIndex,
+            writes: writes,
+        )
+        let vmStates = writes.map { StorageWriteBenchmarkVMState(key: $0.key, value: $0.newValue) }
+        let hostCall = Write(serviceIndex: serviceIndex, accounts: accounts)
+
+        benchmark.startMeasurement()
+        for vmState in vmStates {
+            try await hostCall._callImpl(config: config, state: vmState)
+        }
+        benchmark.stopMeasurement()
+
+        blackHole(accounts.changes)
     }
 
     // MARK: - Trie Node Operations

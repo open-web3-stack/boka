@@ -240,6 +240,13 @@ private struct StubServiceAccounts: ServiceAccounts {
 
     mutating func set(serviceAccount _: ServiceIndex, storageKey _: Data, value _: Data?) async throws {}
 
+    mutating func set(
+        serviceAccount _: ServiceIndex,
+        storageKey _: Data,
+        value _: Data?,
+        updatedAccount _: ServiceAccountDetails,
+    ) {}
+
     mutating func set(serviceAccount _: ServiceIndex, preimageHash _: Data32, value _: Data?) {}
 
     mutating func set(

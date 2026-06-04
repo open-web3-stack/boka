@@ -172,6 +172,16 @@ private struct FullAccumulateState: Accumulation {
         storages[index, default: [:]][key] = value
     }
 
+    mutating func set(
+        serviceAccount index: ServiceIndex,
+        storageKey key: Data,
+        value: Data?,
+        updatedAccount: ServiceAccountDetails,
+    ) {
+        accounts[index] = updatedAccount
+        storages[index, default: [:]][key] = value
+    }
+
     mutating func set(serviceAccount index: ServiceIndex, preimageHash hash: Data32, value: Data?) {
         preimages[index, default: [:]][hash] = value
     }

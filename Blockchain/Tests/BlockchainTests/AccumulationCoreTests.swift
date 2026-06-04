@@ -160,6 +160,47 @@ struct AccumulationCoreTests {
     }
 
     @Test
+    func precheckedStorageSetMatchesGenericSetFootprint() async throws {
+        let serviceIndex = ServiceIndex(32)
+        let key = Data([1, 2, 3])
+        let oldValue = Data([4, 5])
+        let newValue = Data([6, 7, 8, 9])
+
+        var account = ServiceAccount.dummy(config: config).toDetails()
+        account.balance = Balance(10_000)
+
+        var genericState = State.dummy(config: config)
+        genericState.set(serviceAccount: serviceIndex, account: account)
+        try await genericState.set(serviceAccount: serviceIndex, storageKey: key, value: oldValue)
+
+        var precheckedState = State.dummy(config: config)
+        precheckedState.set(serviceAccount: serviceIndex, account: account)
+        try await precheckedState.set(serviceAccount: serviceIndex, storageKey: key, value: oldValue)
+
+        try await genericState.set(serviceAccount: serviceIndex, storageKey: key, value: newValue)
+
+        let previousValue = try await precheckedState.get(serviceAccount: serviceIndex, storageKey: key)
+        guard var updatedAccount = try await precheckedState.get(serviceAccount: serviceIndex) else {
+            Issue.record("Expected service account to exist")
+            return
+        }
+        updatedAccount.updateFootprintStorage(key: key, oldValue: previousValue, newValue: newValue)
+        precheckedState.set(
+            serviceAccount: serviceIndex,
+            storageKey: key,
+            value: newValue,
+            updatedAccount: updatedAccount,
+        )
+
+        let precheckedValue = try await precheckedState.get(serviceAccount: serviceIndex, storageKey: key)
+        let precheckedAccount = try await precheckedState.get(serviceAccount: serviceIndex)
+        let genericAccount = try await genericState.get(serviceAccount: serviceIndex)
+
+        #expect(precheckedValue == newValue)
+        #expect(precheckedAccount == genericAccount)
+    }
+
+    @Test
     func accountChangesApplyRemovesLastAndSkipsEarlierUpdatesForRemovedService() async throws {
         var state = State.dummy(config: config)
         state.set(serviceAccount: 32, account: ServiceAccount.dummy(config: config).toDetails())

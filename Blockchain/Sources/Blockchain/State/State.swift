@@ -441,6 +441,16 @@ extension State: ServiceAccounts {
         layer[serviceAccount: index, storageKey: key] = value
     }
 
+    public mutating func set(
+        serviceAccount index: ServiceIndex,
+        storageKey key: Data,
+        value: Data?,
+        updatedAccount: ServiceAccountDetails,
+    ) {
+        layer[serviceAccount: index] = updatedAccount
+        layer[serviceAccount: index, storageKey: key] = value
+    }
+
     public mutating func set(serviceAccount index: ServiceIndex, preimageHash hash: Data32, value: Data?) {
         layer[serviceAccount: index, preimageHash: hash] = value
     }

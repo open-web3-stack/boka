@@ -15,6 +15,12 @@ public protocol ServiceAccounts: Sendable {
 
     mutating func set(serviceAccount index: ServiceIndex, account: ServiceAccountDetails?)
     mutating func set(serviceAccount index: ServiceIndex, storageKey key: Data, value: Data?) async throws
+    mutating func set(
+        serviceAccount index: ServiceIndex,
+        storageKey key: Data,
+        value: Data?,
+        updatedAccount: ServiceAccountDetails,
+    )
     mutating func set(serviceAccount index: ServiceIndex, preimageHash hash: Data32, value: Data?)
     mutating func set(
         serviceAccount index: ServiceIndex,
@@ -66,6 +72,16 @@ public class ServiceAccountsMutRef: @unchecked Sendable {
 
     public func set(serviceAccount index: ServiceIndex, storageKey key: Data, value: Data?) async throws {
         try await ref.value.set(serviceAccount: index, storageKey: key, value: value)
+        changes.addStorageUpdate(index: index, key: key, value: value)
+    }
+
+    public func set(
+        serviceAccount index: ServiceIndex,
+        storageKey key: Data,
+        value: Data?,
+        updatedAccount: ServiceAccountDetails,
+    ) {
+        ref.value.set(serviceAccount: index, storageKey: key, value: value, updatedAccount: updatedAccount)
         changes.addStorageUpdate(index: index, key: key, value: value)
     }
 
