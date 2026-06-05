@@ -71,6 +71,7 @@ public func accumulate(
 
     let (exitReason, gas, output) = await invokePVM(
         config: config,
+        executionMode: [],
         blob: codeBlob,
         pc: 5,
         gas: gas,

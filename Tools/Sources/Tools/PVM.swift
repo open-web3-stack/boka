@@ -49,31 +49,20 @@ struct PVM: AsyncParsableCommand {
             let config = DefaultPvmConfig()
             let gasValue = Gas(gas)
 
-            do {
-                let state = try VMStateInterpreter(standardProgramBlob: blob, pc: pc, gas: gasValue, argumentData: argumentData)
-                let engine = Engine(config: config, invocationContext: nil)
-                let exitReason = await engine.execute(state: state)
-                let gasUsed = gasValue - Gas(state.getGas())
+            let (exitReason, gasUsed, output) = await invokePVM(
+                config: config,
+                blob: blob,
+                pc: pc,
+                gas: gasValue,
+                argumentData: argumentData,
+                ctx: nil,
+            )
 
-                logger.info("Gas used: \(gasUsed)")
-                logger.info("Registers \n\(state.getRegisters())")
-
-                switch exitReason {
-                case .halt:
-                    let (addr, len): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
-                    let output = try? state.readMemory(address: addr, length: Int(len))
-                    if let output {
-                        logger.info("Output: \(output.toHexString())")
-                    }
-                    logger.info("ExitReason: halt")
-                default:
-                    logger.info("ExitReason: \(exitReason)")
-                }
-            } catch let e as StandardProgram.Error {
-                logger.error("Standard program initialization failed: \(e)")
-            } catch let e {
-                logger.error("Unknown error: \(e)")
+            logger.info("Gas used: \(gasUsed)")
+            if let output {
+                logger.info("Output: \(output.toHexString())")
             }
+            logger.info("ExitReason: \(exitReason)")
         }
     }
 }

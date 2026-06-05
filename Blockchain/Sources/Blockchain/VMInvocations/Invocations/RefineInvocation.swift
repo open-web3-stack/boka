@@ -60,6 +60,7 @@ public func refine(
 
     let (exitReason, gasUsed, output) = await invokePVM(
         config: config,
+        executionMode: [],
         blob: codeBlob,
         pc: 0,
         gas: workItem.refineGasLimit,

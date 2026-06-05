@@ -7,7 +7,7 @@ private let logger = Logger(label: "InvokePVM")
 /// common PVM program-argument invocation function
 public func invokePVM(
     config: PvmConfig,
-    executionMode: ExecutionMode = [],
+    executionMode: ExecutionMode = .jit,
     blob: Data,
     pc: UInt32,
     gas: Gas,
@@ -15,7 +15,7 @@ public func invokePVM(
     ctx: (any InvocationContext)?,
 ) async -> (ExitReason, Gas, Data?) {
     do {
-        // Use JIT/Executor if requested, otherwise use Engine (interpreter)
+        // Use JIT/Executor by default; callers can pass [] for the interpreter.
         if executionMode.contains(.jit) {
             let executor = Executor(config: config)
             let result = await executor.execute(

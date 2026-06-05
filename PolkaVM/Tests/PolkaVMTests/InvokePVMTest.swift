@@ -29,6 +29,7 @@ struct InvokePVMTests {
         let config = DefaultPvmConfig()
         let (exitReason, _, output) = await invokePVM(
             config: config,
+            executionMode: [],
             blob: empty,
             pc: 0,
             gas: Gas(1_000_000),
@@ -48,6 +49,7 @@ struct InvokePVMTests {
         let config = DefaultPvmConfig()
         let (exitReason, _, output) = await invokePVM(
             config: config,
+            executionMode: [],
             blob: fibonacci,
             pc: 0,
             gas: Gas(1_000_000),
@@ -74,6 +76,7 @@ struct InvokePVMTests {
         let config = DefaultPvmConfig()
         let (exitReason, _, output) = await invokePVM(
             config: config,
+            executionMode: [],
             blob: sumToN,
             pc: 0,
             gas: Gas(1_000_000),
@@ -116,6 +119,7 @@ struct InvokePVMTests {
 
         let (exitReason, _, output) = await invokePVM(
             config: config,
+            executionMode: [],
             blob: sumToNWithHostCall,
             pc: 0,
             gas: Gas(1_000_000),
