@@ -119,6 +119,18 @@ public class ProgramCode {
         instCache = Array(repeating: nil, count: code.count)
     }
 
+    public init(copying other: ProgramCode) {
+        blob = other.blob
+        jumpTableEntrySize = other.jumpTableEntrySize
+        jumpTable = other.jumpTable
+        code = other.code
+        bitmask = other.bitmask
+        basicBlockIndices = other.basicBlockIndices
+        skipCache = other.skipCache
+        blockGasCosts = other.blockGasCosts
+        instCache = Array(repeating: nil, count: other.instCache.count)
+    }
+
     private func buildMetadata() throws(Error) {
         var i = UInt32(0)
         basicBlockIndices.insert(0)

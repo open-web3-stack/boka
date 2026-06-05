@@ -216,13 +216,14 @@ public class Lookup: HostCall {
             nil
         }
 
-        let regs: [UInt32] = state.readRegisters(in: 8 ..< 10)
+        let readAddr: UInt32 = state.readRegister(Registers.Index(raw: 8))
+        let writeAddr: UInt32 = state.readRegister(Registers.Index(raw: 9))
 
-        if !state.isMemoryReadable(address: regs[0], length: 32) {
+        if !state.isMemoryReadable(address: readAddr, length: 32) {
             throw VMInvocationsError.panic
         }
 
-        let preimageHash = try Data32(state.readMemory(address: regs[0], length: 32))
+        let preimageHash = try Data32(state.readMemory(address: readAddr, length: 32))
         logger.debug("preimageHash: \(String(describing: preimageHash))")
 
         let value: Data? = if let service, let preimageHash {
@@ -239,11 +240,11 @@ public class Lookup: HostCall {
         let first = min(Int(reg10), value?.count ?? 0)
         let len = min(Int(reg11), (value?.count ?? 0) - first)
 
-        if !state.isMemoryWritable(address: regs[1], length: len) {
+        if !state.isMemoryWritable(address: writeAddr, length: len) {
             throw VMInvocationsError.panic
         } else if let value {
             state.writeRegister(Registers.Index(raw: 7), value.count)
-            try state.writeMemory(address: regs[1], values: value[relative: first ..< (first + len)])
+            try state.writeMemory(address: writeAddr, values: value[relative: first ..< (first + len)])
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         }
@@ -278,13 +279,15 @@ public class Read: HostCall {
 
         logger.debug("service: \(service?.description ?? "nil")")
 
-        let regs: [UInt32] = state.readRegisters(in: 8 ..< 11)
+        let keyAddr: UInt32 = state.readRegister(Registers.Index(raw: 8))
+        let keyLength: UInt32 = state.readRegister(Registers.Index(raw: 9))
+        let writeAddr: UInt32 = state.readRegister(Registers.Index(raw: 10))
 
-        if !state.isMemoryReadable(address: regs[0], length: Int(regs[1])) {
+        if !state.isMemoryReadable(address: keyAddr, length: Int(keyLength)) {
             throw VMInvocationsError.panic
         }
 
-        let key = try state.readMemory(address: regs[0], length: Int(regs[1]))
+        let key = try state.readMemory(address: keyAddr, length: Int(keyLength))
 
         logger.debug("key: \(key.toHexString())")
 
@@ -309,12 +312,12 @@ public class Read: HostCall {
 
         logger.debug("first: \(first), len: \(len)")
 
-        if !state.isMemoryWritable(address: regs[2], length: len) {
+        if !state.isMemoryWritable(address: writeAddr, length: len) {
             throw VMInvocationsError.panic
         } else {
             state.writeRegister(Registers.Index(raw: 7), value.count)
             logger.debug("writing val: \(value[relative: first ..< (first + len)].toDebugHexString())")
-            try state.writeMemory(address: regs[2], values: value[relative: first ..< (first + len)])
+            try state.writeMemory(address: writeAddr, values: value[relative: first ..< (first + len)])
         }
     }
 }
@@ -334,17 +337,22 @@ public class Write: HostCall {
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
-        let regs: [UInt32] = state.readRegisters(in: 7 ..< 11)
+        let keyAddr: UInt32 = state.readRegister(Registers.Index(raw: 7))
+        let keyLength: UInt32 = state.readRegister(Registers.Index(raw: 8))
+        let valueAddr: UInt32 = state.readRegister(Registers.Index(raw: 9))
+        let valueLength: UInt32 = state.readRegister(Registers.Index(raw: 10))
 
-        if !state.isMemoryReadable(address: regs[0], length: Int(regs[1])) {
+        if !state.isMemoryReadable(address: keyAddr, length: Int(keyLength)) {
             throw VMInvocationsError.panic
         }
 
-        logger.debug("regs: \(regs), service: \(serviceIndex)")
+        logger.debug(
+            "keyAddr: \(keyAddr), keyLength: \(keyLength), valueAddr: \(valueAddr), valueLength: \(valueLength), service: \(serviceIndex)",
+        )
 
-        let key = try state.readMemory(address: regs[0], length: Int(regs[1]))
+        let key = try state.readMemory(address: keyAddr, length: Int(keyLength))
 
-        if regs[3] != 0, !state.isMemoryReadable(address: regs[2], length: Int(regs[3])) {
+        if valueLength != 0, !state.isMemoryReadable(address: valueAddr, length: Int(valueLength)) {
             throw VMInvocationsError.panic
         }
 
@@ -357,10 +365,10 @@ public class Write: HostCall {
         }
 
         let newValue: Data?
-        if regs[3] == 0 {
+        if valueLength == 0 {
             newValue = nil
         } else {
-            newValue = try state.readMemory(address: regs[2], length: Int(regs[3]))
+            newValue = try state.readMemory(address: valueAddr, length: Int(valueLength))
         }
 
         // update footprint for threshold balance check
@@ -496,16 +504,17 @@ public class HistoricalLookup: HostCall {
             return
         }
 
-        let regs: [UInt32] = state.readRegisters(in: 8 ..< 10)
+        let readAddr: UInt32 = state.readRegister(Registers.Index(raw: 8))
+        let writeAddr: UInt32 = state.readRegister(Registers.Index(raw: 9))
 
-        guard state.isMemoryReadable(address: regs[0], length: 32) else {
+        guard state.isMemoryReadable(address: readAddr, length: 32) else {
             throw VMInvocationsError.panic
         }
 
         let preimage = try await serviceAccounts.value.historicalLookup(
             serviceAccount: service,
             timeslot: lookupAnchorTimeslot,
-            preimageHash: Data32(state.readMemory(address: regs[0], length: 32))!,
+            preimageHash: Data32(state.readMemory(address: readAddr, length: 32))!,
         )
 
         let reg10: UInt64 = state.readRegister(Registers.Index(raw: 10))
@@ -513,13 +522,13 @@ public class HistoricalLookup: HostCall {
         let first = min(Int(reg10), preimage?.count ?? 0)
         let len = min(Int(reg11), (preimage?.count ?? 0) - first)
 
-        let isWritable = state.isMemoryWritable(address: regs[1], length: len)
+        let isWritable = state.isMemoryWritable(address: writeAddr, length: len)
 
         if !isWritable {
             throw VMInvocationsError.panic
         } else if let preimage {
             state.writeRegister(Registers.Index(raw: 7), preimage.count)
-            try state.writeMemory(address: regs[1], values: preimage[relative: first ..< (first + len)])
+            try state.writeMemory(address: writeAddr, values: preimage[relative: first ..< (first + len)])
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
         }

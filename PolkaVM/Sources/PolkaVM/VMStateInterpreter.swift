@@ -26,7 +26,7 @@ public class VMStateInterpreter: VMState {
 
     /// Initialize from a standard program blob
     public init(standardProgramBlob blob: Data, pc: UInt32, gas: Gas, argumentData: Data?) throws {
-        let program = try StandardProgram(blob: blob, argumentData: argumentData)
+        let program = try StandardProgram.cached(blob: blob, argumentData: argumentData)
         self.program = program.code
         registers = program.initialRegisters
         memory = program.initialMemory

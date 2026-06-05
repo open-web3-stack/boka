@@ -63,8 +63,8 @@ public class Engine {
             return .exit(.panic(.invalidInstructionIndex))
         }
 
-        // consume gas per instruction
-        context.state.consumeGas(inst.gasCost())
+        // All current PVM instructions charge one gas. Avoid a protocol dispatch in the VM hot loop.
+        context.state.consumeGas(Gas(1))
 
         // TODO: Enable basic block based gas consumption when GP specifies it
         // if context.state.program.basicBlockIndices.contains(pc) {
