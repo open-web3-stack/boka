@@ -45,6 +45,7 @@ func polkaVMBenchmarks() {
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(
             config: config,
+            executionMode: [],
             blob: emptyProgram,
             pc: 0,
             gas: Gas(1_000_000),
@@ -59,6 +60,7 @@ func polkaVMBenchmarks() {
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(
             config: config,
+            executionMode: [],
             blob: fibonacciProgram,
             pc: 0,
             gas: Gas(1_000_000),
@@ -73,6 +75,7 @@ func polkaVMBenchmarks() {
         benchmark.startMeasurement()
         let (exitReason, _, _) = await invokePVM(
             config: config,
+            executionMode: [],
             blob: sumToNProgram,
             pc: 0,
             gas: Gas(1_000_000),
@@ -90,6 +93,7 @@ func polkaVMBenchmarks() {
         for _ in 0 ..< batchIterations {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
+                executionMode: [],
                 blob: emptyProgram,
                 pc: 0,
                 gas: Gas(1_000_000),
@@ -106,6 +110,7 @@ func polkaVMBenchmarks() {
         // Run fibonacci with larger input for more computation
         let (exitReason, _, _) = await invokePVM(
             config: config,
+            executionMode: [],
             blob: fibonacciProgram,
             pc: 0,
             gas: Gas(10_000_000),
@@ -122,6 +127,7 @@ func polkaVMBenchmarks() {
         for i in 0 ..< 10 {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
+                executionMode: [],
                 blob: sumToNProgram,
                 pc: 0,
                 gas: Gas(1_000_000),
@@ -139,6 +145,7 @@ func polkaVMBenchmarks() {
         for _ in 0 ..< 5 {
             let (exitReason, _, _) = await invokePVM(
                 config: config,
+                executionMode: [],
                 blob: fibonacciProgram,
                 pc: 0,
                 gas: Gas(1_000_000),
@@ -157,6 +164,7 @@ func polkaVMBenchmarks() {
         // Run fibonacci with larger input
         let (exitReason, _, _) = await invokePVM(
             config: config,
+            executionMode: [],
             blob: fibonacciProgram,
             pc: 0,
             gas: Gas(10_000_000),
@@ -172,6 +180,7 @@ func polkaVMBenchmarks() {
         // Run sumToN which has memory operations
         let (exitReason, _, _) = await invokePVM(
             config: config,
+            executionMode: [],
             blob: sumToNProgram,
             pc: 0,
             gas: Gas(1_000_000),

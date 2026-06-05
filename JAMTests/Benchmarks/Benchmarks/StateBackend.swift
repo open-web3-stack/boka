@@ -14,7 +14,6 @@ private final class StorageWriteBenchmarkVMState: VMState {
 
     private let key: Data
     private let value: Data
-    private var resultRegister = UInt64(0)
 
     var program: ProgramCode {
         fatalError("StorageWriteBenchmarkVMState does not execute program code")
@@ -37,9 +36,6 @@ private final class StorageWriteBenchmarkVMState: VMState {
     }
 
     func readRegister<T: FixedWidthInteger>(_ index: Registers.Index) -> T {
-        if index.value == 7 {
-            return T(truncatingIfNeeded: resultRegister)
-        }
         return registerValue(raw: UInt8(index.value))
     }
 
@@ -51,11 +47,7 @@ private final class StorageWriteBenchmarkVMState: VMState {
         range.map { registerValue(raw: $0) }
     }
 
-    func writeRegister(_ index: Registers.Index, _ value: some FixedWidthInteger) {
-        if index.value == 7 {
-            resultRegister = UInt64(truncatingIfNeeded: value)
-        }
-    }
+    func writeRegister(_: Registers.Index, _: some FixedWidthInteger) {}
 
     func getMemory() -> ReadonlyMemory {
         fatalError("StorageWriteBenchmarkVMState does not expose full memory")
