@@ -112,6 +112,14 @@ public class VMStateInterpreter: VMState {
         gas -= GasInt(amount)
     }
 
+    public func consumeInstructionGas() {
+        gas -= 1
+    }
+
+    public var hasGasRemaining: Bool {
+        gas.value >= 0
+    }
+
     public func increasePC(_ amount: UInt32) {
         // using wrapped add
         // so that it can also be used for jumps which are negative

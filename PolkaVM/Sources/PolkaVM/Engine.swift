@@ -16,6 +16,22 @@ public class Engine {
         self.enableStepLogging = enableStepLogging
     }
 
+    public func execute(state: VMStateInterpreter) async -> ExitReason {
+        let context = ExecutionContext(state: state, config: config)
+        while true {
+            if case let .exit(reason) = step(program: state.program, state: state, context: context) {
+                switch reason {
+                case let .hostCall(callIndex):
+                    if case let .exit(hostExitReason) = await hostCall(state: state, callIndex: callIndex) {
+                        return hostExitReason
+                    }
+                default:
+                    return reason
+                }
+            }
+        }
+    }
+
     public func execute(state: any VMState) async -> ExitReason {
         let context = ExecutionContext(state: state, config: config)
         while true {
@@ -52,6 +68,38 @@ public class Engine {
             state.increasePC(skip + 1)
             return .continued
         }
+    }
+
+    func step(program: ProgramCode, state: VMStateInterpreter, context: ExecutionContext) -> ExecOutcome {
+        let pc = state.pc
+        let skip = program.skip(pc)
+
+        let inst = program.getInstructionAt(pc: pc)
+        guard let inst else {
+            return .exit(.panic(.invalidInstructionIndex))
+        }
+
+        state.consumeInstructionGas()
+
+        // TODO: Enable basic block based gas consumption when GP specifies it
+        // if context.state.program.basicBlockIndices.contains(pc) {
+        //     let blockGas = context.state.program.getBlockGasCosts(pc: pc)
+        //     context.state.consumeGas(blockGas)
+        // }
+
+        guard state.hasGasRemaining else {
+            return .exit(.outOfGas)
+        }
+
+        let result = inst.execute(context: context, skip: skip)
+
+        #if DEBUG
+            if enableStepLogging {
+                logStep(instruction: inst, context: context)
+            }
+        #endif
+
+        return result
     }
 
     func step(program: ProgramCode, context: ExecutionContext) -> ExecOutcome {
