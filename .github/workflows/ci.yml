@@ -106,15 +106,6 @@ jobs:
         components: rustfmt
     - name: Build native dependencies
       run: make deps
-    - name: Configure Sandbox Executable Path
-      run: |
-        swift build -c ${{ matrix.config }} --package-path PolkaVM --product boka-sandbox
-        SANDBOX_BIN="$(swift build -c ${{ matrix.config }} --package-path PolkaVM --show-bin-path)/boka-sandbox"
-        if [ ! -x "$SANDBOX_BIN" ]; then
-          echo "boka-sandbox executable not found at: $SANDBOX_BIN"
-          exit 1
-        fi
-        echo "BOKA_SANDBOX_PATH=$SANDBOX_BIN" >> "$GITHUB_ENV"
     - name: Build (Debug)
       if: matrix.config == 'debug'
       run: make build
@@ -222,15 +213,6 @@ jobs:
         components: rustfmt
     - name: Build native dependencies
       run: make deps
-    - name: Configure Sandbox Executable Path
-      run: |
-        swift build -c release --package-path PolkaVM --product boka-sandbox
-        SANDBOX_BIN="$(swift build -c release --package-path PolkaVM --show-bin-path)/boka-sandbox"
-        if [ ! -x "$SANDBOX_BIN" ]; then
-          echo "boka-sandbox executable not found at: $SANDBOX_BIN"
-          exit 1
-        fi
-        echo "BOKA_SANDBOX_PATH=$SANDBOX_BIN" >> "$GITHUB_ENV"
     - name: Run Fuzz Tests (${{ matrix.mode }})
       run: |
         # Set test filter based on mode

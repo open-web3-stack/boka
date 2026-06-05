@@ -36,7 +36,7 @@ jobs:
           echo "Detected Swift version: $SWIFT_VERSION"
           echo "version=$SWIFT_VERSION" >> $GITHUB_OUTPUT
       - name: Cache SPM
-        uses: runs-on/cache@v5
+        uses: runs-on/cache@v4
         with:
           path: '**/.build'
           key: ${{ runner.os }}-spm-swift-${{ steps.swift-version.outputs.version }}-${{ hashFiles('**/Package.resolved') }}
