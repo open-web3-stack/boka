@@ -17,14 +17,14 @@ jobs:
     timeout-minutes: 50
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
       - run: sudo apt-get update
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev llvm libjemalloc-dev
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: us-east-2
       - name: Setup Swift
@@ -45,7 +45,7 @@ jobs:
         env:
           RUNS_ON_S3_BUCKET_CACHE: laminar-gh-action-cache
       - name: Cache Cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/bin/
@@ -55,28 +55,28 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Cache bandersnatch_vrfs static lib
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .lib/libbandersnatch_vrfs.a
           key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
           restore-keys: |
             ${{ runner.os }}-libs-libbandersnatch
       - name: Cache bls static lib
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .lib/libbls.a
           key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
           restore-keys: |
             ${{ runner.os }}-libs-libbls
       - name: Cache erasure-coding static lib
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .lib/libec.a
           key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
           restore-keys: |
             ${{ runner.os }}-libs-libec
       - name: Cache ed25519-zebra static lib
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .lib/libed25519_zebra_ffi.a
           key: ${{ runner.os }}-libs-libed25519-${{ hashFiles('Utils/Sources/ed25519-zebra/**') }}

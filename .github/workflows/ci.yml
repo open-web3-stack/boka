@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Check swift codestyle
-      uses: cirruslabs/swiftlint-action@v1
+      uses: docker://ghcr.io/realm/swiftlint:latest
       with:
         args: --config .swiftlint.yml --strict
 
@@ -26,7 +26,7 @@ jobs:
     name: Cargo Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
@@ -42,14 +42,14 @@ jobs:
         config: [debug, release]
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: recursive
     - run: sudo apt-get update
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libjemalloc-dev
-    - uses: aws-actions/configure-aws-credentials@v4
+    - uses: aws-actions/configure-aws-credentials@v6
       with:
         aws-region: us-east-2
     - name: Setup Swift
@@ -63,7 +63,7 @@ jobs:
     # SPM caching disabled due to 5.7 GB size causing 7+ minute upload delays
     # The cache save/upload time exceeds the build time, making caching counterproductive
     - name: Cache Cargo
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/bin/
@@ -73,28 +73,28 @@ jobs:
           target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Cache bandersnatch_vrfs static lib
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .lib/libbandersnatch_vrfs.a
         key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
         restore-keys: |
             ${{ runner.os }}-libs-libbandersnatch
     - name: Cache bls static lib
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .lib/libbls.a
         key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
         restore-keys: |
             ${{ runner.os }}-libs-libbls
     - name: Cache erasure-coding static lib
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .lib/libec.a
         key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
         restore-keys: |
             ${{ runner.os }}-libs-libec
     - name: Cache ed25519-zebra static lib
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .lib/libed25519_zebra_ffi.a
         key: ${{ runner.os }}-libs-libed25519-${{ hashFiles('Utils/Sources/ed25519-zebra/**') }}
@@ -160,14 +160,14 @@ jobs:
           - jit-sandbox
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: recursive
     - run: sudo apt-get update
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libjemalloc-dev
-    - uses: aws-actions/configure-aws-credentials@v4
+    - uses: aws-actions/configure-aws-credentials@v6
       with:
         aws-region: us-east-2
     - name: Setup Swift
@@ -179,7 +179,7 @@ jobs:
         echo "Detected Swift version: $SWIFT_VERSION"
         echo "version=$SWIFT_VERSION" >> $GITHUB_OUTPUT
     - name: Cache Cargo
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/bin/
@@ -189,28 +189,28 @@ jobs:
           target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Cache bandersnatch_vrfs static lib
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .lib/libbandersnatch_vrfs.a
         key: ${{ runner.os }}-libs-libbandersnatch-${{ hashFiles('Utils/Sources/bandersnatch/**') }}
         restore-keys: |
             ${{ runner.os }}-libs-libbandersnatch
     - name: Cache bls static lib
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .lib/libbls.a
         key: ${{ runner.os }}-libs-libbls-${{ hashFiles('Utils/Sources/bls/**') }}
         restore-keys: |
             ${{ runner.os }}-libs-libbls
     - name: Cache erasure-coding static lib
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .lib/libec.a
         key: ${{ runner.os }}-libs-libec-${{ hashFiles('Utils/Sources/erasure-coding/**') }}
         restore-keys: |
             ${{ runner.os }}-libs-libec
     - name: Cache ed25519-zebra static lib
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .lib/libed25519_zebra_ffi.a
         key: ${{ runner.os }}-libs-libed25519-${{ hashFiles('Utils/Sources/ed25519-zebra/**') }}
