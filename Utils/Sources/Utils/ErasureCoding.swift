@@ -117,24 +117,19 @@ public enum ErasureCoding {
     }
 
     private static func withDataPointers<R>(_ data: [Data], _ body: ([UnsafePointer<UInt8>?]) throws -> R) throws -> R {
-        var pointers: [UnsafePointer<UInt8>?] = []
-        pointers.reserveCapacity(data.count)
+        let bytes = UnsafeMutablePointer<UInt8>.allocate(capacity: data.reduce(0) { $0 + $1.count })
+        defer { bytes.deallocate() }
 
-        func helper(index: Int) throws -> R {
-            if index == data.count {
-                return try body(pointers)
-            }
-
-            return try data[index].withUnsafeBytes { buffer in
-                pointers.append(buffer.baseAddress?.assumingMemoryBound(to: UInt8.self))
-                defer {
-                    pointers.removeLast()
-                }
-                return try helper(index: index + 1)
-            }
+        var offset = 0
+        let pointers: [UnsafePointer<UInt8>?] = data.map { shard in
+            guard !shard.isEmpty else { return nil }
+            let pointer = bytes.advanced(by: offset)
+            shard.copyBytes(to: pointer, count: shard.count)
+            offset += shard.count
+            return UnsafePointer(pointer)
         }
 
-        return try helper(index: 0)
+        return try body(pointers)
     }
 
     /// join k data of length n into one data of length k * n
