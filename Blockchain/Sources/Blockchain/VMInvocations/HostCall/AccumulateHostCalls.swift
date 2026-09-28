@@ -558,7 +558,7 @@ public class Solicit: HostCall {
     }
 }
 
-/// Forget data made available in-core (through preimage lookups)
+/// Cancel, mark unavailable, or expunge a preimage lookup
 public class Forget: HostCall {
     public static var identifier: UInt8 {
         24
@@ -623,7 +623,7 @@ public class Forget: HostCall {
     }
 }
 
-/// Yield accumulation hash
+/// Set the service's accumulation output hash
 public class Yield: HostCall {
     public static var identifier: UInt8 {
         25
@@ -647,7 +647,7 @@ public class Yield: HostCall {
     }
 }
 
-/// Provide some preimages (will be made available after invocation)
+/// Queue a requested preimage for integration after accumulation
 public class Provide: HostCall {
     public static var identifier: UInt8 {
         26
