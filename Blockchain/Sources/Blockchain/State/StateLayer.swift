@@ -230,7 +230,7 @@ public struct StateLayer: Sendable {
         }
     }
 
-    // ϑ: The accumulation queue.
+    // ω: The accumulation queue.
     public var accumulationQueue: StateKeys.AccumulationQueueKey.Value {
         get {
             changes[FixedStateLayerKeys.accumulationQueue]!.value()!
