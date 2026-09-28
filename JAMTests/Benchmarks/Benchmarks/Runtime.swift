@@ -162,7 +162,7 @@ func runtimeBenchmarks() {
     }
 
     Benchmark("runtime.guaranteeing.validate.repeatedService", configuration: BokaBenchmark.configuration()) { benchmark in
-        let account = runtimeServiceAccount(codeHash: runtimeData32(1), minAccumlateGas: Gas(10), config: config)
+        let account = runtimeServiceAccount(codeHash: runtimeData32(1), minItemGas: Gas(10), config: config)
         let state = try RuntimeGuaranteeingBenchmarkState(config: config, serviceAccounts: [7: account])
         let extrinsic = try runtimeGuaranteingExtrinsic(
             config: config,
@@ -261,12 +261,12 @@ private func runtimeGuaranteingExtrinsic(
 
 private func runtimeServiceAccount(
     codeHash: Data32,
-    minAccumlateGas: Gas,
+    minItemGas: Gas,
     config: ProtocolConfigRef,
 ) -> ServiceAccountDetails {
     var account = ServiceAccount.dummy(config: config).toDetails()
     account.codeHash = codeHash
-    account.minAccumlateGas = minAccumlateGas
+    account.minItemGas = minItemGas
     return account
 }
 

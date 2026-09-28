@@ -41,7 +41,7 @@ struct GuaranteeingRuntimeTests {
 
     @Test
     func validateGuaranteesAcceptsMatchingServiceCodeAndGas() async throws {
-        let account = makeAccount(codeHash: data32(1), minAccumlateGas: Gas(10))
+        let account = makeAccount(codeHash: data32(1), minItemGas: Gas(10))
         let state = try GuaranteeingState(config: config, serviceAccounts: [7: account])
         let extrinsic = try makeExtrinsic(digests: [
             makeDigest(serviceIndex: 7, codeHash: data32(1), gasLimit: Gas(10)),
@@ -64,7 +64,7 @@ struct GuaranteeingRuntimeTests {
 
     @Test
     func validateGuaranteesRejectsMismatchedCodeHash() async throws {
-        let account = makeAccount(codeHash: data32(1), minAccumlateGas: Gas(10))
+        let account = makeAccount(codeHash: data32(1), minItemGas: Gas(10))
         let state = try GuaranteeingState(config: config, serviceAccounts: [7: account])
         let extrinsic = try makeExtrinsic(digests: [
             makeDigest(serviceIndex: 7, codeHash: data32(2), gasLimit: Gas(10)),
@@ -77,7 +77,7 @@ struct GuaranteeingRuntimeTests {
 
     @Test
     func validateGuaranteesRejectsDigestBelowServiceMinimumGas() async throws {
-        let account = makeAccount(codeHash: data32(1), minAccumlateGas: Gas(11))
+        let account = makeAccount(codeHash: data32(1), minItemGas: Gas(11))
         let state = try GuaranteeingState(config: config, serviceAccounts: [7: account])
         let extrinsic = try makeExtrinsic(digests: [
             makeDigest(serviceIndex: 7, codeHash: data32(1), gasLimit: Gas(10)),
@@ -90,7 +90,7 @@ struct GuaranteeingRuntimeTests {
 
     @Test
     func validateGuaranteesRejectsTotalGasOverBlockLimit() async throws {
-        let account = makeAccount(codeHash: data32(1), minAccumlateGas: Gas(0))
+        let account = makeAccount(codeHash: data32(1), minItemGas: Gas(0))
         let state = try GuaranteeingState(config: config, serviceAccounts: [7: account])
         let extrinsic = try makeExtrinsic(digests: [
             makeDigest(
@@ -105,10 +105,10 @@ struct GuaranteeingRuntimeTests {
         }
     }
 
-    private func makeAccount(codeHash: Data32, minAccumlateGas: Gas) -> ServiceAccountDetails {
+    private func makeAccount(codeHash: Data32, minItemGas: Gas) -> ServiceAccountDetails {
         var account = ServiceAccount.dummy(config: config).toDetails()
         account.codeHash = codeHash
-        account.minAccumlateGas = minAccumlateGas
+        account.minItemGas = minItemGas
         return account
     }
 

@@ -154,7 +154,7 @@ struct ExtrinsicTypeTests {
         let services = PrivilegedServices(
             manager: 1,
             assigners: try ConfigFixedSizeArray(config: config, array: [2, 3]),
-            delegator: 4,
+            designator: 4,
             registrar: 5,
             alwaysAcc: [6: Gas(7), 8: Gas(9)],
         )

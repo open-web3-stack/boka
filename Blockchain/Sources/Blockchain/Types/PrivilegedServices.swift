@@ -7,7 +7,7 @@ public struct PrivilegedServices: Sendable, Equatable, Codable {
     /// a
     public var assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>
     /// v
-    public var delegator: ServiceIndex
+    public var designator: ServiceIndex
     /// r
     public var registrar: ServiceIndex
     /// z
@@ -16,13 +16,13 @@ public struct PrivilegedServices: Sendable, Equatable, Codable {
     public init(
         manager: ServiceIndex,
         assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>,
-        delegator: ServiceIndex,
+        designator: ServiceIndex,
         registrar: ServiceIndex,
         alwaysAcc: [ServiceIndex: Gas],
     ) {
         self.manager = manager
         self.assigners = assigners
-        self.delegator = delegator
+        self.designator = designator
         self.registrar = registrar
         self.alwaysAcc = alwaysAcc
     }
@@ -31,7 +31,7 @@ public struct PrivilegedServices: Sendable, Equatable, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         manager = try container.decode(ServiceIndex.self, forKey: .manager)
         assigners = try container.decode(ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>.self, forKey: .assigners)
-        delegator = try container.decode(ServiceIndex.self, forKey: .delegator)
+        designator = try container.decode(ServiceIndex.self, forKey: .designator)
         registrar = try container.decode(ServiceIndex.self, forKey: .registrar)
         let compactGas = try container.decode(SortedKeyValues<ServiceIndex, Compact<Gas>>.self, forKey: .alwaysAcc)
         alwaysAcc = compactGas.alias.mapValues { $0.alias }
@@ -41,13 +41,13 @@ public struct PrivilegedServices: Sendable, Equatable, Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(manager, forKey: .manager)
         try container.encode(assigners, forKey: .assigners)
-        try container.encode(delegator, forKey: .delegator)
+        try container.encode(designator, forKey: .designator)
         try container.encode(registrar, forKey: .registrar)
         let compactGas = SortedKeyValues(alias: alwaysAcc.mapValues { Compact(alias: $0) })
         try container.encode(compactGas, forKey: .alwaysAcc)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case manager, assigners, delegator, registrar, alwaysAcc
+        case manager, assigners, designator, registrar, alwaysAcc
     }
 }

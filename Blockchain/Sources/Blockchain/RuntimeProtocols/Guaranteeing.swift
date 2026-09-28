@@ -160,7 +160,7 @@ extension Guaranteeing {
                     throw .invalidResultCodeHash
                 }
 
-                guard digest.gasLimit >= acc.minAccumlateGas else {
+                guard digest.gasLimit >= acc.minItemGas else {
                     throw .invalidServiceGas
                 }
 

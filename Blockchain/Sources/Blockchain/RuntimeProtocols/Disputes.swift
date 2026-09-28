@@ -135,10 +135,10 @@ extension Disputes {
 
         var allReports = Set(disputes.verdicts.map(\.reportHash))
         allReports.formUnion(judgements.goodSet)
-        allReports.formUnion(judgements.banSet)
+        allReports.formUnion(judgements.badSet)
         allReports.formUnion(judgements.wonkySet)
 
-        let expectedReportCount = disputes.verdicts.count + judgements.goodSet.count + judgements.banSet.count + judgements.wonkySet.count
+        let expectedReportCount = disputes.verdicts.count + judgements.goodSet.count + judgements.badSet.count + judgements.wonkySet.count
 
         guard allReports.count == expectedReportCount else {
             throw .duplicatedReport
@@ -161,7 +161,7 @@ extension Disputes {
                 }
 
                 tobeRemoved.insert(hash)
-                newJudgements.banSet.insert(hash)
+                newJudgements.badSet.insert(hash)
 
                 let faults = disputes.faults.filter { $0.reportHash == hash }
                 for fault in faults {
@@ -195,7 +195,7 @@ extension Disputes {
         }
 
         for culprit in disputes.culprits {
-            guard newJudgements.banSet.contains(culprit.reportHash) else {
+            guard newJudgements.badSet.contains(culprit.reportHash) else {
                 throw .invalidCulprit
             }
         }

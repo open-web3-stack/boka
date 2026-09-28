@@ -304,7 +304,7 @@ extension State: Dummy {
         let privilegedServices: StateKeys.PrivilegedServicesKey.Value = PrivilegedServices(
             manager: ServiceIndex(),
             assigners: try! ConfigFixedSizeArray(config: config, defaultValue: ServiceIndex()),
-            delegator: ServiceIndex(),
+            designator: ServiceIndex(),
             registrar: ServiceIndex(),
             alwaysAcc: [:],
         )

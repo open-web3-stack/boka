@@ -7,12 +7,12 @@ struct AccumulationMergeTests {
     private let config = ProtocolConfigRef.tiny
 
     @Test
-    func delegatorCanDesignateWhenItChangesDelegatorInSameBatch() throws {
-        var state = try makeAccumulateState(delegator: 0)
+    func designatorCanDesignateWhenItChangesDesignatorInSameBatch() throws {
+        var state = try makeAccumulateState(designator: 0)
         let designatedQueue = try makeValidatorQueue(startingAt: 10)
 
         var outputState = state.copy()
-        outputState.delegator = 7
+        outputState.designator = 7
         outputState.validatorQueue = designatedQueue
 
         State.mergePrivilegedUpdates(
@@ -20,7 +20,7 @@ struct AccumulationMergeTests {
             from: [(0, makeResult(state: outputState))],
         )
 
-        #expect(state.delegator == 7)
+        #expect(state.designator == 7)
         #expect(state.validatorQueue == designatedQueue)
     }
 
@@ -53,7 +53,7 @@ struct AccumulationMergeTests {
 
     private func makeAccumulateState(
         assigners: [ServiceIndex]? = nil,
-        delegator: ServiceIndex = 0,
+        designator: ServiceIndex = 0,
     ) throws -> AccumulateState {
         let baseState = State.dummy(config: config)
         let assignerValues = assigners ?? Array(repeating: ServiceIndex(0), count: config.value.totalNumberOfCores)
@@ -64,7 +64,7 @@ struct AccumulationMergeTests {
             authorizationQueue: makeAuthorizationQueue(startingAt: 1),
             manager: 0,
             assigners: ConfigFixedSizeArray(config: config, array: assignerValues),
-            delegator: delegator,
+            designator: designator,
             registrar: 0,
             alwaysAcc: [:],
             entropy: Data32(),

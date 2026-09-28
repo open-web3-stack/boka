@@ -12,10 +12,10 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
     public var balance: Balance
 
     /// g
-    public var minAccumlateGas: Gas
+    public var minItemGas: Gas
 
     /// m
-    public var minMemoGas: Gas
+    public var minDeferredTransferGas: Gas
 
     // o: the total number of octets used in storage
     public var totalByteLength: UInt64
@@ -106,10 +106,10 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
     public var balance: Balance
 
     /// g
-    public var minAccumlateGas: Gas
+    public var minItemGas: Gas
 
     /// m
-    public var minMemoGas: Gas
+    public var minDeferredTransferGas: Gas
 
     /// f
     public var gratisStorage: Balance
@@ -130,8 +130,8 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
         lookup: [HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>],
         codeHash: Data32,
         balance: Balance,
-        minAccumlateGas: Gas,
-        minMemoGas: Gas,
+        minItemGas: Gas,
+        minDeferredTransferGas: Gas,
         gratisStorage: Balance,
         createdAt: TimeslotIndex,
         lastAccAt: TimeslotIndex,
@@ -143,8 +143,8 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
         self.lookup = lookup
         self.codeHash = codeHash
         self.balance = balance
-        self.minAccumlateGas = minAccumlateGas
-        self.minMemoGas = minMemoGas
+        self.minItemGas = minItemGas
+        self.minDeferredTransferGas = minDeferredTransferGas
         self.gratisStorage = gratisStorage
         self.createdAt = createdAt
         self.lastAccAt = lastAccAt
@@ -156,8 +156,8 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
             version: version,
             codeHash: codeHash,
             balance: balance,
-            minAccumlateGas: minAccumlateGas,
-            minMemoGas: minMemoGas,
+            minItemGas: minItemGas,
+            minDeferredTransferGas: minDeferredTransferGas,
             totalByteLength: totalByteLength,
             gratisStorage: gratisStorage,
             itemsCount: itemsCount,
@@ -178,8 +178,8 @@ extension ServiceAccount: Dummy {
             lookup: [:],
             codeHash: Data32(),
             balance: Balance(0),
-            minAccumlateGas: Gas(0),
-            minMemoGas: Gas(0),
+            minItemGas: Gas(0),
+            minDeferredTransferGas: Gas(0),
             gratisStorage: Balance(0),
             createdAt: TimeslotIndex(0),
             lastAccAt: TimeslotIndex(0),

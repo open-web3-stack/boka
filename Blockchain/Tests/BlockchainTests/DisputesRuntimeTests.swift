@@ -25,7 +25,7 @@ struct DisputesRuntimeTests {
 
         let result = try state.update(config: config, disputes: disputes)
 
-        #expect(result.state.judgements.banSet == [reportHash])
+        #expect(result.state.judgements.badSet == [reportHash])
         #expect(result.state.judgements.goodSet.isEmpty)
         #expect(result.state.judgements.wonkySet.isEmpty)
         #expect(result.state.availabilityAssignments[0] == nil)
@@ -51,7 +51,7 @@ struct DisputesRuntimeTests {
         let result = try state.update(config: config, disputes: disputes)
 
         #expect(result.state.judgements.goodSet == [reportHash])
-        #expect(result.state.judgements.banSet.isEmpty)
+        #expect(result.state.judgements.badSet.isEmpty)
         #expect(result.state.availabilityAssignments[0]?.workReport == report)
         #expect(result.offenders == [keys[5].publicKey])
     }
@@ -73,7 +73,7 @@ struct DisputesRuntimeTests {
         let result = try state.update(config: config, disputes: disputes)
 
         #expect(result.state.judgements.wonkySet == [reportHash])
-        #expect(result.state.judgements.banSet.isEmpty)
+        #expect(result.state.judgements.badSet.isEmpty)
         #expect(result.state.availabilityAssignments[0] == nil)
         #expect(result.offenders.isEmpty)
     }
@@ -102,7 +102,7 @@ struct DisputesRuntimeTests {
         let state = try DisputesState(
             config: config,
             keys: keys,
-            judgements: JudgementsState(goodSet: [reportHash], banSet: [], wonkySet: [], punishSet: []),
+            judgements: JudgementsState(goodSet: [reportHash], badSet: [], wonkySet: [], punishSet: []),
         )
         let disputes = try ExtrinsicDisputes(
             verdicts: [

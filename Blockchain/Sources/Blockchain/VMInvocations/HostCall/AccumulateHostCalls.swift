@@ -51,14 +51,14 @@ public class Bless: HostCall {
         } else {
             logger.debug("manager: \(regs[0])")
             logger.debug("assigners: \(String(describing: assigners))")
-            logger.debug("delegator: \(regs[2])")
+            logger.debug("designator: \(regs[2])")
             logger.debug("registrar: \(regs[3])")
             logger.debug("alwaysAcc: \(String(describing: alwaysAcc))")
 
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             x.state.manager = ServiceIndex(regs[0])
             x.state.assigners = assigners!
-            x.state.delegator = ServiceIndex(regs[2])
+            x.state.designator = ServiceIndex(regs[2])
             x.state.registrar = ServiceIndex(regs[3])
             x.state.alwaysAcc = alwaysAcc!
         }
@@ -139,8 +139,8 @@ public class Designate: HostCall {
 
         if validatorQueue == nil {
             throw VMInvocationsError.panic
-        } else if x.serviceIndex != x.state.delegator {
-            logger.debug("Designate HUH: \(x.serviceIndex) != \(x.state.delegator)")
+        } else if x.serviceIndex != x.state.designator {
+            logger.debug("Designate HUH: \(x.serviceIndex) != \(x.state.designator)")
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else {
             x.state.validatorQueue = try ConfigFixedSizeArray(config: config, array: validatorQueue!)
@@ -196,8 +196,8 @@ public class New: HostCall {
         logger.debug("codeHash: \(codeHash?.description ?? "nil")")
         logger.debug("new service index: \(x.nextAccountIndex)")
 
-        let minAccumlateGas = Gas(regs[2])
-        let minMemoGas = Gas(regs[3])
+        let minItemGas = Gas(regs[2])
+        let minDeferredTransferGas = Gas(regs[3])
         let gratisStorage = Balance(regs[4])
 
         var newAccount: ServiceAccount?
@@ -209,8 +209,8 @@ public class New: HostCall {
                 lookup: [HashAndLength(hash: codeHash, length: UInt32(truncatingIfNeeded: regs[1])): []],
                 codeHash: codeHash,
                 balance: Balance(0),
-                minAccumlateGas: minAccumlateGas,
-                minMemoGas: minMemoGas,
+                minItemGas: minItemGas,
+                minDeferredTransferGas: minDeferredTransferGas,
                 gratisStorage: gratisStorage,
                 createdAt: timeslot,
                 lastAccAt: 0,
@@ -287,8 +287,8 @@ public class Upgrade: HostCall {
 
         if let codeHash, var acc = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex) {
             acc.codeHash = codeHash
-            acc.minAccumlateGas = Gas(regs[1])
-            acc.minMemoGas = Gas(regs[2])
+            acc.minItemGas = Gas(regs[1])
+            acc.minDeferredTransferGas = Gas(regs[2])
             x.state.accounts.set(serviceAccount: x.serviceIndex, account: acc)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
@@ -340,7 +340,7 @@ public class Transfer: HostCall {
             return .exit(.panic(.trap))
         } else if destAccount == nil {
             (resultCode, additionalGas) = (HostCallResultCode.WHO.rawValue, Gas(0))
-        } else if gasLimit < destAccount!.minMemoGas {
+        } else if gasLimit < destAccount!.minDeferredTransferGas {
             (resultCode, additionalGas) = (HostCallResultCode.LOW.rawValue, Gas(0))
         } else if let srcAccount, srcAccount.balance - amount < srcAccount.thresholdBalance(config: config) {
             (resultCode, additionalGas) = (HostCallResultCode.CASH.rawValue, Gas(0))

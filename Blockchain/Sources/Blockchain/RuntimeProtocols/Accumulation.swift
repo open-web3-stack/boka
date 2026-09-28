@@ -380,7 +380,7 @@ extension Accumulation {
         from batchResults: [(ServiceIndex, AccumulationResult)],
     ) {
         let initialManager = currentState.manager
-        let initialDelegator = currentState.delegator
+        let initialDesignator = currentState.designator
         let initialRegistrar = currentState.registrar
         let initialAssigners = currentState.assigners
 
@@ -391,17 +391,17 @@ extension Accumulation {
                 temp[index] = singleOutput.state.assigners[index]
                 currentState.assigners = temp
             }
-            // v' - New delegator
-            if service == initialDelegator {
-                currentState.delegator = singleOutput.state.delegator
+            // v' - New designator
+            if service == initialDesignator {
+                currentState.designator = singleOutput.state.designator
             }
             // r' - New registrar
             if service == initialRegistrar {
                 currentState.registrar = singleOutput.state.registrar
             }
 
-            // i' - Current delegator service can update validator queue
-            if service == initialDelegator {
+            // i' - Current designator service can update validator queue
+            if service == initialDesignator {
                 currentState.validatorQueue = singleOutput.state.validatorQueue
             }
             // q' - Current assigners update authorization queue
@@ -420,9 +420,9 @@ extension Accumulation {
             if initialAssigners != managerResult.state.assigners {
                 currentState.assigners = managerResult.state.assigners
             }
-            // v' - if manager changed delegator from initial, use manager's value
-            if initialDelegator != managerResult.state.delegator {
-                currentState.delegator = managerResult.state.delegator
+            // v' - if manager changed designator from initial, use manager's value
+            if initialDesignator != managerResult.state.designator {
+                currentState.designator = managerResult.state.designator
             }
             // r' - if manager changed registrar from initial, use manager's value
             if initialRegistrar != managerResult.state.registrar {
@@ -641,7 +641,7 @@ extension Accumulation {
             authorizationQueue: authorizationQueue,
             manager: privilegedServices.manager,
             assigners: privilegedServices.assigners,
-            delegator: privilegedServices.delegator,
+            designator: privilegedServices.designator,
             registrar: privilegedServices.registrar,
             alwaysAcc: privilegedServices.alwaysAcc,
             entropy: entropy,
@@ -662,7 +662,7 @@ extension Accumulation {
         privilegedServices = PrivilegedServices(
             manager: accumulateOutput.state.manager,
             assigners: accumulateOutput.state.assigners,
-            delegator: accumulateOutput.state.delegator,
+            designator: accumulateOutput.state.designator,
             registrar: accumulateOutput.state.registrar,
             alwaysAcc: accumulateOutput.state.alwaysAcc,
         )
