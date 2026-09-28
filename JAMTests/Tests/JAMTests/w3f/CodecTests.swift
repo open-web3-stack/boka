@@ -150,7 +150,7 @@ struct CodecTests {
                         "index": item["index"]!,
                     ].json
                 }.json,
-                "extrinsic": json["outputs"]!.array!.map { item in
+                "extrinsic": json["extrinsics"]!.array!.map { item in
                     [
                         "hash": item["hash"]!,
                         "len": item["length"]!,
