@@ -222,7 +222,7 @@ public final class Runtime {
             // after reports as reports need old recent history
             try updateRecentHistory(block: block, state: &newState, accumulateRoot: accumulateRoot)
 
-            // update authorization pool and queue
+            // update authorization pool α′ from the fresh queue
             do {
                 let authorizationResult = try newState.update(
                     config: config,
