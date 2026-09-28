@@ -53,7 +53,7 @@ struct WorkItemCodecTests {
                 WorkItem.ImportedDataSegment(root: .segmentRoot(data32(5)), index: 1),
                 WorkItem.ImportedDataSegment(root: .workPackageHash(data32(6)), index: 2),
             ],
-            outputs: [
+            extrinsics: [
                 HashAndLength(hash: data32(7), length: 8),
             ],
             exportsCount: 3,

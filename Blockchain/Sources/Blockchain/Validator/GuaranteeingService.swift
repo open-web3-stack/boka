@@ -191,7 +191,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
         let bundleSize = bundle.workPackage.authorizationToken.count
             + bundle.workPackage.configurationBlob.count
             + bundle.workPackage.workItems.array.reduce(0) { total, item in
-                let extrinsicsSize = item.outputs.reduce(0) { $0 + Int($1.length) }
+                let extrinsicsSize = item.extrinsics.reduce(0) { $0 + Int($1.length) }
                 return total + item.payloadBlob.count
                     + item.inputs.count * config.value.segmentFootprint
                     + extrinsicsSize
@@ -724,8 +724,8 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
                 gasUsed: UInt(refineGasUsed.value),
                 importsCount: UInt(item.inputs.count),
                 exportsCount: UInt(item.exportsCount),
-                extrinsicsCount: UInt(item.outputs.count),
-                extrinsicsSize: UInt(item.outputs.reduce(into: 0) { $0 += $1.length }),
+                extrinsicsCount: UInt(item.extrinsics.count),
+                extrinsicsSize: UInt(item.extrinsics.reduce(into: 0) { $0 += $1.length }),
             )
             workDigests.append(workDigest)
 

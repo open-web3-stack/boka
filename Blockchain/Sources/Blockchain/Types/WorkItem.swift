@@ -106,7 +106,7 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
     public var inputs: [ImportedDataSegment]
 
     // x: a sequence of hashed of blob hashes and lengths to be introduced in this block
-    public var outputs: [HashAndLength]
+    public var extrinsics: [HashAndLength]
 
     public init(
         serviceIndex: ServiceIndex,
@@ -115,7 +115,7 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
         refineGasLimit: Gas,
         accumulateGasLimit: Gas,
         inputs: [ImportedDataSegment],
-        outputs: [HashAndLength],
+        extrinsics: [HashAndLength],
         exportsCount: UInt16,
     ) {
         self.serviceIndex = serviceIndex
@@ -124,7 +124,7 @@ public struct WorkItem: Sendable, Equatable, Codable, Hashable {
         self.refineGasLimit = refineGasLimit
         self.accumulateGasLimit = accumulateGasLimit
         self.inputs = inputs
-        self.outputs = outputs
+        self.extrinsics = extrinsics
         self.exportsCount = exportsCount
     }
 }
@@ -139,7 +139,7 @@ extension WorkItem: Dummy {
             refineGasLimit: Gas(0),
             accumulateGasLimit: Gas(0),
             inputs: [],
-            outputs: [],
+            extrinsics: [],
             exportsCount: 0,
         )
     }

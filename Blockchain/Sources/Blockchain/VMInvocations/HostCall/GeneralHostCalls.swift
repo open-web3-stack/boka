@@ -74,7 +74,7 @@ public class Fetch: HostCall {
         try encoder.encode(item.accumulateGasLimit)
         try encoder.encode(item.exportsCount)
         try encoder.encode(UInt16(item.inputs.count))
-        try encoder.encode(UInt16(item.outputs.count))
+        try encoder.encode(UInt16(item.extrinsics.count))
         try encoder.encode(UInt32(item.payloadBlob.count))
         return encoder.data
     }
@@ -101,17 +101,17 @@ public class Fetch: HostCall {
         case 3:
             if let workPackage, let serviceAccounts, reg11 < workPackage.workItems.count {
                 let item = workPackage.workItems[Int(reg11)]
-                let outputs = item.outputs
-                if reg12 < outputs.count {
-                    value = try await serviceAccounts.value.get(serviceAccount: item.serviceIndex, preimageHash: outputs[Int(reg12)].hash)
+                let extrinsics = item.extrinsics
+                if reg12 < extrinsics.count {
+                    value = try await serviceAccounts.value.get(serviceAccount: item.serviceIndex, preimageHash: extrinsics[Int(reg12)].hash)
                 }
             }
         case 4:
             if let workItemIndex, let workPackage, let serviceAccounts {
                 let item = workPackage.workItems[workItemIndex]
-                let outputs = item.outputs
-                if reg11 < outputs.count {
-                    value = try await serviceAccounts.value.get(serviceAccount: item.serviceIndex, preimageHash: outputs[Int(reg11)].hash)
+                let extrinsics = item.extrinsics
+                if reg11 < extrinsics.count {
+                    value = try await serviceAccounts.value.get(serviceAccount: item.serviceIndex, preimageHash: extrinsics[Int(reg11)].hash)
                 }
             }
         case 5:
