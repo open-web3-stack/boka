@@ -295,17 +295,17 @@ public struct StateLayer: Sendable {
     /// l
     public subscript(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32,
-    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
+    ) -> StateKeys.ServiceAccountLookupKey.Value? {
         get {
             changes[
-                StateKeys.ServiceAccountPreimageInfoKey(
+                StateKeys.ServiceAccountLookupKey(
                     index: index, hash: hash, length: length,
                 ).encode(),
             ]?.value()
         }
         set {
             changes[
-                StateKeys.ServiceAccountPreimageInfoKey(
+                StateKeys.ServiceAccountLookupKey(
                     index: index, hash: hash, length: length,
                 ).encode(),
             ] = .init(newValue)
@@ -359,6 +359,6 @@ extension StateLayer {
     }
 
     public func isDeleted(serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32) -> Bool {
-        changes[StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length).encode()]?.isDeleted ?? false
+        changes[StateKeys.ServiceAccountLookupKey(index: index, hash: hash, length: length).encode()]?.isDeleted ?? false
     }
 }

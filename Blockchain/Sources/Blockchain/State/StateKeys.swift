@@ -324,7 +324,7 @@ public enum StateKeys {
         }
     }
 
-    public struct ServiceAccountPreimageInfoKey: StateKey {
+    public struct ServiceAccountLookupKey: StateKey {
         public typealias Value = LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>
         public static var optional: Bool {
             true

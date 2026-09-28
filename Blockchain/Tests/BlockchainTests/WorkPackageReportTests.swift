@@ -224,7 +224,7 @@ private struct StubServiceAccounts: ServiceAccounts {
         serviceAccount _: ServiceIndex,
         preimageHash _: Data32,
         length _: UInt32,
-    ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
+    ) async throws -> StateKeys.ServiceAccountLookupKey.Value? {
         nil
     }
 
@@ -253,7 +253,7 @@ private struct StubServiceAccounts: ServiceAccounts {
         serviceAccount _: ServiceIndex,
         preimageHash _: Data32,
         length _: UInt32,
-        value _: StateKeys.ServiceAccountPreimageInfoKey.Value?,
+        value _: StateKeys.ServiceAccountLookupKey.Value?,
     ) async throws {}
 
     mutating func remove(serviceAccount _: ServiceIndex) async throws {}

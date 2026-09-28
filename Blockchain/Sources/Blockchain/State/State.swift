@@ -217,7 +217,7 @@ public struct State: Sendable {
     /// l
     public subscript(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32,
-    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
+    ) -> StateKeys.ServiceAccountLookupKey.Value? {
         get {
             layer[serviceAccount: index, preimageHash: hash, length: length]
         }
@@ -390,14 +390,14 @@ extension State: ServiceAccounts {
 
     public func get(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32,
-    ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
+    ) async throws -> StateKeys.ServiceAccountLookupKey.Value? {
         if layer.isDeleted(serviceAccount: index, preimageHash: hash, length: length) {
             return nil
         }
         if let res = layer[serviceAccount: index, preimageHash: hash, length: length] {
             return res
         }
-        return try await backend.read(StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length))
+        return try await backend.read(StateKeys.ServiceAccountLookupKey(index: index, hash: hash, length: length))
     }
 
     public func historicalLookup(
@@ -406,15 +406,15 @@ extension State: ServiceAccounts {
         preimageHash hash: Data32,
     ) async throws -> Data? {
         if let preimage = try await get(serviceAccount: index, preimageHash: hash),
-           let preimageInfo = try await get(serviceAccount: index, preimageHash: hash, length: UInt32(preimage.count))
+           let lookupHistory = try await get(serviceAccount: index, preimageHash: hash, length: UInt32(preimage.count))
         {
             var isAvailable = false
-            if preimageInfo.count == 1 {
-                isAvailable = preimageInfo[0] <= timeslot
-            } else if preimageInfo.count == 2 {
-                isAvailable = preimageInfo[0] <= timeslot && timeslot < preimageInfo[1]
-            } else if preimageInfo.count == 3 {
-                isAvailable = preimageInfo[0] <= timeslot && timeslot < preimageInfo[1] && preimageInfo[2] <= timeslot
+            if lookupHistory.count == 1 {
+                isAvailable = lookupHistory[0] <= timeslot
+            } else if lookupHistory.count == 2 {
+                isAvailable = lookupHistory[0] <= timeslot && timeslot < lookupHistory[1]
+            } else if lookupHistory.count == 3 {
+                isAvailable = lookupHistory[0] <= timeslot && timeslot < lookupHistory[1] && lookupHistory[2] <= timeslot
             }
 
             return isAvailable ? preimage : nil
@@ -459,7 +459,7 @@ extension State: ServiceAccounts {
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value?,
+        value: StateKeys.ServiceAccountLookupKey.Value?,
     ) async throws {
         // update footprint
         let oldValue = try await get(serviceAccount: index, preimageHash: hash, length: length)

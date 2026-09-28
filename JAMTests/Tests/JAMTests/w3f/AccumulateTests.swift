@@ -25,7 +25,7 @@ private struct PreimageRequestKey: Codable, Equatable {
 
 private struct PreimageRequestMapEntry: Codable, Equatable {
     var key: PreimageRequestKey
-    var value: StateKeys.ServiceAccountPreimageInfoKey.Value
+    var value: StateKeys.ServiceAccountLookupKey.Value
 }
 
 private struct StorageMapEntry: Codable, Equatable {
@@ -127,7 +127,7 @@ private struct FullAccumulateState: Accumulation {
     var accounts: [ServiceIndex: ServiceAccountDetails] = [:]
     var storages: [ServiceIndex: [Data: Data]] = [:]
     var preimages: [ServiceIndex: [Data32: Data]] = [:]
-    var preimageInfo: [ServiceIndex: [HashAndLength: StateKeys.ServiceAccountPreimageInfoKey.Value]] = [:]
+    var lookup: [ServiceIndex: [HashAndLength: StateKeys.ServiceAccountLookupKey.Value]] = [:]
 
     func copy() -> ServiceAccounts {
         self
@@ -149,8 +149,8 @@ private struct FullAccumulateState: Accumulation {
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-    ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
-        preimageInfo[index]?[HashAndLength(hash: hash, length: length)]
+    ) async throws -> StateKeys.ServiceAccountLookupKey.Value? {
+        lookup[index]?[HashAndLength(hash: hash, length: length)]
     }
 
     func historicalLookup(serviceAccount _: ServiceIndex, timeslot _: TimeslotIndex, preimageHash _: Data32) async throws -> Data? {
@@ -190,24 +190,24 @@ private struct FullAccumulateState: Accumulation {
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value?,
+        value: StateKeys.ServiceAccountLookupKey.Value?,
     ) {
         let key = HashAndLength(hash: hash, length: length)
         // update footprint
-        let oldValue = preimageInfo[index]?[key]
+        let oldValue = lookup[index]?[key]
         logger.debug("preimage footprint before: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
         accounts[index]?.updateFootprintPreimage(oldValue: oldValue, newValue: value, length: length)
         logger.debug("preimage footprint after: \(accounts[index]?.itemsCount ?? 0) items, \(accounts[index]?.totalByteLength ?? 0) bytes")
 
         // update value
-        preimageInfo[index, default: [:]][key] = value
+        lookup[index, default: [:]][key] = value
     }
 
     mutating func remove(serviceAccount index: ServiceIndex) async throws {
         accounts[index] = nil
         storages[index] = nil
         preimages[index] = nil
-        preimageInfo[index] = nil
+        lookup[index] = nil
     }
 }
 
@@ -243,7 +243,7 @@ struct AccumulateTests {
             }
             for preimageRequest in entry.data.preimageRequests {
                 let key = HashAndLength(hash: preimageRequest.key.hash, length: preimageRequest.key.length)
-                fullState.preimageInfo[entry.index, default: [:]][key] = preimageRequest.value
+                fullState.lookup[entry.index, default: [:]][key] = preimageRequest.value
             }
         }
 
@@ -279,7 +279,7 @@ struct AccumulateTests {
                     for preimageRequest in entry.data.preimageRequests {
                         let key = HashAndLength(hash: preimageRequest.key.hash, length: preimageRequest.key.length)
                         #expect(
-                            fullState.preimageInfo[entry.index]?[key] == preimageRequest.value,
+                            fullState.lookup[entry.index]?[key] == preimageRequest.value,
                         )
                     }
                 }

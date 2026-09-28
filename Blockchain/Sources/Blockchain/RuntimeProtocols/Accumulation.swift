@@ -82,7 +82,7 @@ public struct AccountChanges: Sendable {
         case updateAccount(ServiceIndex, ServiceAccountDetails)
         case updateStorage(ServiceIndex, Data, Data?)
         case updatePreimage(ServiceIndex, Data32, Data?)
-        case updatePreimageInfo(ServiceIndex, Data32, UInt32, StateKeys.ServiceAccountPreimageInfoKey.Value?)
+        case updateLookup(ServiceIndex, Data32, UInt32, StateKeys.ServiceAccountLookupKey.Value?)
     }
 
     // records for checking conflicts
@@ -125,14 +125,14 @@ public struct AccountChanges: Sendable {
         updates.append(.updatePreimage(index, hash, value))
     }
 
-    public mutating func addPreimageInfoUpdate(
+    public mutating func addLookupUpdate(
         index: ServiceIndex,
         hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value?,
+        value: StateKeys.ServiceAccountLookupKey.Value?,
     ) {
         altered.insert(index)
-        updates.append(.updatePreimageInfo(index, hash, length, value))
+        updates.append(.updateLookup(index, hash, length, value))
     }
 
     public func apply(to accounts: ServiceAccountsMutRef) async throws {
@@ -164,7 +164,7 @@ public struct AccountChanges: Sendable {
             case let .updatePreimage(index, hash, value):
                 guard !removedIndices.contains(index) else { continue }
                 accounts.set(serviceAccount: index, preimageHash: hash, value: value)
-            case let .updatePreimageInfo(index, hash, length, value):
+            case let .updateLookup(index, hash, length, value):
                 guard !removedIndices.contains(index) else { continue }
                 try await accounts.set(serviceAccount: index, preimageHash: hash, length: length, value: value)
             }
@@ -510,7 +510,7 @@ extension Accumulation {
             let serviceIndex = item.serviceIndex
             let preimage = item.preimage
             let preimageHash = Blake2b256.hash(preimage)
-            guard let preimageInfo = try await accounts.value.get(
+            guard let lookupHistory = try await accounts.value.get(
                 serviceAccount: serviceIndex,
                 preimageHash: preimageHash,
                 length: UInt32(preimage.count),
@@ -518,7 +518,7 @@ extension Accumulation {
                 continue
             }
 
-            if preimageInfo.isEmpty {
+            if lookupHistory.isEmpty {
                 try await accounts.set(
                     serviceAccount: serviceIndex,
                     preimageHash: preimageHash,
