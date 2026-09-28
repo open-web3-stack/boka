@@ -34,10 +34,10 @@ func runtimeBenchmarks() {
     Benchmark("runtime.validate.header") { benchmark in
         let (parentBlock, parentState) = try await createGenesis(config: config)
         let stateRoot = await parentState.value.stateRoot
-        // Create a block with the correct priorStateRoot and extrinsicsHash
+        // Create a block with the correct priorStateRoot and extrinsicHash
         let block = BlockRef.dummy(config: config, parent: parentBlock).mutate { b in
             b.header.unsigned.priorStateRoot = stateRoot
-            b.header.unsigned.extrinsicsHash = b.extrinsic.hash()
+            b.header.unsigned.extrinsicHash = b.extrinsic.hash()
         }
         let runtime = Runtime(config: config, ancestry: nil)
         let validatedBlock = try block.toValidated(config: config)
@@ -51,10 +51,10 @@ func runtimeBenchmarks() {
     Benchmark("runtime.validate.block") { benchmark in
         let (parentBlock, parentState) = try await createGenesis(config: config)
         let stateRoot = await parentState.value.stateRoot
-        // Create a block with the correct priorStateRoot and extrinsicsHash
+        // Create a block with the correct priorStateRoot and extrinsicHash
         let block = BlockRef.dummy(config: config, parent: parentBlock).mutate { b in
             b.header.unsigned.priorStateRoot = stateRoot
-            b.header.unsigned.extrinsicsHash = b.extrinsic.hash()
+            b.header.unsigned.extrinsicHash = b.extrinsic.hash()
         }
         let runtime = Runtime(config: config, ancestry: nil)
         let validatedBlock = try block.toValidated(config: config)
