@@ -70,7 +70,7 @@ private enum FixedStateLayerKeys {
     static let validatorQueue = StateKeys.ValidatorQueueKey().encode()
     static let currentValidators = StateKeys.CurrentValidatorsKey().encode()
     static let previousValidators = StateKeys.PreviousValidatorsKey().encode()
-    static let reports = StateKeys.ReportsKey().encode()
+    static let availabilityAssignments = StateKeys.AvailabilityAssignmentsKey().encode()
     static let timeslot = StateKeys.TimeslotKey().encode()
     static let privilegedServices = StateKeys.PrivilegedServicesKey().encode()
     static let activityStatistics = StateKeys.ActivityStatisticsKey().encode()
@@ -190,13 +190,13 @@ public struct StateLayer: Sendable {
         }
     }
 
-    // ρ: The ρending reports, per core, which are being made available prior to accumulation.
-    public var reports: StateKeys.ReportsKey.Value {
+    // ρ: The availability assignments, one per core.
+    public var availabilityAssignments: StateKeys.AvailabilityAssignmentsKey.Value {
         get {
-            changes[FixedStateLayerKeys.reports]!.value()!
+            changes[FixedStateLayerKeys.availabilityAssignments]!.value()!
         }
         set {
-            changes[FixedStateLayerKeys.reports] = .init(newValue)
+            changes[FixedStateLayerKeys.availabilityAssignments] = .init(newValue)
         }
     }
 

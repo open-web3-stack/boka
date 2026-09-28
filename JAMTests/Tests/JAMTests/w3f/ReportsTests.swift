@@ -6,7 +6,7 @@ import Testing
 import Utils
 
 struct ReportsTestcaseState: Codable, Equatable {
-    var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
+    var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var currentValidators:
         ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
     var previousValidators:
@@ -40,7 +40,7 @@ struct ReportsOutput: Codable, Equatable {
 }
 
 struct ReportsState: Guaranteeing {
-    var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
+    var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var currentValidators:
         ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
     var previousValidators:
@@ -85,7 +85,7 @@ struct ReportsTests {
         let testcase = try decoder.decode(ReportsTestcase.self)
 
         let state = ReportsState(
-            reports: testcase.preState.reports,
+            availabilityAssignments: testcase.preState.availabilityAssignments,
             currentValidators: testcase.preState.currentValidators,
             previousValidators: testcase.preState.previousValidators,
             entropyPool: testcase.preState.entropyPool,
@@ -107,11 +107,11 @@ struct ReportsTests {
             )
         }
         switch result {
-        case let .success((newReports, reported, reporters)):
+        case let .success((newAvailabilityAssignments, reported, reporters)):
             switch testcase.output {
             case let .left(output):
                 let expectedPostState = ReportsTestcaseState(
-                    reports: newReports,
+                    availabilityAssignments: newAvailabilityAssignments,
                     currentValidators: state.currentValidators,
                     previousValidators: state.previousValidators,
                     entropyPool: state.entropyPool,

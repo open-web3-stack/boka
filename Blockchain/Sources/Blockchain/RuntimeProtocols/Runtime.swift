@@ -306,14 +306,14 @@ public final class Runtime {
     /// returns available reports
     public func updateAssurances(block: BlockRef, state newState: inout State) async throws -> [WorkReport] {
         let (
-            newReports: newReports, availableReports: availableReports,
+            newAvailabilityAssignments: newAvailabilityAssignments, availableReports: availableReports,
         ) = try newState.update(
             config: config,
             timeslot: block.header.timeslot,
             extrinsic: block.extrinsic.availability,
         )
 
-        newState.reports = newReports
+        newState.availabilityAssignments = newAvailabilityAssignments
         return availableReports
     }
 
@@ -321,7 +321,7 @@ public final class Runtime {
         let result = try await newState.update(
             config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports, ancestry: ancestry,
         )
-        newState.reports = result.newReports
+        newState.availabilityAssignments = result.newAvailabilityAssignments
         return result.reporters
     }
 

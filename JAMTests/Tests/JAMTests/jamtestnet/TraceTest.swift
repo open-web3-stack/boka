@@ -41,7 +41,7 @@ enum TraceTest {
             #expect(stateRef.value.validatorQueue == expectedState.validatorQueue)
             #expect(stateRef.value.currentValidators == expectedState.currentValidators)
             #expect(stateRef.value.previousValidators == expectedState.previousValidators)
-            #expect(stateRef.value.reports == expectedState.reports)
+            #expect(stateRef.value.availabilityAssignments == expectedState.availabilityAssignments)
             #expect(stateRef.value.timeslot == expectedState.timeslot)
             #expect(stateRef.value.privilegedServices == expectedState.privilegedServices)
             #expect(stateRef.value.activityStatistics == expectedState.activityStatistics)

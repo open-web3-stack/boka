@@ -69,7 +69,7 @@ public enum StateKeys {
         ValidatorQueueKey(),
         CurrentValidatorsKey(),
         PreviousValidatorsKey(),
-        ReportsKey(),
+        AvailabilityAssignmentsKey(),
         TimeslotKey(),
         PrivilegedServicesKey(),
         ActivityStatisticsKey(),
@@ -190,7 +190,7 @@ public enum StateKeys {
         }
     }
 
-    public struct ReportsKey: StateKey {
+    public struct AvailabilityAssignmentsKey: StateKey {
         public typealias Value = ConfigFixedSizeArray<
             ReportItem?,
             ProtocolConfig.TotalNumberOfCores,

@@ -7,7 +7,7 @@ public enum AssurancesError: Error {
 }
 
 public protocol Assurances {
-    var reports:
+    var availabilityAssignments:
         ConfigFixedSizeArray<
             ReportItem?,
             ProtocolConfig.TotalNumberOfCores,
@@ -47,18 +47,18 @@ extension Assurances {
         timeslot: TimeslotIndex,
         extrinsic: ExtrinsicAvailability,
     ) throws -> (
-        newReports: ConfigFixedSizeArray<
+        newAvailabilityAssignments: ConfigFixedSizeArray<
             ReportItem?,
             ProtocolConfig.TotalNumberOfCores,
         >,
         availableReports: [WorkReport],
     ) {
-        var newReports = reports
+        var newAvailabilityAssignments = availabilityAssignments
 
-        for i in 0 ..< newReports.count {
-            if let report = newReports[i] {
+        for i in 0 ..< newAvailabilityAssignments.count {
+            if let report = newAvailabilityAssignments[i] {
                 if (report.timeslot + UInt32(config.value.preimageReplacementPeriod)) <= timeslot {
-                    newReports[i] = nil
+                    newAvailabilityAssignments[i] = nil
                 }
             }
         }
@@ -74,17 +74,17 @@ extension Assurances {
         var availableReports = [WorkReport]()
 
         for (idx, count) in availabilityCount.enumerated() where count > 0 {
-            guard let report = reports[idx] else {
+            guard let report = availabilityAssignments[idx] else {
                 throw AssurancesError.assuranceForEmptyCore
             }
             if count >= ProtocolConfig.TwoThirdValidatorsPlusOne.read(config: config) {
                 availableReports.append(report.workReport)
-                newReports[idx] = nil // remove available report from pending reports
+                newAvailabilityAssignments[idx] = nil // remove available report from pending assignments
             }
         }
 
         return (
-            newReports: newReports,
+            newAvailabilityAssignments: newAvailabilityAssignments,
             availableReports: availableReports,
         )
     }

@@ -112,13 +112,13 @@ public struct State: Sendable {
         }
     }
 
-    // ρ: The ρending reports, per core, which are being made available prior to accumulation.
-    public var reports: StateKeys.ReportsKey.Value {
+    // ρ: The availability assignments, one per core.
+    public var availabilityAssignments: StateKeys.AvailabilityAssignmentsKey.Value {
         get {
-            layer.reports
+            layer.availabilityAssignments
         }
         set {
-            layer.reports = newValue
+            layer.availabilityAssignments = newValue
         }
     }
 
@@ -297,7 +297,7 @@ extension State: Dummy {
             try! ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config))
         let previousValidators: StateKeys.PreviousValidatorsKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config))
-        let reports: StateKeys.ReportsKey.Value = try! ConfigFixedSizeArray(config: config, defaultValue: nil)
+        let availabilityAssignments: StateKeys.AvailabilityAssignmentsKey.Value = try! ConfigFixedSizeArray(config: config, defaultValue: nil)
         let timeslot: StateKeys.TimeslotKey.Value = block?.header.timeslot ?? 0
         let authorizationQueue: StateKeys.AuthorizationQueueKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32()))
@@ -330,7 +330,7 @@ extension State: Dummy {
             (StateKeys.ValidatorQueueKey(), validatorQueue),
             (StateKeys.CurrentValidatorsKey(), currentValidators),
             (StateKeys.PreviousValidatorsKey(), previousValidators),
-            (StateKeys.ReportsKey(), reports),
+            (StateKeys.AvailabilityAssignmentsKey(), availabilityAssignments),
             (StateKeys.TimeslotKey(), timeslot),
             (StateKeys.PrivilegedServicesKey(), privilegedServices),
             (StateKeys.ActivityStatisticsKey(), activityStatistics),
@@ -544,7 +544,7 @@ extension State: Assurances {}
 extension State: Disputes {
     public mutating func mergeWith(postState: DisputesPostState) {
         judgements = postState.judgements
-        reports = postState.reports
+        availabilityAssignments = postState.availabilityAssignments
     }
 }
 
