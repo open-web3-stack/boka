@@ -63,10 +63,20 @@ test-all: test test-cargo
 
 .PHONY: test-coverage
 test-coverage:
-	@for pkg in $(TEST_PACKAGES); do \
+	@failed=""; \
+	for pkg in $(TEST_PACKAGES); do \
 		echo "Running coverage for $$pkg..."; \
-		swift test --enable-code-coverage --package-path "$$pkg"; \
-	done
+		if swift test --enable-code-coverage --package-path "$$pkg"; then \
+			echo "  ✓ PASS"; \
+		else \
+			echo "  ✗ FAIL"; \
+			failed="$$failed $$pkg"; \
+		fi; \
+	done; \
+	if [ -n "$$failed" ]; then \
+		echo "Failed packages:$$failed"; \
+		exit 1; \
+	fi
 
 .PHONY: build
 build: githooks deps

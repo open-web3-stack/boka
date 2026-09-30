@@ -6,6 +6,12 @@ import Logging
 import Node
 import Testing
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
+
 struct BokaTests {
     @Test func commandWithInvalidPaths() async throws {
         let invalidChainPath = "/path/to/wrong/file.json"
@@ -314,7 +320,8 @@ struct BokaTests {
         }
     }
 
-    @Test func fuzzEnvironmentRejectsUnwritableDataDirectory() throws {
+    @Test(.disabled(if: geteuid() == 0, "requires a non-root user"))
+    func fuzzEnvironmentRejectsUnwritableDataDirectory() throws {
         let root = try makeTemporaryDirectory()
         defer {
             try? FileManager.default.removeItem(at: root)
