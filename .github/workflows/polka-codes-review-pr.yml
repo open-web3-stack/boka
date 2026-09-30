@@ -29,7 +29,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check Polka Codes configuration
+        id: check-polka-config
+        shell: bash
+        env:
+          POLKA_BASE_URL: ${{ secrets.POLKA_BASE_URL }}
+          POLKA_API_KEY: ${{ secrets.POLKA_API_KEY }}
+        run: |
+          if [[ -n "$POLKA_BASE_URL" && -n "$POLKA_API_KEY" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Polka Codes secrets are not configured; skipping review."
+          fi
+
       - name: Run Polka Codes
+        if: steps.check-polka-config.outputs.enabled == 'true'
         uses: polka-codes/action@master
         with:
           pr_number: ${{ github.event.inputs.pr_number || github.event.number }}
