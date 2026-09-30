@@ -25,10 +25,10 @@ struct DisputesRuntimeTests {
 
         let result = try state.update(config: config, disputes: disputes)
 
-        #expect(result.state.judgements.banSet == [reportHash])
+        #expect(result.state.judgements.badSet == [reportHash])
         #expect(result.state.judgements.goodSet.isEmpty)
         #expect(result.state.judgements.wonkySet.isEmpty)
-        #expect(result.state.reports[0] == nil)
+        #expect(result.state.availabilityAssignments[0] == nil)
         #expect(Set(result.offenders) == [keys[0].publicKey, keys[1].publicKey])
     }
 
@@ -51,8 +51,8 @@ struct DisputesRuntimeTests {
         let result = try state.update(config: config, disputes: disputes)
 
         #expect(result.state.judgements.goodSet == [reportHash])
-        #expect(result.state.judgements.banSet.isEmpty)
-        #expect(result.state.reports[0]?.workReport == report)
+        #expect(result.state.judgements.badSet.isEmpty)
+        #expect(result.state.availabilityAssignments[0]?.workReport == report)
         #expect(result.offenders == [keys[5].publicKey])
     }
 
@@ -73,8 +73,8 @@ struct DisputesRuntimeTests {
         let result = try state.update(config: config, disputes: disputes)
 
         #expect(result.state.judgements.wonkySet == [reportHash])
-        #expect(result.state.judgements.banSet.isEmpty)
-        #expect(result.state.reports[0] == nil)
+        #expect(result.state.judgements.badSet.isEmpty)
+        #expect(result.state.availabilityAssignments[0] == nil)
         #expect(result.offenders.isEmpty)
     }
 
@@ -102,7 +102,7 @@ struct DisputesRuntimeTests {
         let state = try DisputesState(
             config: config,
             keys: keys,
-            judgements: JudgementsState(goodSet: [reportHash], banSet: [], wonkySet: [], punishSet: []),
+            judgements: JudgementsState(goodSet: [reportHash], badSet: [], wonkySet: [], punishSet: []),
         )
         let disputes = try ExtrinsicDisputes(
             verdicts: [
@@ -226,7 +226,7 @@ private struct DisputeValidatorKey {
 
 private struct DisputesState: Disputes {
     var judgements: JudgementsState
-    var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
+    var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var timeslot: TimeslotIndex
     var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
     var previousValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
@@ -247,12 +247,12 @@ private struct DisputesState: Disputes {
         if let report {
             reportSlots[0] = ReportItem(workReport: report, timeslot: timeslot)
         }
-        reports = try ConfigFixedSizeArray(config: config, array: reportSlots)
+        availabilityAssignments = try ConfigFixedSizeArray(config: config, array: reportSlots)
     }
 
     mutating func mergeWith(postState: DisputesPostState) {
         judgements = postState.judgements
-        reports = postState.reports
+        availabilityAssignments = postState.availabilityAssignments
     }
 }
 

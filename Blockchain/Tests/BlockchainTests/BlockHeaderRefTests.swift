@@ -11,13 +11,13 @@ struct BlockHeaderRefTests {
 
         #expect(header.parentHash == data32(1))
         #expect(header.priorStateRoot == data32(2))
-        #expect(header.extrinsicsHash == data32(3))
+        #expect(header.extrinsicHash == data32(3))
         #expect(header.timeslot == 99)
-        #expect(header.epoch == nil)
+        #expect(header.epochMarker == nil)
         #expect(header.winningTickets == nil)
-        #expect(header.offendersMarkers == [data32(4), data32(5)])
+        #expect(header.offendersMarker == [data32(4), data32(5)])
         #expect(header.authorIndex == 2)
-        #expect(header.vrfSignature == Data96(repeating: 6))
+        #expect(header.entropySource == Data96(repeating: 6))
     }
 
     @Test
@@ -107,13 +107,13 @@ struct BlockHeaderRefTests {
             unsigned: Header.Unsigned(
                 parentHash: data32(1),
                 priorStateRoot: data32(2),
-                extrinsicsHash: data32(3),
+                extrinsicHash: data32(3),
                 timeslot: 99,
-                epoch: nil,
+                epochMarker: nil,
                 winningTickets: nil,
                 authorIndex: authorIndex,
-                vrfSignature: Data96(repeating: 6),
-                offendersMarkers: [data32(4), data32(5)],
+                entropySource: Data96(repeating: 6),
+                offendersMarker: [data32(4), data32(5)],
             ),
             seal: Data96(repeating: 7),
         )

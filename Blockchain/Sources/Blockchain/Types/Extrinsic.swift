@@ -9,7 +9,7 @@ public struct Extrinsic: Sendable, Equatable, Codable {
     // permissioning of block authoring
     public var tickets: ExtrinsicTickets
 
-    // EP: Static data which is presently being requested to be available for workloads to be able to fetch on demand
+    // EP: Preimage data supplied for prior requests, integrated after accumulation
     public var preimages: ExtrinsicPreimages
 
     // EG: Reports of newly completed workloads whose accuracy is guaranteed by specific validators
@@ -19,7 +19,7 @@ public struct Extrinsic: Sendable, Equatable, Codable {
     // correctly received and are storing locally
     public var availability: ExtrinsicAvailability
 
-    // ED: Votes, by validators, on dispute(s) arising between them presently taking place
+    // ED: Verdicts, culprits, and faults for disputed work-reports
     public var disputes: ExtrinsicDisputes
 
     public init(

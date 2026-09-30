@@ -117,7 +117,7 @@ public struct AccumulateState: Sendable {
     /// a
     public var assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>
     /// v
-    public var delegator: ServiceIndex
+    public var designator: ServiceIndex
     /// r
     public var registrar: ServiceIndex
     /// z
@@ -132,7 +132,7 @@ public struct AccumulateState: Sendable {
             authorizationQueue: authorizationQueue,
             manager: manager,
             assigners: assigners,
-            delegator: delegator,
+            designator: designator,
             registrar: registrar,
             alwaysAcc: alwaysAcc,
             entropy: entropy,

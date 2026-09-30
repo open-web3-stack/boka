@@ -12,10 +12,10 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
     public var balance: Balance
 
     /// g
-    public var minAccumlateGas: Gas
+    public var minItemGas: Gas
 
     /// m
-    public var minMemoGas: Gas
+    public var minDeferredTransferGas: Gas
 
     // o: the total number of octets used in storage
     public var totalByteLength: UInt64
@@ -63,8 +63,8 @@ public struct ServiceAccountDetails: Sendable, Equatable, Codable {
     }
 
     public mutating func updateFootprintPreimage(
-        oldValue: StateKeys.ServiceAccountPreimageInfoKey.Value?,
-        newValue: StateKeys.ServiceAccountPreimageInfoKey.Value?,
+        oldValue: StateKeys.ServiceAccountLookupKey.Value?,
+        newValue: StateKeys.ServiceAccountLookupKey.Value?,
         length: UInt32,
     ) {
         if oldValue != nil {
@@ -95,7 +95,7 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
     public var preimages: [Data32: Data]
 
     /// l
-    public var preimageInfos: [
+    public var lookup: [
         HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>
     ]
 
@@ -106,10 +106,10 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
     public var balance: Balance
 
     /// g
-    public var minAccumlateGas: Gas
+    public var minItemGas: Gas
 
     /// m
-    public var minMemoGas: Gas
+    public var minDeferredTransferGas: Gas
 
     /// f
     public var gratisStorage: Balance
@@ -127,11 +127,11 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
         version: UInt8,
         storage: [Data: Data],
         preimages: [Data32: Data],
-        preimageInfos: [HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>],
+        lookup: [HashAndLength: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>],
         codeHash: Data32,
         balance: Balance,
-        minAccumlateGas: Gas,
-        minMemoGas: Gas,
+        minItemGas: Gas,
+        minDeferredTransferGas: Gas,
         gratisStorage: Balance,
         createdAt: TimeslotIndex,
         lastAccAt: TimeslotIndex,
@@ -140,11 +140,11 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
         self.version = version
         self.storage = storage
         self.preimages = preimages
-        self.preimageInfos = preimageInfos
+        self.lookup = lookup
         self.codeHash = codeHash
         self.balance = balance
-        self.minAccumlateGas = minAccumlateGas
-        self.minMemoGas = minMemoGas
+        self.minItemGas = minItemGas
+        self.minDeferredTransferGas = minDeferredTransferGas
         self.gratisStorage = gratisStorage
         self.createdAt = createdAt
         self.lastAccAt = lastAccAt
@@ -156,8 +156,8 @@ public struct ServiceAccount: Sendable, Equatable, Codable {
             version: version,
             codeHash: codeHash,
             balance: balance,
-            minAccumlateGas: minAccumlateGas,
-            minMemoGas: minMemoGas,
+            minItemGas: minItemGas,
+            minDeferredTransferGas: minDeferredTransferGas,
             totalByteLength: totalByteLength,
             gratisStorage: gratisStorage,
             itemsCount: itemsCount,
@@ -175,11 +175,11 @@ extension ServiceAccount: Dummy {
             version: 0,
             storage: [:],
             preimages: [:],
-            preimageInfos: [:],
+            lookup: [:],
             codeHash: Data32(),
             balance: Balance(0),
-            minAccumlateGas: Gas(0),
-            minMemoGas: Gas(0),
+            minItemGas: Gas(0),
+            minDeferredTransferGas: Gas(0),
             gratisStorage: Balance(0),
             createdAt: TimeslotIndex(0),
             lastAccAt: TimeslotIndex(0),
@@ -191,14 +191,14 @@ extension ServiceAccount: Dummy {
 extension ServiceAccount {
     // i: number of items in storage
     public var itemsCount: UInt32 {
-        UInt32(2 * preimageInfos.count + storage.count)
+        UInt32(2 * lookup.count + storage.count)
     }
 
     // o: the total number of octets used in storage
     public var totalByteLength: UInt64 {
-        let preimageInfosBytes = preimageInfos.keys.reduce(into: 0) { $0 += 81 + $1.length }
+        let lookupBytes = lookup.keys.reduce(into: 0) { $0 += 81 + $1.length }
         let storageBytes = storage.enumerated().reduce(into: 0) { $0 += 34 + $1.element.key.count + $1.element.value.count }
-        return UInt64(preimageInfosBytes) + UInt64(storageBytes)
+        return UInt64(lookupBytes) + UInt64(storageBytes)
     }
 
     // t: the minimum, or threshold, balance needed for any given service account in terms of its storage footprint

@@ -8,12 +8,12 @@ Install tools and dependencies:
 
 **macOS**
 ```bash
-brew install swiftlint swiftformat rocksdb openssl
+brew install swiftlint swiftformat rocksdb openssl jemalloc zstd
 ```
 
 **Linux**
 ```bash
-apt-get install librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libssl-dev
+apt-get install librocksdb-dev libzstd-dev libbz2-dev liblz4-dev libssl-dev libjemalloc-dev
 ```
 
 Setup the project:
@@ -36,24 +36,40 @@ make deps
 
 ## CLI Usage
 
-The Boka CLI supports the following arguments:
+The Boka CLI supports the following options:
 
-- `--base-path <path>`: Base path to database files.
-- `--chain <chain>`: A preset config or path to chain config file. Default: `minimal`.
-- `--rpc <address>`: Listen address for RPC server. Pass 'no' to disable. Default: `127.0.0.1:9955`.
+- `-b <path>` / `--base-path <path>`: Directory for the database and keys. Without it, both are in memory.
+- `--chain <chain>`: Preset (`minimal`, `dev`, `tiny`, `mainnet`) or path to a chain spec file. Default: `minimal`.
+- `--rpc <address>`: Listen address for RPC server. Pass `no` to disable. Default: `127.0.0.1:9955`.
 - `--p2p <address>`: Listen address for P2P protocol. Default: `127.0.0.1:0`.
-- `--peers <address>`: Specify peer P2P addresses.
+- `--peers <address>`: Add a P2P peer. Repeat `--peers` to add more.
 - `--validator`: Run as a validator.
-- `--operator-rpc <address>`: Listen address for operator RPC server. Pass 'false' to disable.
 - `--dev-seed <seed>`: For development only. Seed for validator keys.
 - `--name <name>`: Node name. For telemetry only.
 - `--local`: Enable local mode, whereas peers are not expected.
 - `--dev`: Enable dev mode. This is equivalent to `--local --validator`.
 
+Subcommands:
+
+- `generate <output>`: Create a chainspec file at the required output path.
+  - `--config <preset>`: `minimal` (default), `dev`, `tiny`, or `mainnet`.
+  - `--chainspec <path>`: Use an existing chainspec instead of a preset.
+  - `--id <id>`: Override the chain ID.
+- `fuzz target`: Wait for JAM conformance fuzzer connections.
+  - `--socket-path <path>`: Unix socket path (default: `/tmp/jam_conformance.sock`).
+  - `--config <tiny|full>`: Protocol configuration (default: `tiny`).
+- `fuzz fuzzer`: Connect to a target and run the JAM conformance fuzzer.
+  - `--socket-path <path>`: Unix socket path (default: `/tmp/jam_conformance.sock`).
+  - `--config <tiny|full>`: Protocol configuration (default: `tiny`).
+  - `--seed <number>`: Random seed (random by default).
+  - `--blocks <count>`: Number of blocks to process (default: `200`).
+  - `--traces-dir <path>`: Directory containing trace test vectors.
+
 ## Testing
 
 - Run all Swift tests: `make test`
 - Run specific package: `cd <package> && swift test`
+- Run specific package from the repository root: `swift test --package-path <package>`
 - Run with filter: `cd <package> && swift test --filter <test-name>`
 - Verbose output: `swift test --verbose`
 - Run Rust tests: `make test-cargo`
@@ -137,3 +153,11 @@ Regression thresholds are configured alongside the benchmark code in
   - The JAM codec implementation.
 - Utils
   - Provide the common utilities for the blockchain node.
+- TracingUtils
+  - Logging and tracing utilities.
+- JAMTests
+  - JAM test vectors and benchmarks.
+- Fuzzing
+  - JAM conformance fuzzing tools.
+- Tools
+  - Developer utilities for PVM, RPC, and proof-of-concept workflows.

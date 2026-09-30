@@ -51,14 +51,14 @@ public class Bless: HostCall {
         } else {
             logger.debug("manager: \(regs[0])")
             logger.debug("assigners: \(String(describing: assigners))")
-            logger.debug("delegator: \(regs[2])")
+            logger.debug("designator: \(regs[2])")
             logger.debug("registrar: \(regs[3])")
             logger.debug("alwaysAcc: \(String(describing: alwaysAcc))")
 
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
             x.state.manager = ServiceIndex(regs[0])
             x.state.assigners = assigners!
-            x.state.delegator = ServiceIndex(regs[2])
+            x.state.designator = ServiceIndex(regs[2])
             x.state.registrar = ServiceIndex(regs[3])
             x.state.alwaysAcc = alwaysAcc!
         }
@@ -139,8 +139,8 @@ public class Designate: HostCall {
 
         if validatorQueue == nil {
             throw VMInvocationsError.panic
-        } else if x.serviceIndex != x.state.delegator {
-            logger.debug("Designate HUH: \(x.serviceIndex) != \(x.state.delegator)")
+        } else if x.serviceIndex != x.state.designator {
+            logger.debug("Designate HUH: \(x.serviceIndex) != \(x.state.designator)")
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else {
             x.state.validatorQueue = try ConfigFixedSizeArray(config: config, array: validatorQueue!)
@@ -196,8 +196,8 @@ public class New: HostCall {
         logger.debug("codeHash: \(codeHash?.description ?? "nil")")
         logger.debug("new service index: \(x.nextAccountIndex)")
 
-        let minAccumlateGas = Gas(regs[2])
-        let minMemoGas = Gas(regs[3])
+        let minItemGas = Gas(regs[2])
+        let minDeferredTransferGas = Gas(regs[3])
         let gratisStorage = Balance(regs[4])
 
         var newAccount: ServiceAccount?
@@ -206,11 +206,11 @@ public class New: HostCall {
                 version: 0,
                 storage: [:],
                 preimages: [:],
-                preimageInfos: [HashAndLength(hash: codeHash, length: UInt32(truncatingIfNeeded: regs[1])): []],
+                lookup: [HashAndLength(hash: codeHash, length: UInt32(truncatingIfNeeded: regs[1])): []],
                 codeHash: codeHash,
                 balance: Balance(0),
-                minAccumlateGas: minAccumlateGas,
-                minMemoGas: minMemoGas,
+                minItemGas: minItemGas,
+                minDeferredTransferGas: minDeferredTransferGas,
                 gratisStorage: gratisStorage,
                 createdAt: timeslot,
                 lastAccAt: 0,
@@ -287,8 +287,8 @@ public class Upgrade: HostCall {
 
         if let codeHash, var acc = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex) {
             acc.codeHash = codeHash
-            acc.minAccumlateGas = Gas(regs[1])
-            acc.minMemoGas = Gas(regs[2])
+            acc.minItemGas = Gas(regs[1])
+            acc.minDeferredTransferGas = Gas(regs[2])
             x.state.accounts.set(serviceAccount: x.serviceIndex, account: acc)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
@@ -340,7 +340,7 @@ public class Transfer: HostCall {
             return .exit(.panic(.trap))
         } else if destAccount == nil {
             (resultCode, additionalGas) = (HostCallResultCode.WHO.rawValue, Gas(0))
-        } else if gasLimit < destAccount!.minMemoGas {
+        } else if gasLimit < destAccount!.minDeferredTransferGas {
             (resultCode, additionalGas) = (HostCallResultCode.LOW.rawValue, Gas(0))
         } else if let srcAccount, srcAccount.balance - amount < srcAccount.thresholdBalance(config: config) {
             (resultCode, additionalGas) = (HostCallResultCode.CASH.rawValue, Gas(0))
@@ -410,7 +410,7 @@ public class Eject: HostCall {
             return
         }
 
-        let preimageInfo = try await x.state.accounts.value.get(
+        let lookupHistory = try await x.state.accounts.value.get(
             serviceAccount: ejectIndex,
             preimageHash: Data32(preimageHash!)!,
             length: max(81, UInt32(ejectAccount!.totalByteLength)) - 81,
@@ -418,10 +418,10 @@ public class Eject: HostCall {
 
         let minHoldSlot = max(0, Int(timeslot) - Int(minHoldPeriod))
 
-        if ejectAccount!.itemsCount != 2 || preimageInfo == nil {
-            logger.debug("Eject HUH: itemsCount != 2 or preimageInfo is nil")
+        if ejectAccount!.itemsCount != 2 || lookupHistory == nil {
+            logger.debug("Eject HUH: itemsCount != 2 or lookupHistory is nil")
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
-        } else if preimageInfo!.count == 2, preimageInfo![1] < minHoldSlot {
+        } else if lookupHistory!.count == 2, lookupHistory![1] < minHoldSlot {
             // accumulating service definitely exist
             var destAccount = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex)!
             destAccount.balance += ejectAccount!.balance
@@ -430,13 +430,13 @@ public class Eject: HostCall {
             logger.debug("Eject OK: successfully ejected service account")
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         } else {
-            logger.debug("Eject HUH: preimageInfo conditions not met")
+            logger.debug("Eject HUH: lookupHistory conditions not met")
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         }
     }
 }
 
-/// Query preimage info
+/// Query preimage lookup history
 public class Query: HostCall {
     public static var identifier: UInt8 {
         22
@@ -455,29 +455,29 @@ public class Query: HostCall {
             throw VMInvocationsError.panic
         }
 
-        let preimageInfo = try await x.state.accounts.value.get(
+        let lookupHistory = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: Data32(preimageHash)!,
             length: length,
         )
-        guard let preimageInfo else {
+        guard let lookupHistory else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.NONE.rawValue)
             state.writeRegister(Registers.Index(raw: 8), 0)
             return
         }
 
-        if preimageInfo.isEmpty {
+        if lookupHistory.isEmpty {
             state.writeRegister(Registers.Index(raw: 7), 0)
             state.writeRegister(Registers.Index(raw: 8), 0)
-        } else if preimageInfo.count == 1 {
-            state.writeRegister(Registers.Index(raw: 7), 1 + (1 << 32) * UInt64(preimageInfo[0]))
+        } else if lookupHistory.count == 1 {
+            state.writeRegister(Registers.Index(raw: 7), 1 + (1 << 32) * UInt64(lookupHistory[0]))
             state.writeRegister(Registers.Index(raw: 8), 0)
-        } else if preimageInfo.count == 2 {
-            state.writeRegister(Registers.Index(raw: 7), 2 + (1 << 32) * UInt64(preimageInfo[0]))
-            state.writeRegister(Registers.Index(raw: 8), UInt64(preimageInfo[1]))
-        } else if preimageInfo.count == 3 {
-            state.writeRegister(Registers.Index(raw: 7), 3 + (1 << 32) * UInt64(preimageInfo[0]))
-            state.writeRegister(Registers.Index(raw: 8), UInt64(preimageInfo[1]) + (1 << 32) * UInt64(preimageInfo[2]))
+        } else if lookupHistory.count == 2 {
+            state.writeRegister(Registers.Index(raw: 7), 2 + (1 << 32) * UInt64(lookupHistory[0]))
+            state.writeRegister(Registers.Index(raw: 8), UInt64(lookupHistory[1]))
+        } else if lookupHistory.count == 3 {
+            state.writeRegister(Registers.Index(raw: 7), 3 + (1 << 32) * UInt64(lookupHistory[0]))
+            state.writeRegister(Registers.Index(raw: 8), UInt64(lookupHistory[1]) + (1 << 32) * UInt64(lookupHistory[2]))
         }
     }
 }
@@ -507,15 +507,15 @@ public class Solicit: HostCall {
             throw VMInvocationsError.panic
         }
 
-        let preimageInfo = try await x.state.accounts.value.get(
+        let lookupHistory = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: hash,
             length: length,
         )
-        logger.debug("previous info: \(String(describing: preimageInfo))")
+        logger.debug("previous lookup history: \(String(describing: lookupHistory))")
 
-        let notRequestedYet = preimageInfo == nil
-        let isPreviouslyAvailable = preimageInfo?.count == 2
+        let notRequestedYet = lookupHistory == nil
+        let isPreviouslyAvailable = lookupHistory?.count == 2
         let canSolicit = notRequestedYet || isPreviouslyAvailable
 
         if !canSolicit {
@@ -530,9 +530,9 @@ public class Solicit: HostCall {
             let oldValue = try await x.state.accounts.value.get(serviceAccount: x.serviceIndex, preimageHash: hash, length: length)
             if notRequestedYet {
                 tempAcc.updateFootprintPreimage(oldValue: oldValue, newValue: [], length: length)
-            } else if isPreviouslyAvailable, var preimageInfo {
-                try preimageInfo.append(timeslot)
-                tempAcc.updateFootprintPreimage(oldValue: oldValue, newValue: preimageInfo, length: length)
+            } else if isPreviouslyAvailable, var lookupHistory {
+                try lookupHistory.append(timeslot)
+                tempAcc.updateFootprintPreimage(oldValue: oldValue, newValue: lookupHistory, length: length)
             }
             acc = tempAcc
         }
@@ -544,21 +544,21 @@ public class Solicit: HostCall {
             if notRequestedYet {
                 logger.debug("solicit new preimage")
                 try await x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: hash, length: length, value: [])
-            } else if isPreviouslyAvailable, var preimageInfo {
+            } else if isPreviouslyAvailable, var lookupHistory {
                 logger.debug("solicit existing preimage")
-                try preimageInfo.append(timeslot)
+                try lookupHistory.append(timeslot)
                 try await x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: hash,
                     length: length,
-                    value: preimageInfo,
+                    value: lookupHistory,
                 )
             }
         }
     }
 }
 
-/// Forget data made available in-core (through preimage lookups)
+/// Cancel, mark unavailable, or expunge a preimage lookup
 public class Forget: HostCall {
     public static var identifier: UInt8 {
         24
@@ -581,17 +581,17 @@ public class Forget: HostCall {
             throw VMInvocationsError.panic
         }
 
-        let preimageInfo = try await x.state.accounts.value.get(
+        let lookupHistory = try await x.state.accounts.value.get(
             serviceAccount: x.serviceIndex,
             preimageHash: hash,
             length: length,
         )
-        let historyCount = preimageInfo?.count
+        let historyCount = lookupHistory?.count
         let minHoldSlot = max(0, Int(timeslot) - config.value.preimagePurgePeriod)
 
-        let canExpunge = historyCount == 0 || (historyCount == 2 && preimageInfo![1] < minHoldSlot)
+        let canExpunge = historyCount == 0 || (historyCount == 2 && lookupHistory![1] < minHoldSlot)
         let isAvailable1 = historyCount == 1
-        let isAvailable3 = historyCount == 3 && (preimageInfo![1] < minHoldSlot)
+        let isAvailable3 = historyCount == 3 && (lookupHistory![1] < minHoldSlot)
 
         let canForget = canExpunge || isAvailable1 || isAvailable3
 
@@ -602,28 +602,28 @@ public class Forget: HostCall {
             if canExpunge {
                 try await x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: hash, length: length, value: nil)
                 x.state.accounts.set(serviceAccount: x.serviceIndex, preimageHash: hash, value: nil)
-            } else if isAvailable1, var preimageInfo {
-                try preimageInfo.append(timeslot)
+            } else if isAvailable1, var lookupHistory {
+                try lookupHistory.append(timeslot)
                 try await x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: hash,
                     length: length,
-                    value: preimageInfo,
+                    value: lookupHistory,
                 )
-            } else if isAvailable3, var preimageInfo {
-                preimageInfo = [preimageInfo[2], timeslot]
+            } else if isAvailable3, var lookupHistory {
+                lookupHistory = [lookupHistory[2], timeslot]
                 try await x.state.accounts.set(
                     serviceAccount: x.serviceIndex,
                     preimageHash: hash,
                     length: length,
-                    value: preimageInfo,
+                    value: lookupHistory,
                 )
             }
         }
     }
 }
 
-/// Yield accumulation hash
+/// Set the service's accumulation output hash
 public class Yield: HostCall {
     public static var identifier: UInt8 {
         25
@@ -647,7 +647,7 @@ public class Yield: HostCall {
     }
 }
 
-/// Provide some preimages (will be made available after invocation)
+/// Queue a requested preimage for integration after accumulation
 public class Provide: HostCall {
     public static var identifier: UInt8 {
         26

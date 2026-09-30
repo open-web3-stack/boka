@@ -34,26 +34,26 @@ extension ReportItem: Validate {
 
 public struct DisputesPostState: Sendable, Equatable {
     public var judgements: JudgementsState
-    public var reports: ConfigFixedSizeArray<
+    public var availabilityAssignments: ConfigFixedSizeArray<
         ReportItem?,
         ProtocolConfig.TotalNumberOfCores,
     >
 
     public init(
         judgements: JudgementsState,
-        reports: ConfigFixedSizeArray<
+        availabilityAssignments: ConfigFixedSizeArray<
             ReportItem?,
             ProtocolConfig.TotalNumberOfCores,
         >,
     ) {
         self.judgements = judgements
-        self.reports = reports
+        self.availabilityAssignments = availabilityAssignments
     }
 }
 
 public protocol Disputes {
     var judgements: JudgementsState { get }
-    var reports: ConfigFixedSizeArray<
+    var availabilityAssignments: ConfigFixedSizeArray<
         ReportItem?,
         ProtocolConfig.TotalNumberOfCores,
     > { get }
@@ -79,7 +79,7 @@ extension Disputes {
         offenders: [Ed25519PublicKey],
     ) {
         var newJudgements = judgements
-        var newReports = reports
+        var newAvailabilityAssignments = availabilityAssignments
         var offenders: [Ed25519PublicKey] = []
 
         let epochLength = UInt32(config.value.epochLength)
@@ -135,10 +135,10 @@ extension Disputes {
 
         var allReports = Set(disputes.verdicts.map(\.reportHash))
         allReports.formUnion(judgements.goodSet)
-        allReports.formUnion(judgements.banSet)
+        allReports.formUnion(judgements.badSet)
         allReports.formUnion(judgements.wonkySet)
 
-        let expectedReportCount = disputes.verdicts.count + judgements.goodSet.count + judgements.banSet.count + judgements.wonkySet.count
+        let expectedReportCount = disputes.verdicts.count + judgements.goodSet.count + judgements.badSet.count + judgements.wonkySet.count
 
         guard allReports.count == expectedReportCount else {
             throw .duplicatedReport
@@ -161,7 +161,7 @@ extension Disputes {
                 }
 
                 tobeRemoved.insert(hash)
-                newJudgements.banSet.insert(hash)
+                newJudgements.badSet.insert(hash)
 
                 let faults = disputes.faults.filter { $0.reportHash == hash }
                 for fault in faults {
@@ -195,16 +195,16 @@ extension Disputes {
         }
 
         for culprit in disputes.culprits {
-            guard newJudgements.banSet.contains(culprit.reportHash) else {
+            guard newJudgements.badSet.contains(culprit.reportHash) else {
                 throw .invalidCulprit
             }
         }
 
-        for i in 0 ..< newReports.count {
-            if let report = newReports[i]?.workReport {
+        for i in 0 ..< newAvailabilityAssignments.count {
+            if let report = newAvailabilityAssignments[i]?.workReport {
                 let hash = report.hash()
                 if tobeRemoved.contains(hash) {
-                    newReports[i] = nil
+                    newAvailabilityAssignments[i] = nil
                 }
             }
         }
@@ -212,7 +212,7 @@ extension Disputes {
         return (
             state: DisputesPostState(
                 judgements: newJudgements,
-                reports: newReports,
+                availabilityAssignments: newAvailabilityAssignments,
             ),
             offenders: offenders,
         )

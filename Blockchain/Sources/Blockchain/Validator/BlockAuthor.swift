@@ -98,7 +98,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
             vrfOutput = try secretKey.getOutput(vrfInputData: inputData)
         }
 
-        let vrfSignature = try secretKey.ietfVRFSign(vrfInputData: SigningContext.entropyInputData(entropy: vrfOutput))
+        let entropySource = try secretKey.ietfVRFSign(vrfInputData: SigningContext.entropyInputData(entropy: vrfOutput))
 
         let authorIndex = state.value.currentValidators.firstIndex { publicKey.data == $0.bandersnatch }
         guard let authorIndex else {
@@ -108,7 +108,7 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
         let safroleResult = try state.value.updateSafrole(
             config: config,
             slot: timeslot,
-            entropy: Bandersnatch.getIetfSignatureOutput(signature: vrfSignature),
+            entropy: Bandersnatch.getIetfSignatureOutput(signature: entropySource),
             offenders: state.value.judgements.punishSet,
             extrinsics: extrinsic.tickets,
         )
@@ -116,13 +116,13 @@ public final class BlockAuthor: ServiceBase2, @unchecked Sendable, OnBeforeEpoch
         let unsignedHeader = Header.Unsigned(
             parentHash: parentHash,
             priorStateRoot: stateRoot,
-            extrinsicsHash: extrinsic.hash(),
+            extrinsicHash: extrinsic.hash(),
             timeslot: timeslot,
-            epoch: safroleResult.epochMark,
+            epochMarker: safroleResult.epochMark,
             winningTickets: safroleResult.ticketsMark,
             authorIndex: ValidatorIndex(authorIndex),
-            vrfSignature: vrfSignature,
-            offendersMarkers: [], // Judged offenders who will be marked in this block
+            entropySource: entropySource,
+            offendersMarker: [], // Judged offenders who will be marked in this block
         )
 
         let encodedHeader = try JamEncoder.encode(unsignedHeader)

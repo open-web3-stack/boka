@@ -27,7 +27,7 @@ func validatorBenchmarks() {
         var block = BlockRef.dummy(config: config, parent: parent)
         for _ in 0 ..< 100 {
             block = BlockRef.dummy(config: config, parent: parent).mutate { b in
-                b.header.unsigned.extrinsicsHash = Data32.random()
+                b.header.unsigned.extrinsicHash = Data32.random()
             }
         }
         benchmark.stopMeasurement()

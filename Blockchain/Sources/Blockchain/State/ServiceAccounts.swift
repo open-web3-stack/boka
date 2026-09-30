@@ -9,7 +9,7 @@ public protocol ServiceAccounts: Sendable {
     func get(serviceAccount index: ServiceIndex, preimageHash hash: Data32) async throws -> Data?
     func get(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32,
-    ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value?
+    ) async throws -> StateKeys.ServiceAccountLookupKey.Value?
 
     func historicalLookup(serviceAccount index: ServiceIndex, timeslot: TimeslotIndex, preimageHash hash: Data32) async throws -> Data?
 
@@ -26,7 +26,7 @@ public protocol ServiceAccounts: Sendable {
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value?,
+        value: StateKeys.ServiceAccountLookupKey.Value?,
     ) async throws
 
     mutating func remove(serviceAccount index: ServiceIndex) async throws
@@ -97,7 +97,7 @@ public class ServiceAccountsMutRef: @unchecked Sendable {
         value: LimitedSizeArray<TimeslotIndex, ConstInt0, ConstInt3>?,
     ) async throws {
         try await ref.value.set(serviceAccount: index, preimageHash: hash, length: length, value: value)
-        changes.addPreimageInfoUpdate(index: index, hash: hash, length: length, value: value)
+        changes.addLookupUpdate(index: index, hash: hash, length: length, value: value)
     }
 
     public func addNew(serviceAccount index: ServiceIndex, account: ServiceAccount) async throws {
@@ -113,7 +113,7 @@ public class ServiceAccountsMutRef: @unchecked Sendable {
         for (key, value) in account.preimages {
             ref.value.set(serviceAccount: index, preimageHash: key, value: value)
         }
-        for (key, value) in account.preimageInfos {
+        for (key, value) in account.lookup {
             try await ref.value.set(serviceAccount: index, preimageHash: key.hash, length: key.length, value: value)
         }
         changes.addNewAccount(index: index, account: account)

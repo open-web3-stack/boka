@@ -34,10 +34,10 @@ func runtimeBenchmarks() {
     Benchmark("runtime.validate.header") { benchmark in
         let (parentBlock, parentState) = try await createGenesis(config: config)
         let stateRoot = await parentState.value.stateRoot
-        // Create a block with the correct priorStateRoot and extrinsicsHash
+        // Create a block with the correct priorStateRoot and extrinsicHash
         let block = BlockRef.dummy(config: config, parent: parentBlock).mutate { b in
             b.header.unsigned.priorStateRoot = stateRoot
-            b.header.unsigned.extrinsicsHash = b.extrinsic.hash()
+            b.header.unsigned.extrinsicHash = b.extrinsic.hash()
         }
         let runtime = Runtime(config: config, ancestry: nil)
         let validatedBlock = try block.toValidated(config: config)
@@ -51,10 +51,10 @@ func runtimeBenchmarks() {
     Benchmark("runtime.validate.block") { benchmark in
         let (parentBlock, parentState) = try await createGenesis(config: config)
         let stateRoot = await parentState.value.stateRoot
-        // Create a block with the correct priorStateRoot and extrinsicsHash
+        // Create a block with the correct priorStateRoot and extrinsicHash
         let block = BlockRef.dummy(config: config, parent: parentBlock).mutate { b in
             b.header.unsigned.priorStateRoot = stateRoot
-            b.header.unsigned.extrinsicsHash = b.extrinsic.hash()
+            b.header.unsigned.extrinsicHash = b.extrinsic.hash()
         }
         let runtime = Runtime(config: config, ancestry: nil)
         let validatedBlock = try block.toValidated(config: config)
@@ -162,7 +162,7 @@ func runtimeBenchmarks() {
     }
 
     Benchmark("runtime.guaranteeing.validate.repeatedService", configuration: BokaBenchmark.configuration()) { benchmark in
-        let account = runtimeServiceAccount(codeHash: runtimeData32(1), minAccumlateGas: Gas(10), config: config)
+        let account = runtimeServiceAccount(codeHash: runtimeData32(1), minItemGas: Gas(10), config: config)
         let state = try RuntimeGuaranteeingBenchmarkState(config: config, serviceAccounts: [7: account])
         let extrinsic = try runtimeGuaranteingExtrinsic(
             config: config,
@@ -183,7 +183,7 @@ private struct RuntimeGuaranteeingBenchmarkState: Guaranteeing {
     var entropyPool: EntropyPool
     var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
     var previousValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
-    var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
+    var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
         ProtocolConfig.TotalNumberOfCores,
@@ -201,7 +201,7 @@ private struct RuntimeGuaranteeingBenchmarkState: Guaranteeing {
         entropyPool = EntropyPool((Data32(), Data32(), Data32(), Data32()))
         currentValidators = try ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey())
         previousValidators = try ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey())
-        reports = try ConfigFixedSizeArray(
+        availabilityAssignments = try ConfigFixedSizeArray(
             config: config,
             array: Array(repeating: nil, count: config.value.totalNumberOfCores),
         )
@@ -261,12 +261,12 @@ private func runtimeGuaranteingExtrinsic(
 
 private func runtimeServiceAccount(
     codeHash: Data32,
-    minAccumlateGas: Gas,
+    minItemGas: Gas,
     config: ProtocolConfigRef,
 ) -> ServiceAccountDetails {
     var account = ServiceAccount.dummy(config: config).toDetails()
     account.codeHash = codeHash
-    account.minAccumlateGas = minAccumlateGas
+    account.minItemGas = minItemGas
     return account
 }
 

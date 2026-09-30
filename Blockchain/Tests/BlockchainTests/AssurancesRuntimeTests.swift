@@ -11,7 +11,7 @@ struct AssurancesRuntimeTests {
         let staleReport = makeReport(coreIndex: 0, timeslot: 5)
         let freshReport = makeReport(coreIndex: 1, timeslot: 6)
         let state = try AssuranceState(
-            reports: makeReports([staleReport, freshReport]),
+            availabilityAssignments: makeAvailabilityAssignments([staleReport, freshReport]),
             currentValidators: makeValidators(),
         )
 
@@ -21,8 +21,8 @@ struct AssurancesRuntimeTests {
             extrinsic: ExtrinsicAvailability.dummy(config: config),
         )
 
-        #expect(result.newReports[0] == nil)
-        #expect(result.newReports[1] == freshReport)
+        #expect(result.newAvailabilityAssignments[0] == nil)
+        #expect(result.newAvailabilityAssignments[1] == freshReport)
         #expect(result.availableReports.isEmpty)
     }
 
@@ -30,7 +30,7 @@ struct AssurancesRuntimeTests {
     func updateMakesReportAvailableAfterValidatorThreshold() throws {
         let report = makeReport(coreIndex: 0, timeslot: 6)
         let state = try AssuranceState(
-            reports: makeReports([report, nil]),
+            availabilityAssignments: makeAvailabilityAssignments([report, nil]),
             currentValidators: makeValidators(),
         )
         let threshold = ProtocolConfig.TwoThirdValidatorsPlusOne.read(config: config)
@@ -45,15 +45,15 @@ struct AssurancesRuntimeTests {
         )
 
         #expect(result.availableReports == [report.workReport])
-        #expect(result.newReports[0] == nil)
-        #expect(result.newReports[1] == nil)
+        #expect(result.newAvailabilityAssignments[0] == nil)
+        #expect(result.newAvailabilityAssignments[1] == nil)
     }
 
     @Test
     func updateRejectsAssuranceForEmptyCore() throws {
         let report = makeReport(coreIndex: 0, timeslot: 6)
         let state = try AssuranceState(
-            reports: makeReports([report, nil]),
+            availabilityAssignments: makeAvailabilityAssignments([report, nil]),
             currentValidators: makeValidators(),
         )
 
@@ -72,10 +72,10 @@ struct AssurancesRuntimeTests {
         return ReportItem(workReport: workReport, timeslot: timeslot)
     }
 
-    private func makeReports(
-        _ reports: [ReportItem?],
+    private func makeAvailabilityAssignments(
+        _ assignments: [ReportItem?],
     ) throws -> ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores> {
-        try ConfigFixedSizeArray(config: config, array: reports)
+        try ConfigFixedSizeArray(config: config, array: assignments)
     }
 
     private func makeValidators() throws -> ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators> {
@@ -102,6 +102,6 @@ struct AssurancesRuntimeTests {
 }
 
 private struct AssuranceState: Assurances {
-    var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
+    var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
 }

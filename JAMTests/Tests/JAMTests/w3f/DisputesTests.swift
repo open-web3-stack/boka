@@ -7,7 +7,7 @@ import Utils
 
 struct DisputesState: Equatable, Codable, Disputes {
     var judgements: JudgementsState
-    var reports: ConfigFixedSizeArray<
+    var availabilityAssignments: ConfigFixedSizeArray<
         ReportItem?,
         ProtocolConfig.TotalNumberOfCores,
     >
@@ -21,7 +21,7 @@ struct DisputesState: Equatable, Codable, Disputes {
 
     mutating func mergeWith(postState: DisputesPostState) {
         judgements = postState.judgements
-        reports = postState.reports
+        availabilityAssignments = postState.availabilityAssignments
     }
 }
 

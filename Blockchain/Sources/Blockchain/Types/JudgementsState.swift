@@ -6,7 +6,7 @@ public struct JudgementsState: Sendable, Equatable, Codable {
     @CodingAs<SortedSet<Data32>> public var goodSet: Set<Data32>
 
     // ψb: Work-reports judged to be incorrect
-    @CodingAs<SortedSet<Data32>> public var banSet: Set<Data32>
+    @CodingAs<SortedSet<Data32>> public var badSet: Set<Data32>
 
     // ψw: Work-reports whose validity is judged to be unknowable
     @CodingAs<SortedSet<Data32>> public var wonkySet: Set<Data32>
@@ -16,12 +16,12 @@ public struct JudgementsState: Sendable, Equatable, Codable {
 
     public init(
         goodSet: Set<Data32>,
-        banSet: Set<Data32>,
+        badSet: Set<Data32>,
         wonkySet: Set<Data32>,
         punishSet: Set<Ed25519PublicKey>,
     ) {
         self.goodSet = goodSet
-        self.banSet = banSet
+        self.badSet = badSet
         self.wonkySet = wonkySet
         self.punishSet = punishSet
     }
@@ -32,7 +32,7 @@ extension JudgementsState: Dummy {
     public static func dummy(config _: Config) -> JudgementsState {
         JudgementsState(
             goodSet: [],
-            banSet: [],
+            badSet: [],
             wonkySet: [],
             punishSet: [],
         )

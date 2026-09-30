@@ -12,7 +12,7 @@ struct AssurancesInput: Codable {
 }
 
 struct AssuranceState: Equatable, Codable, Assurances {
-    var reports: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
+    var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var currentValidators:
         ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
 }
@@ -47,10 +47,10 @@ struct AssurancesTests {
             )
         }
         switch result {
-        case let .success((newReports, availableReports)):
+        case let .success((newAvailabilityAssignments, availableReports)):
             switch testcase.output {
             case let .left(reports):
-                state.reports = newReports
+                state.availabilityAssignments = newAvailabilityAssignments
                 #expect(state == testcase.postState)
                 #expect(availableReports == reports)
             case .right:

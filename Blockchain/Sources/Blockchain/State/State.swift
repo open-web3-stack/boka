@@ -112,13 +112,13 @@ public struct State: Sendable {
         }
     }
 
-    // ρ: The ρending reports, per core, which are being made available prior to accumulation.
-    public var reports: StateKeys.ReportsKey.Value {
+    // ρ: The availability assignments, one per core.
+    public var availabilityAssignments: StateKeys.AvailabilityAssignmentsKey.Value {
         get {
-            layer.reports
+            layer.availabilityAssignments
         }
         set {
-            layer.reports = newValue
+            layer.availabilityAssignments = newValue
         }
     }
 
@@ -217,7 +217,7 @@ public struct State: Sendable {
     /// l
     public subscript(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32,
-    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
+    ) -> StateKeys.ServiceAccountLookupKey.Value? {
         get {
             layer[serviceAccount: index, preimageHash: hash, length: length]
         }
@@ -297,14 +297,14 @@ extension State: Dummy {
             try! ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config))
         let previousValidators: StateKeys.PreviousValidatorsKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config))
-        let reports: StateKeys.ReportsKey.Value = try! ConfigFixedSizeArray(config: config, defaultValue: nil)
+        let availabilityAssignments: StateKeys.AvailabilityAssignmentsKey.Value = try! ConfigFixedSizeArray(config: config, defaultValue: nil)
         let timeslot: StateKeys.TimeslotKey.Value = block?.header.timeslot ?? 0
         let authorizationQueue: StateKeys.AuthorizationQueueKey.Value =
             try! ConfigFixedSizeArray(config: config, defaultValue: ConfigFixedSizeArray(config: config, defaultValue: Data32()))
         let privilegedServices: StateKeys.PrivilegedServicesKey.Value = PrivilegedServices(
             manager: ServiceIndex(),
             assigners: try! ConfigFixedSizeArray(config: config, defaultValue: ServiceIndex()),
-            delegator: ServiceIndex(),
+            designator: ServiceIndex(),
             registrar: ServiceIndex(),
             alwaysAcc: [:],
         )
@@ -330,7 +330,7 @@ extension State: Dummy {
             (StateKeys.ValidatorQueueKey(), validatorQueue),
             (StateKeys.CurrentValidatorsKey(), currentValidators),
             (StateKeys.PreviousValidatorsKey(), previousValidators),
-            (StateKeys.ReportsKey(), reports),
+            (StateKeys.AvailabilityAssignmentsKey(), availabilityAssignments),
             (StateKeys.TimeslotKey(), timeslot),
             (StateKeys.PrivilegedServicesKey(), privilegedServices),
             (StateKeys.ActivityStatisticsKey(), activityStatistics),
@@ -390,14 +390,14 @@ extension State: ServiceAccounts {
 
     public func get(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32,
-    ) async throws -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
+    ) async throws -> StateKeys.ServiceAccountLookupKey.Value? {
         if layer.isDeleted(serviceAccount: index, preimageHash: hash, length: length) {
             return nil
         }
         if let res = layer[serviceAccount: index, preimageHash: hash, length: length] {
             return res
         }
-        return try await backend.read(StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length))
+        return try await backend.read(StateKeys.ServiceAccountLookupKey(index: index, hash: hash, length: length))
     }
 
     public func historicalLookup(
@@ -406,15 +406,15 @@ extension State: ServiceAccounts {
         preimageHash hash: Data32,
     ) async throws -> Data? {
         if let preimage = try await get(serviceAccount: index, preimageHash: hash),
-           let preimageInfo = try await get(serviceAccount: index, preimageHash: hash, length: UInt32(preimage.count))
+           let lookupHistory = try await get(serviceAccount: index, preimageHash: hash, length: UInt32(preimage.count))
         {
             var isAvailable = false
-            if preimageInfo.count == 1 {
-                isAvailable = preimageInfo[0] <= timeslot
-            } else if preimageInfo.count == 2 {
-                isAvailable = preimageInfo[0] <= timeslot && timeslot < preimageInfo[1]
-            } else if preimageInfo.count == 3 {
-                isAvailable = preimageInfo[0] <= timeslot && timeslot < preimageInfo[1] && preimageInfo[2] <= timeslot
+            if lookupHistory.count == 1 {
+                isAvailable = lookupHistory[0] <= timeslot
+            } else if lookupHistory.count == 2 {
+                isAvailable = lookupHistory[0] <= timeslot && timeslot < lookupHistory[1]
+            } else if lookupHistory.count == 3 {
+                isAvailable = lookupHistory[0] <= timeslot && timeslot < lookupHistory[1] && lookupHistory[2] <= timeslot
             }
 
             return isAvailable ? preimage : nil
@@ -459,7 +459,7 @@ extension State: ServiceAccounts {
         serviceAccount index: ServiceIndex,
         preimageHash hash: Data32,
         length: UInt32,
-        value: StateKeys.ServiceAccountPreimageInfoKey.Value?,
+        value: StateKeys.ServiceAccountLookupKey.Value?,
     ) async throws {
         // update footprint
         let oldValue = try await get(serviceAccount: index, preimageHash: hash, length: length)
@@ -544,7 +544,7 @@ extension State: Assurances {}
 extension State: Disputes {
     public mutating func mergeWith(postState: DisputesPostState) {
         judgements = postState.judgements
-        reports = postState.reports
+        availabilityAssignments = postState.availabilityAssignments
     }
 }
 

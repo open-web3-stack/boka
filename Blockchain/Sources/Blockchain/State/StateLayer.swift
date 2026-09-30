@@ -70,7 +70,7 @@ private enum FixedStateLayerKeys {
     static let validatorQueue = StateKeys.ValidatorQueueKey().encode()
     static let currentValidators = StateKeys.CurrentValidatorsKey().encode()
     static let previousValidators = StateKeys.PreviousValidatorsKey().encode()
-    static let reports = StateKeys.ReportsKey().encode()
+    static let availabilityAssignments = StateKeys.AvailabilityAssignmentsKey().encode()
     static let timeslot = StateKeys.TimeslotKey().encode()
     static let privilegedServices = StateKeys.PrivilegedServicesKey().encode()
     static let activityStatistics = StateKeys.ActivityStatisticsKey().encode()
@@ -190,13 +190,13 @@ public struct StateLayer: Sendable {
         }
     }
 
-    // ρ: The ρending reports, per core, which are being made available prior to accumulation.
-    public var reports: StateKeys.ReportsKey.Value {
+    // ρ: The availability assignments, one per core.
+    public var availabilityAssignments: StateKeys.AvailabilityAssignmentsKey.Value {
         get {
-            changes[FixedStateLayerKeys.reports]!.value()!
+            changes[FixedStateLayerKeys.availabilityAssignments]!.value()!
         }
         set {
-            changes[FixedStateLayerKeys.reports] = .init(newValue)
+            changes[FixedStateLayerKeys.availabilityAssignments] = .init(newValue)
         }
     }
 
@@ -230,7 +230,7 @@ public struct StateLayer: Sendable {
         }
     }
 
-    // ϑ: The accumulation queue.
+    // ω: The accumulation queue.
     public var accumulationQueue: StateKeys.AccumulationQueueKey.Value {
         get {
             changes[FixedStateLayerKeys.accumulationQueue]!.value()!
@@ -295,17 +295,17 @@ public struct StateLayer: Sendable {
     /// l
     public subscript(
         serviceAccount index: ServiceIndex, preimageHash hash: Data32, length length: UInt32,
-    ) -> StateKeys.ServiceAccountPreimageInfoKey.Value? {
+    ) -> StateKeys.ServiceAccountLookupKey.Value? {
         get {
             changes[
-                StateKeys.ServiceAccountPreimageInfoKey(
+                StateKeys.ServiceAccountLookupKey(
                     index: index, hash: hash, length: length,
                 ).encode(),
             ]?.value()
         }
         set {
             changes[
-                StateKeys.ServiceAccountPreimageInfoKey(
+                StateKeys.ServiceAccountLookupKey(
                     index: index, hash: hash, length: length,
                 ).encode(),
             ] = .init(newValue)
@@ -359,6 +359,6 @@ extension StateLayer {
     }
 
     public func isDeleted(serviceAccount index: ServiceIndex, preimageHash hash: Data32, length: UInt32) -> Bool {
-        changes[StateKeys.ServiceAccountPreimageInfoKey(index: index, hash: hash, length: length).encode()]?.isDeleted ?? false
+        changes[StateKeys.ServiceAccountLookupKey(index: index, hash: hash, length: length).encode()]?.isDeleted ?? false
     }
 }

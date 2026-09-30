@@ -80,7 +80,7 @@ public final class Runtime {
             throw Error.invalidHeaderStateRoot
         }
 
-        guard block.header.extrinsicsHash == block.extrinsic.hash() else {
+        guard block.header.extrinsicHash == block.extrinsic.hash() else {
             throw Error.invalidExtrinsicHash
         }
 
@@ -92,7 +92,7 @@ public final class Runtime {
 
         // winning tickets is validated at apply time by Safrole
 
-        // offendersMarkers is validated at apply time by Disputes
+        // offendersMarker is validated at apply time by Disputes
     }
 
     public func validateHeaderSeal(block: BlockRef, state: State) throws(Error) {
@@ -142,7 +142,7 @@ public final class Runtime {
         }
 
         _ = try Result {
-            try blockAuthorKey.ietfVRFVerify(vrfInputData: entropyVRFInputData, signature: block.header.vrfSignature)
+            try blockAuthorKey.ietfVRFVerify(vrfInputData: entropyVRFInputData, signature: block.header.entropySource)
         }.mapError { _ in Error.invalidVrfSignature }.get()
     }
 
@@ -222,7 +222,7 @@ public final class Runtime {
             // after reports as reports need old recent history
             try updateRecentHistory(block: block, state: &newState, accumulateRoot: accumulateRoot)
 
-            // update authorization pool and queue
+            // update authorization pool α′ from the fresh queue
             do {
                 let authorizationResult = try newState.update(
                     config: config,
@@ -279,13 +279,13 @@ public final class Runtime {
         let safroleResult = try newState.updateSafrole(
             config: config,
             slot: block.header.timeslot,
-            entropy: Bandersnatch.getIetfSignatureOutput(signature: block.header.vrfSignature),
+            entropy: Bandersnatch.getIetfSignatureOutput(signature: block.header.entropySource),
             offenders: newState.judgements.punishSet,
             extrinsics: block.extrinsic.tickets,
         )
         newState.mergeWith(postState: safroleResult.state)
 
-        guard safroleResult.epochMark == block.header.epoch else {
+        guard safroleResult.epochMark == block.header.epochMarker else {
             throw Error.invalidHeaderEpochMarker
         }
 
@@ -298,7 +298,7 @@ public final class Runtime {
         let (posState, offenders) = try newState.update(config: config, disputes: block.extrinsic.disputes)
         newState.mergeWith(postState: posState)
 
-        guard offenders == block.header.offendersMarkers else {
+        guard offenders == block.header.offendersMarker else {
             throw Error.invalidHeaderOffendersMarkers
         }
     }
@@ -306,14 +306,14 @@ public final class Runtime {
     /// returns available reports
     public func updateAssurances(block: BlockRef, state newState: inout State) async throws -> [WorkReport] {
         let (
-            newReports: newReports, availableReports: availableReports,
+            newAvailabilityAssignments: newAvailabilityAssignments, availableReports: availableReports,
         ) = try newState.update(
             config: config,
             timeslot: block.header.timeslot,
             extrinsic: block.extrinsic.availability,
         )
 
-        newState.reports = newReports
+        newState.availabilityAssignments = newAvailabilityAssignments
         return availableReports
     }
 
@@ -321,7 +321,7 @@ public final class Runtime {
         let result = try await newState.update(
             config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports, ancestry: ancestry,
         )
-        newState.reports = result.newReports
+        newState.availabilityAssignments = result.newAvailabilityAssignments
         return result.reporters
     }
 

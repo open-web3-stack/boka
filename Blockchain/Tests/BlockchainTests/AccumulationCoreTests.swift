@@ -137,14 +137,14 @@ struct AccumulationCoreTests {
 
         var updated = existing
         updated.balance = Balance(250)
-        let preimageInfo: StateKeys.ServiceAccountPreimageInfoKey.Value = [9]
+        let lookupHistory: StateKeys.ServiceAccountLookupKey.Value = [9]
 
         var changes = AccountChanges()
         changes.addNewAccount(index: 30, account: newAccount)
         changes.addAccountUpdate(index: 31, account: updated)
         changes.addStorageUpdate(index: 31, key: Data([7]), value: Data([8]))
         changes.addPreimageUpdate(index: 31, hash: data32(9), value: Data([10]))
-        changes.addPreimageInfoUpdate(index: 31, hash: data32(9), length: 1, value: preimageInfo)
+        changes.addLookupUpdate(index: 31, hash: data32(9), length: 1, value: lookupHistory)
 
         try await changes.apply(to: accounts)
 
@@ -156,7 +156,7 @@ struct AccumulationCoreTests {
         #expect(try await accounts.value.get(serviceAccount: 31)?.balance == Balance(250))
         #expect(try await accounts.value.get(serviceAccount: 31, storageKey: Data([7])) == Data([8]))
         #expect(try await accounts.value.get(serviceAccount: 31, preimageHash: data32(9)) == Data([10]))
-        #expect(try await accounts.value.get(serviceAccount: 31, preimageHash: data32(9), length: 1) == preimageInfo)
+        #expect(try await accounts.value.get(serviceAccount: 31, preimageHash: data32(9), length: 1) == lookupHistory)
     }
 
     @Test
@@ -211,7 +211,7 @@ struct AccumulationCoreTests {
         changes.addAccountUpdate(index: 32, account: ServiceAccount.dummy(config: config).toDetails())
         changes.addStorageUpdate(index: 32, key: Data([1]), value: Data([2]))
         changes.addPreimageUpdate(index: 32, hash: data32(3), value: Data([4]))
-        changes.addPreimageInfoUpdate(index: 32, hash: data32(3), length: 1, value: [5])
+        changes.addLookupUpdate(index: 32, hash: data32(3), length: 1, value: [5])
         changes.addRemovedAccount(index: 32)
 
         try await changes.apply(to: accounts)

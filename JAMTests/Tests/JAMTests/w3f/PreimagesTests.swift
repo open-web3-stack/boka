@@ -5,11 +5,11 @@ import Foundation
 import Testing
 import Utils
 
-private struct PreimageInfo: Codable, Equatable, Hashable, Comparable {
+private struct PreimageMapEntry: Codable, Equatable, Hashable, Comparable {
     var hash: Data32
     var blob: Data
 
-    static func < (lhs: PreimageInfo, rhs: PreimageInfo) -> Bool {
+    static func < (lhs: PreimageMapEntry, rhs: PreimageMapEntry) -> Bool {
         lhs.hash < rhs.hash
     }
 }
@@ -21,7 +21,7 @@ private struct HistoryEntry: Codable, Equatable {
 
 private struct AccountsMapEntry: Codable, Equatable {
     var index: ServiceIndex
-    @CodingAs<SortedSet<PreimageInfo>> var preimages: Set<PreimageInfo>
+    @CodingAs<SortedSet<PreimageMapEntry>> var preimages: Set<PreimageMapEntry>
     @CodingAs<SortedKeyValues<HashAndLength, [TimeslotIndex]>> var history: [HashAndLength: [TimeslotIndex]]
 }
 
@@ -56,7 +56,7 @@ private struct PreimagesState: Equatable, Codable, Preimages {
             }
             if let accountIndex {
                 var account = accounts[accountIndex]
-                account.preimages.insert(PreimageInfo(hash: update.hash, blob: update.data))
+                account.preimages.insert(PreimageMapEntry(hash: update.hash, blob: update.data))
                 account.history[HashAndLength(hash: update.hash, length: update.length)] = [update.timeslot]
                 accounts[accountIndex] = account
             }

@@ -32,7 +32,7 @@ public protocol Guaranteeing {
     var previousValidators: ConfigFixedSizeArray<
         ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
     > { get }
-    var reports: ConfigFixedSizeArray<
+    var availabilityAssignments: ConfigFixedSizeArray<
         ReportItem?,
         ProtocolConfig.TotalNumberOfCores,
     > { get }
@@ -114,7 +114,7 @@ extension Guaranteeing {
                 hashes.formUnion(item.workReport.refinementContext.prerequisiteWorkPackages)
             }
         }
-        for report in reports {
+        for report in availabilityAssignments {
             if let report {
                 hashes.formUnion(report.workReport.refinementContext.prerequisiteWorkPackages)
             }
@@ -160,7 +160,7 @@ extension Guaranteeing {
                     throw .invalidResultCodeHash
                 }
 
-                guard digest.gasLimit >= acc.minAccumlateGas else {
+                guard digest.gasLimit >= acc.minItemGas else {
                     throw .invalidServiceGas
                 }
 
@@ -179,7 +179,7 @@ extension Guaranteeing {
         extrinsic: ExtrinsicGuarantees,
         ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>?,
     ) async throws(GuaranteeingError) -> (
-        newReports: ConfigFixedSizeArray<
+        newAvailabilityAssignments: ConfigFixedSizeArray<
             ReportItem?,
             ProtocolConfig.TotalNumberOfCores,
         >,
@@ -265,7 +265,7 @@ extension Guaranteeing {
 
             let coreIndex = Int(report.coreIndex)
 
-            if let existingReport = reports[coreIndex] {
+            if let existingReport = availabilityAssignments[coreIndex] {
                 guard timeslot >= (existingReport.timeslot + UInt32(config.value.preimageReplacementPeriod)) else {
                     throw .coreNotAvailable
                 }
@@ -323,13 +323,13 @@ extension Guaranteeing {
             }
         }
 
-        var newReports = reports
+        var newAvailabilityAssignments = availabilityAssignments
         var reported = [WorkReport]()
 
         for guarantee in extrinsic.guarantees {
             let report = guarantee.workReport
             let coreIndex = Int(report.coreIndex)
-            newReports[coreIndex] = ReportItem(
+            newAvailabilityAssignments[coreIndex] = ReportItem(
                 workReport: report,
                 timeslot: timeslot,
             )
@@ -339,6 +339,6 @@ extension Guaranteeing {
         reported.sort { $0.packageSpecification.workPackageHash < $1.packageSpecification.workPackageHash }
         let reportersArr = Array(reporters).sorted()
 
-        return (newReports, reported, reportersArr)
+        return (newAvailabilityAssignments, reported, reportersArr)
     }
 }

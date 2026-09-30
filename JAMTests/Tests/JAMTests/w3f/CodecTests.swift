@@ -150,7 +150,7 @@ struct CodecTests {
                         "index": item["index"]!,
                     ].json
                 }.json,
-                "extrinsic": json["outputs"]!.array!.map { item in
+                "extrinsic": json["extrinsics"]!.array!.map { item in
                     [
                         "hash": item["hash"]!,
                         "len": item["length"]!,
@@ -216,13 +216,13 @@ struct CodecTests {
             return [
                 "parent": json["parentHash"]!,
                 "parent_state_root": json["priorStateRoot"]!,
-                "extrinsic_hash": json["extrinsicsHash"]!,
+                "extrinsic_hash": json["extrinsicHash"]!,
                 "slot": json["timeslot"]!,
-                "epoch_mark": transform(json["epoch"] ?? .null, value: value.epoch as Any),
+                "epoch_mark": transform(json["epochMarker"] ?? .null, value: value.epochMarker as Any),
                 "tickets_mark": transform(json["winningTickets"] ?? .null, value: value.winningTickets as Any),
                 "author_index": json["authorIndex"]!,
-                "entropy_source": json["vrfSignature"]!,
-                "offenders_mark": transform(json["offendersMarkers"]!, value: value.offendersMarkers),
+                "entropy_source": json["entropySource"]!,
+                "offenders_mark": transform(json["offendersMarker"]!, value: value.offendersMarker),
                 "seal": json["seal"]!,
             ].json
         }

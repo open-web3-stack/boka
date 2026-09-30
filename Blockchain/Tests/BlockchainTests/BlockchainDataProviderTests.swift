@@ -124,7 +124,7 @@ struct BlockchainDataProviderTests {
 
         // Verify fork removal
         let fork = BlockRef.dummy(config: config, parent: block1).mutate {
-            $0.header.unsigned.extrinsicsHash = Data32.random() // so it is different
+            $0.header.unsigned.extrinsicHash = Data32.random() // so it is different
         }
         try await provider.add(block: fork)
         try await provider.setFinalizedHead(hash: block2.hash)
