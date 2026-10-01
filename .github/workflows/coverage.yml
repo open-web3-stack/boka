@@ -90,18 +90,32 @@ jobs:
         run: make test-coverage
       - name: Merge and generate coverage report
         run: |
-          llvm-profdata merge -sparse $(find . -type f -path '*/.build/*/debug/codecov/*.profdata') -o default.profdata
+          mapfile -t PROFDATA_FILES < <(find . -type f -path '*/codecov/*.profdata' -print)
+          if [ "${#PROFDATA_FILES[@]}" -eq 0 ]; then
+              echo "No coverage profile data found"
+              exit 1
+          fi
+          llvm-profdata merge -sparse "${PROFDATA_FILES[@]}" -o default.profdata
           for file in **/Tests; do
             BIN_PATH="$(swift build --show-bin-path --package-path "$(dirname "$file")")"
-            XCTEST_PATHS=$(find "${BIN_PATH}" -name '*.xctest')
-            for XCTEST_PATH in $XCTEST_PATHS; do
-                echo "Processing $XCTEST_PATH"
-                # Export the code coverage for the current subproject and append to coverage.lcov
-                llvm-cov export "${XCTEST_PATH}" \
-                -instr-profile=default.profdata \
-                -format lcov >> coverage.lcov \
-                -ignore-filename-regex=".build/repositories/.*|.*/JAMTests/.*"
-            done
+            while IFS= read -r TEST_BUNDLE; do
+                echo "Processing $TEST_BUNDLE"
+                llvm-cov export "${TEST_BUNDLE}" \
+                  -instr-profile=default.profdata \
+                  -format lcov >> coverage.lcov \
+                  -ignore-filename-regex=".build/repositories/.*|.*/JAMTests/.*"
+            done < <(find "${BIN_PATH}" -type d -name '*.xctest' -print)
+
+            while IFS= read -r TEST_LIBRARY; do
+                TEST_RUNNER="${TEST_LIBRARY%.so}-test-runner"
+                if [ -f "${TEST_RUNNER}" ]; then
+                    echo "Processing $TEST_LIBRARY"
+                    llvm-cov export "${TEST_LIBRARY}" \
+                      -instr-profile=default.profdata \
+                      -format lcov >> coverage.lcov \
+                      -ignore-filename-regex=".build/repositories/.*|.*/JAMTests/.*"
+                fi
+            done < <(find "${BIN_PATH}" -type f -name '*.so' -print)
           done
       - uses: codecov/codecov-action@v4
         with:
