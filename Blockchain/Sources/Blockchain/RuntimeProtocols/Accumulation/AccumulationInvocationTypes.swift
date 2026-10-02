@@ -2,6 +2,8 @@ import Codec
 import Foundation
 import Utils
 
+// MARK: Inputs
+
 public struct OperandTuple: Codable, Sendable {
     /// p
     public var packageHash: Data32
@@ -95,6 +97,8 @@ public struct AccumulationInput: Sendable, Codable {
     }
 }
 
+// MARK: State
+
 /// Characterization (i.e. values capable of representing) of state components
 /// which are both needed and mutable by the accumulation process.
 public struct AccumulateState: Sendable {
@@ -139,6 +143,8 @@ public struct AccumulateState: Sendable {
         )
     }
 }
+
+// MARK: Result
 
 public class AccumulateResultContext {
     /// s: the accumulating service account index
