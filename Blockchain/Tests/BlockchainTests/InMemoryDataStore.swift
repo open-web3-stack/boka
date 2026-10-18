@@ -255,6 +255,10 @@ public actor InMemoryDataStore: DataStoreProtocol {
         metadata[key]
     }
 
+    public func deleteMetadata(key: Data) async throws {
+        metadata.removeValue(forKey: key)
+    }
+
     public func setMetadataIfAbsent(key: Data, value: Data) async throws -> Bool {
         if let existing = metadata[key] {
             return existing == value

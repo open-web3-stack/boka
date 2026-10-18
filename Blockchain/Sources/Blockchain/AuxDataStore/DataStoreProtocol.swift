@@ -59,6 +59,7 @@ public protocol DataStoreProtocol: Sendable {
 
     func setMetadata(key: Data, value: Data) async throws
     func getMetadata(key: Data) async throws -> Data?
+    func deleteMetadata(key: Data) async throws
 
     /// Atomically insert absent metadata, or return whether the existing value matches.
     func setMetadataIfAbsent(key: Data, value: Data) async throws -> Bool
@@ -67,6 +68,14 @@ public protocol DataStoreProtocol: Sendable {
 // MARK: - Supporting Types
 
 extension DataStoreProtocol {
+    /// Retain coding dimensions while either availability store still references the root.
+    public func deleteErasureValidatorCountIfUnused(erasureRoot: Data32) async throws {
+        guard try await getAuditEntry(erasureRoot: erasureRoot) == nil,
+              try await getD3LEntry(erasureRoot: erasureRoot) == nil
+        else { return }
+        try await deleteMetadata(key: Data("ec-validator-count:".utf8) + erasureRoot.data)
+    }
+
     /// Record the encoding count from locally encoded data or a validated report.
     /// Store it before publishing shards for reconstruction.
     public func setErasureValidatorCount(erasureRoot: Data32, count: Int) async throws {

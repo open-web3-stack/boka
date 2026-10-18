@@ -15,15 +15,18 @@ public actor AuditBundleStore {
     private let dataStore: any DataStoreProtocol
     private let filesystemStore: FilesystemDataStore
     private let erasureCoding: ErasureCodingService
+    private let config: ProtocolConfigRef
 
     public init(
         dataStore: any DataStoreProtocol,
         filesystemStore: FilesystemDataStore,
         erasureCoding: ErasureCodingService,
+        config: ProtocolConfigRef,
     ) {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
         self.erasureCoding = erasureCoding
+        self.config = config
     }
 
     /// Store auditable work package bundle with automatic erasure coding
@@ -43,7 +46,7 @@ public actor AuditBundleStore {
         logger.debug("Storing audit bundle: workPackageHash=\(workPackageHash.toHexString()), size=\(bundle.count)")
 
         // Encoded bundle limit, including framing and references (GP #563).
-        let maxBundleSize = 13_904_950
+        let maxBundleSize = config.value.maxWorkBundleSize
         guard bundle.count <= maxBundleSize else {
             throw ErasureCodingStoreError.bundleTooLarge(size: bundle.count, maxSize: maxBundleSize)
         }
@@ -100,15 +103,15 @@ public actor AuditBundleStore {
     /// - Parameter erasureRoot: Erasure root identifying the bundle
     /// - Returns: Bundle data or nil if not found
     public func getBundle(erasureRoot: Data32) async throws -> Data? {
-        let count = try await dataStore.getErasureValidatorCount(erasureRoot: erasureRoot)
-        let erasureCoding = await erasureCoding.forValidators(count)
-        let requiredShardCount = await erasureCoding.requiredShardCount
-        // Try filesystem first (faster)
+        // A complete bundle needs no coding metadata or reconstruction.
         if let bundle = try await filesystemStore.getAuditBundle(erasureRoot: erasureRoot) {
             return bundle
         }
 
         // Fallback to reconstruction from shards
+        let count = try await dataStore.getErasureValidatorCount(erasureRoot: erasureRoot)
+        let erasureCoding = await erasureCoding.forValidators(count)
+        let requiredShardCount = await erasureCoding.requiredShardCount
         let indices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
         guard indices.count >= requiredShardCount else {
             logger.warning("Insufficient shards for reconstruction: \(indices.count)/\(requiredShardCount)")

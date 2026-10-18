@@ -91,6 +91,7 @@ public actor StorageMonitor {
             try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
             try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
             try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
+            try await dataStore.deleteErasureValidatorCountIfUnused(erasureRoot: entry.erasureRoot)
 
             deletedCount += 1
             bytesReclaimed += size
@@ -151,6 +152,7 @@ public actor StorageMonitor {
                     try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
                     try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
                     try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
+                    try await dataStore.deleteErasureValidatorCountIfUnused(erasureRoot: entry.erasureRoot)
 
                     // Update counter
                     await counter.add(size)
@@ -200,6 +202,7 @@ public actor StorageMonitor {
                     try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
                     try await dataStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
                     try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
+                    try await dataStore.deleteErasureValidatorCountIfUnused(erasureRoot: entry.erasureRoot)
 
                     // Update counter
                     await counter.add(size)

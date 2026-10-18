@@ -95,6 +95,7 @@ public actor ErasureCodingDataStore {
             dataStore: dataStore,
             filesystemStore: filesystemStore,
             erasureCoding: erasureCoding,
+            config: config,
         )
         d3lSegmentStore = D3LSegmentStore(
             dataStore: dataStore,

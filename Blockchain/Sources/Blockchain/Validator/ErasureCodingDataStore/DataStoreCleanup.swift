@@ -79,6 +79,7 @@ public actor DataStoreCleanup {
                 // Delete from RocksDB
                 try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
                 try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
+                try await dataStore.deleteErasureValidatorCountIfUnused(erasureRoot: entry.erasureRoot)
 
                 _ = await deletedCount.increment()
                 _ = await bytesReclaimed.add(entry.bundleSize)
@@ -122,6 +123,7 @@ public actor DataStoreCleanup {
             // Delete from RocksDB
             try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
             try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
+            try await dataStore.deleteErasureValidatorCountIfUnused(erasureRoot: entry.erasureRoot)
 
             deletedCount += 1
             bytesReclaimed += entry.bundleSize
@@ -175,6 +177,7 @@ public actor DataStoreCleanup {
                 // Delete from RocksDB
                 try await dataStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
                 try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
+                try await dataStore.deleteErasureValidatorCountIfUnused(erasureRoot: entry.erasureRoot)
 
                 _ = await deletedEntries.increment()
                 _ = await deletedSegments.add(Int(entry.segmentCount))
@@ -216,6 +219,7 @@ public actor DataStoreCleanup {
             // Delete from RocksDB
             try await dataStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
             try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
+            try await dataStore.deleteErasureValidatorCountIfUnused(erasureRoot: entry.erasureRoot)
 
             deletedEntries += 1
             deletedSegments += Int(entry.segmentCount)

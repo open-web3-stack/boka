@@ -35,6 +35,60 @@ struct ErasureCodingDataStoreFacadeTests {
     }
 
     @Test
+    func completeBundleDoesNotRequireCodingMetadata() async throws {
+        let fixture = try makeFixture()
+        defer { removeFixtureDirectory(fixture) }
+        let root = data32(91)
+        let bundle = Data([1, 2, 3])
+        try await fixture.filesystemStore.storeAuditBundle(erasureRoot: root, data: bundle)
+        #expect(try await fixture.store.getAuditBundle(erasureRoot: root) == bundle)
+    }
+
+    @Test
+    func auditBundleLimitUsesTheActiveConfiguration() async throws {
+        let fixture = try makeFixture()
+        defer { removeFixtureDirectory(fixture) }
+        let config = ProtocolConfigRef.dev.mutate {
+            $0.maxEncodedWorkPackageSize = 16
+            $0.maxWorkPackageImports = 0
+            $0.maxWorkPackageExtrinsics = 0
+            $0.maxDepsInWorkReport = 0
+            $0.maxWorkItems = 1
+        }
+        let store = ErasureCodingDataStore(dataStore: fixture.dataStore, filesystemStore: fixture.filesystemStore, config: config)
+        await #expect(throws: ErasureCodingStoreError.self) {
+            try await store.storeAuditBundle(bundle: Data(count: config.value.maxWorkBundleSize + 1), workPackageHash: data32(92), segmentsRoot: data32(93))
+        }
+        _ = try await store.storeAuditBundle(bundle: Data(count: config.value.maxWorkBundleSize), workPackageHash: data32(92), segmentsRoot: data32(93))
+    }
+
+    @Test(arguments: [false, true])
+    func cleanupKeepsSharedCodingCountUntilBothStoresExpire(iterative: Bool) async throws {
+        let fixture = try makeFixture()
+        defer { removeFixtureDirectory(fixture) }
+        let root = data32(94)
+        let old = Date(timeIntervalSince1970: 0)
+        try await fixture.dataStore.setErasureValidatorCount(erasureRoot: root, count: 6)
+        try await fixture.dataStore.setAuditEntry(workPackageHash: data32(95), erasureRoot: root, segmentsRoot: data32(96), bundleSize: 6, timestamp: old)
+        try await fixture.dataStore.setD3LEntry(segmentsRoot: data32(96), erasureRoot: root, segmentCount: 1, timestamp: old)
+        let cleanup = DataStoreCleanup(dataStore: fixture.dataStore, filesystemStore: fixture.filesystemStore)
+        if iterative {
+            _ = try await cleanup.cleanupAuditEntries(retentionEpochs: 0)
+        } else {
+            _ = try await cleanup.cleanupAuditEntriesBeforeEpoch(cutoffEpoch: 1)
+        }
+        #expect(try await fixture.dataStore.getErasureValidatorCount(erasureRoot: root) == 6)
+        if iterative {
+            _ = try await cleanup.cleanupD3LEntries(retentionEpochs: 0)
+        } else {
+            _ = try await cleanup.cleanupD3LEntriesBeforeEpoch(cutoffEpoch: 1)
+        }
+        await #expect(throws: ErasureCodingStoreError.self) {
+            try await fixture.dataStore.getErasureValidatorCount(erasureRoot: root)
+        }
+    }
+
+    @Test
     func concurrentCodingCountsCannotOverwriteEachOther() async throws {
         let store = InMemoryDataStore()
         let root = data32(56)

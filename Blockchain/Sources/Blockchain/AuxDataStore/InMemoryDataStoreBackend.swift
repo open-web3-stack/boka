@@ -240,6 +240,10 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
         genericMetadata[key]
     }
 
+    public func deleteMetadata(key: Data) async throws {
+        genericMetadata.removeValue(forKey: key)
+    }
+
     public func setMetadataIfAbsent(key: Data, value: Data) async throws -> Bool {
         if let existing = genericMetadata[key] {
             return existing == value
