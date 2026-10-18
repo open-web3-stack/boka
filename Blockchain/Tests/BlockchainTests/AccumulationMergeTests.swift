@@ -7,6 +7,25 @@ struct AccumulationMergeTests {
     private let config = ProtocolConfigRef.tiny
 
     @Test
+    func allOwnedCoresMergeWithPerCoreManagerOverride() throws {
+        var state = try makeAccumulateState(assigners: [1, 1])
+        var assigner = state.copy()
+        assigner.assigners[0] = 10
+        assigner.assigners[1] = 11
+        let queues = try makeAuthorizationQueue(startingAt: 20)
+        assigner.authorizationQueue = queues
+        var manager = state.copy()
+        manager.assigners[0] = 12
+
+        State.mergePrivilegedUpdates(into: &state, from: [
+            (0, makeResult(state: manager)), (1, makeResult(state: assigner)),
+        ])
+
+        #expect(state.assigners.array == [12, 11])
+        #expect(state.authorizationQueue == queues)
+    }
+
+    @Test
     func designatorCanDesignateWhenItChangesDesignatorInSameBatch() throws {
         var state = try makeAccumulateState(designator: 0)
         let designatedQueue = try makeValidatorQueue(startingAt: 10)

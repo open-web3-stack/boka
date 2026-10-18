@@ -193,7 +193,7 @@ extension Accumulation {
 
         for (service, singleOutput) in batchResults {
             // a' - New assigners
-            if let index = initialAssigners.firstIndex(of: service) {
+            for index in initialAssigners.indices where initialAssigners[index] == service {
                 var temp = currentState.assigners
                 temp[index] = singleOutput.state.assigners[index]
                 currentState.assigners = temp
@@ -212,7 +212,7 @@ extension Accumulation {
                 currentState.validatorQueue = singleOutput.state.validatorQueue
             }
             // q' - Current assigners update authorization queue
-            if let index = initialAssigners.firstIndex(of: service) {
+            for index in initialAssigners.indices where initialAssigners[index] == service {
                 currentState.authorizationQueue[index] = singleOutput.state.authorizationQueue[index]
             }
         }
@@ -223,9 +223,9 @@ extension Accumulation {
             currentState.manager = managerResult.state.manager
             // z' - alwaysAcc always writes
             currentState.alwaysAcc = managerResult.state.alwaysAcc
-            // a' - if manager changed assigners from initial, use manager's value
-            if initialAssigners != managerResult.state.assigners {
-                currentState.assigners = managerResult.state.assigners
+            // The manager overrides only the core assignments it changed.
+            for index in initialAssigners.indices where initialAssigners[index] != managerResult.state.assigners[index] {
+                currentState.assigners[index] = managerResult.state.assigners[index]
             }
             // v' - if manager changed designator from initial, use manager's value
             if initialDesignator != managerResult.state.designator {
