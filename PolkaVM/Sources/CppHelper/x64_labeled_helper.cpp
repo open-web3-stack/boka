@@ -166,14 +166,6 @@ static inline bool is_variable_length_opcode(uint8_t opcode) {
 
 // Helper to get instruction size
 static uint32_t getInstructionSize(const uint8_t* bytecode, uint32_t pc, size_t bytecode_size) {
-    uint8_t opcode = bytecode[pc];
-
-    // Handle old opcode numbers for backwards compatibility
-    // Old JumpInd = opcode 2 (2 bytes: [opcode][reg_index])
-    if (opcode == 2) {
-        return 2;
-    }
-
     return get_instruction_size(bytecode, pc, bytecode_size);
 }
 

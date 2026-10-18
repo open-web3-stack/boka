@@ -5,6 +5,19 @@ import Utils
 
 struct ControlFlowValidationTests {
     @Test
+    func unlikelyDoesNotSkipTheFollowingInstruction() async throws {
+        // unlikely; load_imm r0, 7; trap. The instruction starts are 0, 1 and 7.
+        let code = Data([0, 0, 8, 2, 51, 0, 7, 0, 0, 0, 0, 131])
+        let program = try ProgramCode(code)
+        let result = await JITInstructionExecutor.execute(
+            blob: ProgramBlobBuilder.createStandardProgram(programCode: code), gas: Gas(1000),
+        )
+        #expect(result.exitReason == .panic(.trap))
+        #expect(result.finalRegisters[.init(raw: 0)] == 7)
+        #expect(result.finalGas == Gas(1000) - program.getBlockGasCosts(pc: 0))
+    }
+
+    @Test
     func takenBranchRejectsMissingFallthrough() async throws {
         let code = Data([0, 0, 3, 170, 0, 0, 1])
         let program = try ProgramCode(code)
