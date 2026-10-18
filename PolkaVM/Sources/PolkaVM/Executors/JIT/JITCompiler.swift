@@ -64,6 +64,7 @@ final class JITCompiler {
         jitMemorySize: UInt32,
         skipTable: [UInt32], // NEW: skip table for variable-length instructions
         bitmask: Data, // NEW: bitmask for instruction boundary validation
+        blockGasCosts: JITGasCosts,
     ) throws -> UnsafeMutableRawPointer {
         logger.debug("Starting JIT compilation. Blob size: \(blob.count), Initial PC: \(initialPC), Target: \(targetArchitecture)")
 
@@ -118,6 +119,8 @@ final class JITCompiler {
                     skipTable,
                     skipTable.count,
                     bitmaskBytes, bitmask.count,
+                    blockGasCosts.values,
+                    blockGasCosts.starts, blockGasCosts.starts.count,
                     &compiledFuncPtr,
                 )
             }
@@ -137,6 +140,8 @@ final class JITCompiler {
                     skipTable,
                     skipTable.count,
                     bitmaskBytes, bitmask.count,
+                    blockGasCosts.values,
+                    blockGasCosts.starts, blockGasCosts.starts.count,
                     &compiledFuncPtr,
                 )
             }

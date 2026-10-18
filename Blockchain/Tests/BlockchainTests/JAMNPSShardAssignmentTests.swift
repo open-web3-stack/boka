@@ -154,8 +154,8 @@ struct JAMNPSShardAssignmentTests {
         )
 
         // Formula: i = (cR + v) mod V
-        // i = (1 * 342 + 0) mod 6 = 342 mod 6 = 0
-        #expect(shardIndex == 0)
+        // i = (1 * 3 + 0) mod 6 = 3
+        #expect(shardIndex == 3)
     }
 
     // MARK: - Get All Assigned Shards Tests
@@ -449,11 +449,11 @@ struct JAMNPSShardAssignmentTests {
         let shardIndex = await assignment.getShardAssignment(
             validatorIndex: 0,
             coreIndex: 0,
-            totalValidators: 1,
+            totalValidators: 6,
         )
 
         // Formula: i = (cR + v) mod V
-        // i = (0 * 342 + 0) mod 1 = 0
+        // i = (0 * 3 + 0) mod 6 = 0
         #expect(shardIndex == 0)
     }
 

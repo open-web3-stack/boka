@@ -12,16 +12,10 @@ private let logger = Logger(label: "JAMNPSShardAssignment")
 /// Where:
 /// - v = validator index
 /// - i = assigned shard index
-/// - c = core index (0-15)
-/// - R = recovery threshold (342)
-/// - V = number of validators (1023)
+/// - c = core index
+/// - R = recovery threshold derived from V
+/// - V = number of assuring validators
 public actor JAMNPSShardAssignment {
-    /// Recovery threshold (R)
-    private let recoveryThreshold: UInt32 = 342
-
-    /// Total number of validators (V) in mainnet
-    private let mainnetValidatorCount: UInt32 = 1023
-
     /// Calculate the shard index assigned to a validator for a given core
     ///
     /// Per JAMNP-S spec: i = (cR + v) mod V
@@ -39,7 +33,7 @@ public actor JAMNPSShardAssignment {
         let c = UInt32(coreIndex)
         let v = UInt32(validatorIndex)
         let V = UInt32(totalValidators)
-        let R = recoveryThreshold
+        let R = UInt32(ErasureCodingService.originalShards(validators: Int(totalValidators)))
 
         let shardIndex = (c * R + v) % V
 
@@ -98,7 +92,7 @@ public actor JAMNPSShardAssignment {
         let targetShardIndex = UInt32(shardIndex)
         let c = UInt32(coreIndex)
         let V = UInt32(totalValidators)
-        let R = recoveryThreshold
+        let R = UInt32(ErasureCodingService.originalShards(validators: Int(totalValidators)))
 
         var validators: [UInt16] = []
 
@@ -149,6 +143,9 @@ public actor JAMNPSShardAssignment {
         totalValidators: UInt16,
     ) -> [UInt16: [UInt16]] {
         var validatorToShards: [UInt16: [UInt16]] = [:]
+        let c = UInt32(coreIndex)
+        let V = UInt32(totalValidators)
+        let R = UInt32(ErasureCodingService.originalShards(validators: Int(totalValidators)))
 
         for shardIndex in missingShardIndices {
             // Invert the assignment to find which validator should have this shard
@@ -156,9 +153,6 @@ public actor JAMNPSShardAssignment {
             // v = (i - c * R) % V
 
             let i = UInt32(shardIndex)
-            let c = UInt32(coreIndex)
-            let V = UInt32(totalValidators)
-            let R = recoveryThreshold
 
             // Cast to Int for safe modular arithmetic with potential negative results
             let base = (Int(i) - Int(c * R)) % Int(V)

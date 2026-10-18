@@ -44,7 +44,7 @@ public actor WorkReportProcessor {
     ///   - data: The segments to export
     ///   - erasureRoot: The erasure root to associate with the segments
     /// - Returns: The segments root
-    public func exportSegments(data: [Data4104], erasureRoot: Data32) async throws -> Data32 {
+    public func exportSegments(data: [Data4104], erasureRoot: Data32, validatorCount: Int? = nil) async throws -> Data32 {
         // Use ErasureCodingDataStore if available for automatic erasure coding
         if let ecStore = erasureCodingDataStore {
             // For D³L store, we need to track work package hash
@@ -58,6 +58,7 @@ public actor WorkReportProcessor {
                 segments: data,
                 workPackageHash: workPackageHash,
                 segmentsRoot: segmentRoot,
+                validatorCount: validatorCount,
             )
 
             logger.info("Stored exported segments: erasureRoot=\(storedErasureRoot.toHexString()), count=\(data.count)")
@@ -112,7 +113,7 @@ public actor WorkReportProcessor {
     /// Export a work package bundle to audit store with erasure coding
     /// - Parameter bundle: The bundle to export
     /// - Returns: The erasure root and length of the bundle
-    public func exportWorkpackageBundle(bundle: WorkPackageBundle) async throws -> (erasureRoot: Data32, length: DataLength) {
+    public func exportWorkpackageBundle(bundle: WorkPackageBundle, validatorCount: Int? = nil) async throws -> (erasureRoot: Data32, length: DataLength) {
         // Serialize the bundle
         let serializedData = try JamEncoder.encode(bundle)
         let dataLength = DataLength(UInt32(serializedData.count))
@@ -149,6 +150,7 @@ public actor WorkReportProcessor {
                 bundle: serializedData,
                 workPackageHash: workPackageHash,
                 segmentsRoot: segmentsRoot,
+                validatorCount: validatorCount,
             )
 
             logger.info("Stored audit bundle: erasureRoot=\(erasureRoot.toHexString()), length=\(serializedData.count)")
@@ -226,10 +228,14 @@ public actor WorkReportProcessor {
     public func reconstructData(
         shards: [(index: UInt16, data: Data)],
         originalLength: Int,
+        validatorCount: Int,
     ) async throws -> Data {
-        // GP section 10: Erasure Coding
-        // We need at least minimumValidatorResponses shards to reconstruct the original data
-        let requiredShards = DataAvailabilityConstants.minimumValidatorResponses
+        guard validatorCount >= 6, validatorCount <= 3 * config.value.totalNumberOfCores,
+              validatorCount.isMultiple(of: 3)
+        else {
+            throw DataAvailabilityError.retrievalError
+        }
+        let requiredShards = ErasureCodingService.originalShards(validators: validatorCount)
         guard shards.count >= requiredShards else {
             throw DataAvailabilityError.retrievalError
         }
@@ -239,21 +245,15 @@ public actor WorkReportProcessor {
             ErasureCoding.Shard(data: shard.data, index: UInt32(shard.index))
         }
 
-        // Calculate parameters for reconstruction
-        let basicSize = config.value.erasureCodedPieceSize
-        let totalValidators = config.value.totalNumberOfValidators
-
-        // Determine original count based on data size
-        // For erasure coding, original count is approximately 1/3 of recovery count
-        let originalCount = (totalValidators + 2) / 3
+        let basicSize = 2 * requiredShards
 
         do {
             // Use ErasureCoding.reconstruct to recover the original data
             return try ErasureCoding.reconstruct(
                 shards: erasureShards,
                 basicSize: basicSize,
-                originalCount: originalCount,
-                recoveryCount: totalValidators,
+                originalCount: requiredShards,
+                recoveryCount: validatorCount,
                 originalLength: originalLength,
             )
         } catch {
@@ -271,6 +271,7 @@ public actor WorkReportProcessor {
     public func reconstructSegments(
         shards: [(index: UInt16, data: Data)],
         segmentCount: Int,
+        validatorCount: Int,
     ) async throws -> [Data4104] {
         // Determine the total data size
         let totalDataSize = segmentCount * 4104
@@ -279,6 +280,7 @@ public actor WorkReportProcessor {
         let reconstructedData = try await reconstructData(
             shards: shards,
             originalLength: totalDataSize,
+            validatorCount: validatorCount,
         )
 
         // Split into segments
@@ -340,6 +342,7 @@ public actor WorkReportProcessor {
     public func batchReconstructWithFallback(
         erasureRoots: [Data32],
         originalLengths: [Data32: Int],
+        validatorCounts: [Data32: UInt16] = [:],
     ) async throws -> [Data32: Data] {
         guard let ecStore = erasureCodingDataStore else {
             throw DataAvailabilityError.segmentNotFound
@@ -350,7 +353,7 @@ public actor WorkReportProcessor {
             originalLengths: originalLengths,
             validators: nil,
             coreIndex: 0,
-            totalValidators: 1023,
+            validatorCounts: validatorCounts,
         )
     }
 

@@ -70,6 +70,12 @@ public struct Statistics: Sendable, Equatable, Codable {
             public var size: UInt
         }
 
+        public struct Accumulation: Sendable, Equatable, Codable {
+            public var count: UInt
+            public var transferCount: UInt
+            public var gasUsed: UInt
+        }
+
         // p: total number of preimages and size
         public var preimages: PreimagesAndSize
 
@@ -88,13 +94,13 @@ public struct Statistics: Sendable, Equatable, Codable {
         // e: total number of segments exported into the Segments DA
         public var exportsCount: UInt
 
-        // a: accumulate count and gas used
-        public var accumulates: CountAndGas
+        // a: accumulated work-item count, transfer count and gas used
+        public var accumulates: Accumulation
     }
 
     // validator activity statistics
-    public var accumulator: ConfigFixedSizeArray<Validator, ProtocolConfig.TotalNumberOfValidators>
-    public var previous: ConfigFixedSizeArray<Validator, ProtocolConfig.TotalNumberOfValidators>
+    public var accumulator: ConfigLimitedSizeArray<Validator, ProtocolConfig.MinValidators, ProtocolConfig.MaxValidators>
+    public var previous: ConfigLimitedSizeArray<Validator, ProtocolConfig.MinValidators, ProtocolConfig.MaxValidators>
 
     /// core statistics
     public var core: ConfigFixedSizeArray<Core, ProtocolConfig.TotalNumberOfCores>
@@ -107,11 +113,11 @@ extension Statistics: Dummy {
     public typealias Config = ProtocolConfigRef
     public static func dummy(config: Config) -> Statistics {
         Statistics(
-            accumulator: try! ConfigFixedSizeArray(
-                config: config, defaultValue: Validator.dummy(config: config),
+            accumulator: try! ConfigLimitedSizeArray(
+                config: config, array: Array(repeating: Validator.dummy(config: config), count: config.value.initialValidatorCount),
             ),
-            previous: try! ConfigFixedSizeArray(
-                config: config, defaultValue: Validator.dummy(config: config),
+            previous: try! ConfigLimitedSizeArray(
+                config: config, array: Array(repeating: Validator.dummy(config: config), count: config.value.initialValidatorCount),
             ),
             core: try! ConfigFixedSizeArray(
                 config: config, defaultValue: Core.dummy(config: config),
@@ -161,7 +167,7 @@ extension Statistics.Service: Dummy {
             extrinsicsCount: 0,
             extrinsicsSize: 0,
             exportsCount: 0,
-            accumulates: .init(count: 0, gasUsed: 0),
+            accumulates: .init(count: 0, transferCount: 0, gasUsed: 0),
         )
     }
 }

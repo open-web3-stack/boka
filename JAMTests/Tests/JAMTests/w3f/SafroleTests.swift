@@ -25,21 +25,13 @@ struct SafroleState: Equatable, Safrole, Codable {
     /// eta
     var entropyPool: EntropyPool
     /// lambda
-    var previousValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
+    var previousValidators: ValidatorKeys
     /// kappa
-    var currentValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
+    var currentValidators: ValidatorKeys
     /// gammaK
-    var nextValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
+    var nextValidators: ValidatorKeys
     /// iota
-    var validatorQueue: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
+    var validatorQueue: ValidatorKeys
     /// gammaA
     var ticketsAccumulator: ConfigLimitedSizeArray<
         Ticket,

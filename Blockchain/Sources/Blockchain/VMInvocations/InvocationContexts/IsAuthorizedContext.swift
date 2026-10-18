@@ -1,6 +1,7 @@
 import Foundation
 import PolkaVM
 import TracingUtils
+import Utils
 
 private let logger = Logger(label: "IsAuthorizedContext")
 
@@ -19,17 +20,19 @@ public final class IsAuthorizedContext: InvocationContext {
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
-        switch UInt8(index) {
+        switch UInt8(clamping: index) {
         case GasFn.identifier:
             return await GasFn().call(config: config, state: state)
+        case GrowHeap.identifier:
+            return await GrowHeap().call(config: config, state: state)
         case Fetch.identifier:
             return await Fetch(workPackage: package).call(config: config, state: state)
         case Log.identifier:
             return await Log().call(config: config, state: state)
         default:
-            state.consumeGas(Gas(10))
+            state.consumeGas(Gas(1000))
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)
-            return .continued
+            return state.getGas() < GasInt(0) ? .exit(.outOfGas) : .continued
         }
     }
 }

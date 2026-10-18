@@ -16,6 +16,8 @@ public struct RecentHistory: Sendable, Equatable, Codable {
         /// s
         public var stateRoot: Data32
 
+        public var timeslot: TimeslotIndex
+
         // p: work package hash -> segment root lookup
         @CodingAs<SortedKeyValues<Data32, Data32>> public var lookup: [Data32: Data32]
 
@@ -23,11 +25,13 @@ public struct RecentHistory: Sendable, Equatable, Codable {
             headerHash: Data32,
             superPeak: Data32,
             stateRoot: Data32,
+            timeslot: TimeslotIndex,
             lookup: [Data32: Data32],
         ) {
             self.headerHash = headerHash
             self.superPeak = superPeak
             self.stateRoot = stateRoot
+            self.timeslot = timeslot
             self.lookup = lookup
         }
     }
@@ -49,6 +53,7 @@ extension RecentHistory: Dummy {
                     headerHash: Data32(),
                     superPeak: Data32(),
                     stateRoot: Data32(),
+                    timeslot: 0,
                     lookup: [Data32: Data32](),
                 )],
             ),
@@ -70,6 +75,7 @@ extension RecentHistory {
     public mutating func update(
         headerHash: Data32,
         accumulateRoot: Data32,
+        timeslot: TimeslotIndex,
         lookup: [Data32: Data32],
     ) {
         mmr.append(accumulateRoot, hasher: Keccak.self)
@@ -80,6 +86,7 @@ extension RecentHistory {
             headerHash: headerHash,
             superPeak: mmr.superPeak(),
             stateRoot: Data32(), // empty and will be updated upon next block
+            timeslot: timeslot,
             lookup: lookup,
         )
 

@@ -6,12 +6,18 @@ import Utils
 
 private let logger = Logger(label: "HostCalls.Refine")
 
+/// Empty ranges contain no inaccessible addresses, regardless of their start.
+private func fitsMemoryRange(address: UInt64, length: UInt64) -> Bool {
+    let end = UInt64(1) << 32
+    return length == 0 || (address < end && length <= end - address)
+}
+
 // MARK: - Refine
 
 /// Export a segment from memory
 public class Export: HostCall {
     public static var identifier: UInt8 {
-        7
+        8
     }
 
     public let context: RefineContext.ContextType
@@ -23,23 +29,21 @@ public class Export: HostCall {
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
-        let startAddr: UInt32 = state.readRegister(Registers.Index(raw: 7))
+        let startAddr: UInt64 = state.readRegister(Registers.Index(raw: 7))
         let segmentSize = UInt64(config.value.segmentSize)
         let length = min(state.readRegister(Registers.Index(raw: 8)), segmentSize)
-        let isReadable = state.isMemoryReadable(address: startAddr, length: Int(length))
+        let isReadable = fitsMemoryRange(address: startAddr, length: length)
+            && state.isMemoryReadable(address: startAddr, length: Int(length))
 
         guard isReadable else {
             throw VMInvocationsError.panic
         }
 
         var data = try state.readMemory(address: startAddr, length: Int(length))
-        let remainder = data.count % Int(segmentSize)
-        if remainder != 0 {
-            data.append(Data(repeating: 0, count: Int(segmentSize) - remainder))
-        }
+        data.append(Data(repeating: 0, count: Int(segmentSize) - data.count))
         let segment = Data4104(data)!
 
-        if exportSegmentOffset + UInt64(context.exports.count) >= UInt64(config.value.maxWorkPackageImports) {
+        if exportSegmentOffset + UInt64(context.exports.count) >= UInt64(config.value.maxWorkPackageExports) {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), exportSegmentOffset + UInt64(context.exports.count))
@@ -51,47 +55,6 @@ public class Export: HostCall {
 /// Create an inner PVM
 public class Machine: HostCall {
     public static var identifier: UInt8 {
-        8
-    }
-
-    public let context: RefineContext.ContextType
-
-    public init(context: RefineContext.ContextType) {
-        self.context = context
-    }
-
-    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
-        let regs: [UInt32] = state.readRegisters(in: 7 ..< 10)
-
-        let isReadable = state.isMemoryReadable(address: regs[0], length: Int(regs[1]))
-
-        let max = context.pvms.keys.max() ?? 0
-        var innerVmIndex: UInt64 = max + 1
-        for i in 0 ..< max where context.pvms[i] == nil {
-            innerVmIndex = i
-            break
-        }
-
-        let code = isReadable ? try state.readMemory(address: regs[0], length: Int(regs[1])) : nil
-        let pc = UInt32(truncatingIfNeeded: regs[2])
-        let mem = try GeneralMemory(pageMap: [], chunks: [])
-
-        guard let code else {
-            throw VMInvocationsError.panic
-        }
-
-        if (try? ProgramCode(code)) == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
-        } else {
-            state.writeRegister(Registers.Index(raw: 7), innerVmIndex)
-            context.pvms[innerVmIndex] = InnerPvm(code: code, memory: mem, pc: pc)
-        }
-    }
-}
-
-/// Peek (read inner memory into outer memory)
-public class Peek: HostCall {
-    public static var identifier: UInt8 {
         9
     }
 
@@ -102,26 +65,44 @@ public class Peek: HostCall {
     }
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
-        let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
+        guard context.pvms.count < 63 else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.FULL.rawValue)
+            return
+        }
+        let regs: [UInt64] = state.readRegisters(in: 7 ..< 10)
 
-        guard state.isMemoryWritable(address: regs[1], length: Int(regs[3])) else {
+        guard fitsMemoryRange(address: regs[0], length: regs[1]), let length = Int(exactly: regs[1]) else {
+            throw VMInvocationsError.panic
+        }
+        let isReadable = state.isMemoryReadable(address: regs[0], length: length)
+
+        var innerVmIndex: UInt64 = 0
+        while context.pvms[innerVmIndex] != nil {
+            innerVmIndex += 1
+        }
+
+        let code = isReadable ? try state.readMemory(address: regs[0], length: length) : nil
+        let initialPC: UInt64 = state.readRegister(Registers.Index(raw: 9))
+        let mem = try GeneralMemory(pageMap: [], chunks: [])
+
+        guard let code else {
             throw VMInvocationsError.panic
         }
 
-        if context.pvms[regs[0]] == nil {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
-        } else if !context.pvms[regs[0]]!.memory.isReadable(address: UInt32(truncatingIfNeeded: regs[2]), length: Int(regs[3])) {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
-        } else {
-            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            let data = try context.pvms[regs[0]]!.memory.read(address: UInt32(truncatingIfNeeded: regs[2]), length: Int(regs[3]))
-            try state.writeMemory(address: regs[1], values: data)
+        guard let program = try? ProgramCode(code),
+              let pc = UInt32(exactly: initialPC),
+              (try? program.validate(pc: pc)) != nil
+        else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
+            return
         }
+        state.writeRegister(Registers.Index(raw: 7), innerVmIndex)
+        context.pvms[innerVmIndex] = InnerPvm(program: program, memory: mem, pc: pc)
     }
 }
 
-/// Poke (write outer memory into inner memory)
-public class Poke: HostCall {
+/// Peek (read inner memory into outer memory)
+public class Peek: HostCall {
     public static var identifier: UInt8 {
         10
     }
@@ -135,18 +116,59 @@ public class Poke: HostCall {
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
 
-        guard state.isMemoryReadable(address: regs[1], length: Int(regs[3])) else {
+        guard fitsMemoryRange(address: regs[1], length: regs[3]), let length = Int(exactly: regs[3]),
+              state.isMemoryWritable(address: regs[1], length: length)
+        else {
             throw VMInvocationsError.panic
         }
 
         if context.pvms[regs[0]] == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
-        } else if !context.pvms[regs[0]]!.memory.isWritable(address: UInt32(truncatingIfNeeded: regs[2]), length: Int(regs[3])) {
+        } else if !fitsMemoryRange(address: regs[2], length: regs[3])
+            || !context.pvms[regs[0]]!.memory.isReadable(address: UInt32(truncatingIfNeeded: regs[2]), length: length)
+        {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
         } else {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
-            let data = try state.readMemory(address: regs[1], length: Int(regs[3]))
-            try context.pvms[regs[0]]!.memory.write(address: UInt32(truncatingIfNeeded: regs[2]), values: data)
+            let data = length == 0 ? Data() : try context.pvms[regs[0]]!.memory.read(address: UInt32(truncatingIfNeeded: regs[2]), length: length)
+            try state.writeMemory(address: regs[1], values: data)
+        }
+    }
+}
+
+/// Poke (write outer memory into inner memory)
+public class Poke: HostCall {
+    public static var identifier: UInt8 {
+        11
+    }
+
+    public let context: RefineContext.ContextType
+
+    public init(context: RefineContext.ContextType) {
+        self.context = context
+    }
+
+    public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
+        let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
+
+        guard fitsMemoryRange(address: regs[1], length: regs[3]), let length = Int(exactly: regs[3]),
+              state.isMemoryReadable(address: regs[1], length: length)
+        else {
+            throw VMInvocationsError.panic
+        }
+
+        if context.pvms[regs[0]] == nil {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
+        } else if !fitsMemoryRange(address: regs[2], length: regs[3])
+            || !context.pvms[regs[0]]!.memory.isWritable(address: UInt32(truncatingIfNeeded: regs[2]), length: length)
+        {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OOB.rawValue)
+        } else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
+            if length > 0 {
+                let data = try state.readMemory(address: regs[1], length: length)
+                try context.pvms[regs[0]]!.memory.write(address: UInt32(truncatingIfNeeded: regs[2]), values: data)
+            }
         }
     }
 }
@@ -154,7 +176,7 @@ public class Poke: HostCall {
 /// Modify pages in the inner PVM
 public class Pages: HostCall {
     public static var identifier: UInt8 {
-        11
+        12
     }
 
     public let context: RefineContext.ContextType
@@ -166,10 +188,11 @@ public class Pages: HostCall {
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
         let regs: [UInt64] = state.readRegisters(in: 7 ..< 11)
 
+        let pageLimit = (UInt64(1) << 32) / UInt64(config.value.pvmMemoryPageSize)
         if context.pvms[regs[0]] == nil {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHO.rawValue)
         } else if regs[3] > 4 || regs[1] < 16 ||
-            (regs[1] + regs[2]) >= ((1 << 32) / UInt32(config.value.pvmMemoryPageSize))
+            regs[1] >= pageLimit || regs[2] >= pageLimit - regs[1]
         {
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else if regs[3] > 2,
@@ -190,7 +213,7 @@ public class Pages: HostCall {
 /// Invoke an inner PVM
 public class Invoke: HostCall {
     public static var identifier: UInt8 {
-        12
+        13
     }
 
     public let context: RefineContext.ContextType
@@ -199,13 +222,27 @@ public class Invoke: HostCall {
         self.context = context
     }
 
+    public func gasCost(state: VMState) -> Gas {
+        let address: UInt64 = state.readRegister(Registers.Index(raw: 8))
+        guard address <= (1 << 32) - 112, state.isMemoryWritable(address: address, length: 112),
+              let data = try? state.readMemory(address: address, length: 8)
+        else {
+            return Gas(968)
+        }
+        let gas = data.decode(UInt64.self)
+        return Gas(968) + Gas(gas)
+    }
+
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
         let pvmIndex: UInt64 = state.readRegister(Registers.Index(raw: 7))
-        let startAddr: UInt32 = state.readRegister(Registers.Index(raw: 8))
+        let address: UInt64 = state.readRegister(Registers.Index(raw: 8))
+        guard let startAddr = UInt32(exactly: address), UInt64(startAddr) + 112 <= 1 << 32 else {
+            throw VMInvocationsError.panic
+        }
 
         var gas: UInt64?
         var registers: [UInt64] = []
-        if state.isMemoryReadable(address: startAddr, length: 112) {
+        if state.isMemoryWritable(address: startAddr, length: 112) {
             gas = try state.readMemory(address: startAddr, length: 8).decode(UInt64.self)
             for i in 0 ..< 13 {
                 try registers.append(state.readMemory(address: startAddr + 8 + 8 * UInt32(i), length: 8).decode(UInt64.self))
@@ -221,7 +258,7 @@ public class Invoke: HostCall {
             return
         }
 
-        let program = try ProgramCode(innerPvm.code)
+        let program = innerPvm.program
         let vm = VMStateInterpreter(
             program: program,
             pc: innerPvm.pc,
@@ -230,15 +267,20 @@ public class Invoke: HostCall {
             memory: innerPvm.memory,
         )
         let engine = Engine(config: DefaultPvmConfig())
+        vm.blockGasCharged = innerPvm.blockGasCharged
         let exitReason = await engine.execute(state: vm)
+
+        state.refundGas(Gas(max(0, vm.getGas().value)))
 
         try state.writeMemory(address: startAddr, values: JamEncoder.encode(vm.getGas(), vm.getRegisters()))
         context.pvms[pvmIndex]?.memory = vm.getMemoryUnsafe()
+        context.pvms[pvmIndex]?.pc = vm.pc
+        context.pvms[pvmIndex]?.blockGasCharged = vm.blockGasCharged
 
         switch exitReason {
         case let .hostCall(callIndex):
-            let skip = program.skip(innerPvm.pc)
-            context.pvms[pvmIndex]?.pc = innerPvm.pc + skip + 1
+            let skip = program.skip(vm.pc)
+            context.pvms[pvmIndex]?.pc = vm.pc + skip + 1
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCodeInner.HOST.rawValue)
             state.writeRegister(Registers.Index(raw: 8), callIndex)
         case let .pageFault(addr):
@@ -247,8 +289,10 @@ public class Invoke: HostCall {
         case .outOfGas:
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCodeInner.OOG.rawValue)
         case .panic:
+            context.pvms[pvmIndex]?.pc = 0
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCodeInner.PANIC.rawValue)
         case .halt:
+            context.pvms[pvmIndex]?.pc = 0
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCodeInner.HALT.rawValue)
         }
     }
@@ -257,7 +301,7 @@ public class Invoke: HostCall {
 /// Expunge an inner PVM
 public class Expunge: HostCall {
     public static var identifier: UInt8 {
-        13
+        14
     }
 
     public let context: RefineContext.ContextType

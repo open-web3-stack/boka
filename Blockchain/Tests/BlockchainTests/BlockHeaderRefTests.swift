@@ -25,12 +25,11 @@ struct BlockHeaderRefTests {
         let config = ProtocolConfigRef.tiny
         try makeHeader(authorIndex: 5).validateSelf(config: config)
 
-        var invalid = makeHeader(authorIndex: ValidatorIndex(config.value.totalNumberOfValidators))
+        var invalid = makeHeader(authorIndex: ValidatorIndex(config.value.initialValidatorCount))
         do {
             try invalid.validateSelf(config: config)
             Issue.record("Expected invalid author index")
-        } catch Header.Error.invalidAuthorIndex {
-        }
+        } catch Header.Error.invalidAuthorIndex {}
 
         invalid.unsigned.authorIndex = 0
         try invalid.validateSelf(config: config)

@@ -14,6 +14,7 @@ struct RecentHistoryInput: Codable {
     var headerHash: Data32
     var parentStateRoot: Data32
     var accumulateRoot: Data32
+    var slot: TimeslotIndex
     var workPackages: [ReportedWorkPackage]
 }
 
@@ -39,6 +40,7 @@ struct RecentHistoryTests {
         state.update(
             headerHash: testcase.input.headerHash,
             accumulateRoot: testcase.input.accumulateRoot,
+            timeslot: testcase.input.slot,
             lookup: Dictionary(uniqueKeysWithValues: testcase.input.workPackages.map { (
                 $0.hash,
                 $0.exportsRoot,

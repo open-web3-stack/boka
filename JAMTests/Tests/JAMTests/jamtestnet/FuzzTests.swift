@@ -4,6 +4,7 @@ import PolkaVM
 import Testing
 import Utils
 
+@Suite(.disabled("GP 0.7.2 fuzz fixtures use incompatible state encoding and gas rules; retain under their original version."))
 struct FuzzTests {
     static func loadTests(
         version: String,

@@ -20,8 +20,8 @@ struct ErasureTests {
         let decoder = JamDecoder(data: testcase.data, config: config)
         let testcase = try decoder.decode(ErasureCodingTestcase.self)
 
-        let basicSize = config.value.erasureCodedPieceSize
-        let recoveryCount = config.value.totalNumberOfValidators
+        let basicSize = 2 * ErasureCodingService.originalShards(validators: config.value.initialValidatorCount)
+        let recoveryCount = config.value.initialValidatorCount
         let originalCount = basicSize / 2
 
         let actualShards = try ErasureCoding.chunk(

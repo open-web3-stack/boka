@@ -11,6 +11,24 @@ public final class StandardMemory: Memory {
         heapZone.endAddress
     }
 
+    public var heapPages: (current: UInt32, limit: UInt32) {
+        let page = UInt32(config.pvmMemoryPageSize)
+        let stackReservation = StandardProgram.alignToZoneSize(
+            size: stackZone.endAddress - stackZone.startAddress, config: config,
+        )
+        return (heapEnd / page,
+                (stackZone.endAddress - UInt32(config.pvmProgramInitZoneSize) - stackReservation) / page)
+    }
+
+    public func growHeap(to pages: UInt32) {
+        let bounds = heapPages
+        guard pages > bounds.current, pages <= bounds.limit else {
+            return
+        }
+        pageMap.update(pageIndex: bounds.current, pages: Int(pages - bounds.current), access: .readWrite)
+        heapZone.endAddress = pages * UInt32(config.pvmMemoryPageSize)
+    }
+
     // MARK: - JIT Memory Layout Support
 
     /// Public zone information for JIT memory rebasing

@@ -36,6 +36,7 @@ public struct AccumulationOutput {
     public var state: AccumulateState
     public var commitments: Set<Commitment>
     public var gasUsed: [(serviceIndex: ServiceIndex, gas: Gas)]
+    public var processedTransfers: [DeferredTransfers]
 }
 
 /// parallelized accumulation function ∆* output
@@ -72,4 +73,4 @@ public struct AccumulationResult: Sendable {
     public var provide: Set<ServicePreimagePair>
 }
 
-public typealias AccumulationStats = [ServiceIndex: (Gas, UInt32)]
+public typealias AccumulationStats = [ServiceIndex: (gas: Gas, items: UInt32, transfers: UInt32)]

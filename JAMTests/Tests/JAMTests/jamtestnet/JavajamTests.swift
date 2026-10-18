@@ -7,7 +7,9 @@ import Utils
 struct JavajamTests {
     @Test(.disabled("Known crash: Blockchain/State.swift nil unwrap in current STF fixtures"), arguments: try JamTestnet.loadTests(path: "stf/state_transitions", src: .javajam))
     func stfTests(_ input: Testcase) async throws {
-        if input.description.starts(with: "3932781") { return } // problematic initial recent history
+        if input.description.starts(with: "3932781") {
+            return
+        } // problematic initial recent history
 
         try await TraceTest.test(input)
     }
@@ -35,9 +37,10 @@ struct JavajamTests {
             return .init(data: Data(fromHexString: hexString)!, index: UInt32(index))
         }
 
-        let basicSize = config.value.erasureCodedPieceSize
+        // These historical primitive vectors use the two-source-shard tiny code.
+        let basicSize = isTiny ? 4 : 684
         let originalCount = basicSize / 2
-        let recoveryCount = config.value.totalNumberOfValidators
+        let recoveryCount = config.value.initialValidatorCount
 
         #expect(recoveryShards.count == recoveryCount)
 

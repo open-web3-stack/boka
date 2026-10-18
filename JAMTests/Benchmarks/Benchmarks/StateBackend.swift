@@ -9,8 +9,8 @@ private enum StorageWriteBenchmarkError: Error {
 }
 
 private final class StorageWriteBenchmarkVMState: VMState {
-    private static let keyAddress = UInt32(0x1_0000)
-    private static let valueAddress = UInt32(0x2_0000)
+    private static let keyAddress = UInt32(0x10000)
+    private static let valueAddress = UInt32(0x20000)
 
     private let key: Data
     private let value: Data
@@ -19,7 +19,18 @@ private final class StorageWriteBenchmarkVMState: VMState {
         fatalError("StorageWriteBenchmarkVMState does not execute program code")
     }
 
-    var pc: UInt32 { 0 }
+    var pc: UInt32 {
+        0
+    }
+
+    var blockGasCharged = false
+    var heapPages: (current: UInt32, limit: UInt32)? {
+        nil
+    }
+
+    func growHeap(to _: UInt32) throws {
+        fatalError("StorageWriteBenchmarkVMState does not allocate memory")
+    }
 
     init(key: Data, value: Data) {
         self.key = key
@@ -36,7 +47,7 @@ private final class StorageWriteBenchmarkVMState: VMState {
     }
 
     func readRegister<T: FixedWidthInteger>(_ index: Registers.Index) -> T {
-        return registerValue(raw: UInt8(index.value))
+        registerValue(raw: UInt8(index.value))
     }
 
     func readRegister<T: FixedWidthInteger>(_ index: Registers.Index, _ index2: Registers.Index) -> (T, T) {
@@ -100,6 +111,7 @@ private final class StorageWriteBenchmarkVMState: VMState {
     }
 
     func consumeGas(_: Gas) {}
+    func refundGas(_: Gas) {}
 
     func increasePC(_: UInt32) {}
 
@@ -195,7 +207,7 @@ func stateBackendBenchmarks() {
     func createServiceAccountsWithStorage(
         config: ProtocolConfigRef,
         serviceIndex: ServiceIndex,
-        writes: [(key: Data, oldValue: Data, newValue: Data)]
+        writes: [(key: Data, oldValue: Data, newValue: Data)],
     ) async throws -> ServiceAccountsMutRef {
         var state = State.dummy(config: config)
         var account = ServiceAccount.dummy(config: config).toDetails()

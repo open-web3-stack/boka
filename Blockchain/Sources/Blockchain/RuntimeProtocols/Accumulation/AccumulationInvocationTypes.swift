@@ -105,9 +105,7 @@ public struct AccumulateState: Sendable {
     /// d (all service accounts)
     public var accounts: ServiceAccountsMutRef
     /// i
-    public var validatorQueue: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
+    public var validatorQueue: ValidatorKeys
     /// q
     public var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<

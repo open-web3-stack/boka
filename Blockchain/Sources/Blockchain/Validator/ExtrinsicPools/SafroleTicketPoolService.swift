@@ -11,6 +11,8 @@ private actor ServiceStorage {
     var epoch: EpochIndex = 0
     var verifier: Bandersnatch.Verifier!
     var entropy: Data32 = .init()
+    var pendingValidatorCount = 0
+    var attemptLimit = 0
     let ringContext: Bandersnatch.RingContext
 
     init(ringContext: Bandersnatch.RingContext) {
@@ -23,7 +25,7 @@ private actor ServiceStorage {
 
     func add(tickets: [TicketItem], config: ProtocolConfigRef) {
         for ticket in tickets {
-            if (try? ticket.validate(config: config)) == nil {
+            if Int(ticket.attempt) >= attemptLimit || (try? ticket.validate(config: config)) == nil {
                 logger.info("Received invalid ticket: \(ticket)")
                 continue
             }
@@ -38,17 +40,20 @@ private actor ServiceStorage {
     }
 
     func add(tickets: [TicketItemAndOutput]) {
-        pendingTickets.append(contentsOf: tickets)
+        pendingTickets.append(contentsOf: tickets.filter { Int($0.ticket.attempt) < attemptLimit })
     }
 
     func update(state: StateRef, config: ProtocolConfigRef) throws {
         let epoch = state.value.timeslot.timeslotToEpochIndex(config: config)
-        if verifier == nil || self.epoch != epoch {
+        let count = state.value.nextValidators.count
+        if verifier == nil || self.epoch != epoch || pendingValidatorCount != count {
             let commitment = try Bandersnatch.RingCommitment(data: state.value.safroleState.ticketsVerifier)
             let verifier = Bandersnatch.Verifier(ctx: ringContext, commitment: commitment)
 
             self.epoch = epoch
             self.verifier = verifier
+            pendingValidatorCount = count
+            attemptLimit = (2 * config.value.epochLength + count - 1) / count
             entropy = state.value.entropyPool.t3
             pendingTickets.removeAll()
         }
@@ -86,7 +91,7 @@ public final class SafroleTicketPoolService: ServiceBase, @unchecked Sendable {
     ) async {
         self.dataProvider = dataProvider
 
-        let ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
+        let ringContext = try! Bandersnatch.RingContext(size: UInt(ProtocolConfig.MaxValidators.read(config: config)))
         storage = ServiceStorage(ringContext: ringContext)
 
         super.init(id: "SafroleTicketPoolService", config: config, eventBus: eventBus)

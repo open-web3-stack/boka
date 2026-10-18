@@ -4,13 +4,47 @@ import Testing
 import Utils
 
 struct ProgramTests {
+    @Test func fallingPastCodeDoesNotChargeAnotherBlock() async throws {
+        let program = try ProgramCode(Data([0, 0, 1, 1, 1])) // fallthrough
+        let state = try VMStateInterpreter(
+            program: program, pc: 0, registers: Registers(),
+            gas: program.getBlockGasCosts(pc: 0),
+            memory: GeneralMemory(pageMap: [], chunks: []),
+        )
+        let result = await Engine(config: DefaultPvmConfig()).execute(state: state)
+        #expect(result == .panic(.invalidBranch))
+        #expect(state.getGas() == GasInt(0))
+    }
+
+    @Test func invocationValidation() throws {
+        // load_imm r0, 1; trap. Only offsets 0 and 3 start instructions.
+        let program = try ProgramCode(Data([0, 0, 4, 51, 0, 1, 0, 9]))
+        try program.validate(pc: 0)
+        try program.validate(pc: 3)
+        try ProgramCode(copying: program).validate(pc: 3)
+        for pc: UInt32 in [1, 4, .max] {
+            #expect(throws: ProgramCode.Error.invalidInstruction) { try program.validate(pc: pc) }
+        }
+        let invalidPrograms: [Data] = [
+            Data([0, 0, 0]), // Empty instruction sequence.
+            Data([0, 0, 1, 0, 0]), // Missing initial instruction-start bit.
+            Data([0, 0, 2, 2, 0, 1]), // Final instruction is not a terminator.
+            Data([0, 0, 3, 0, 255, 0, 7]), // Invalid opcode after a valid entry point.
+        ]
+        for blob in invalidPrograms {
+            let invalid = try ProgramCode(blob)
+            #expect(throws: ProgramCode.Error.invalidInstruction) { try invalid.validate(pc: 0) }
+            #expect(throws: ProgramCode.Error.invalidInstruction) { try ProgramCode(copying: invalid).validate(pc: 0) }
+        }
+    }
+
     @Test func empty() {
         let blob = Data()
         #expect(throws: ProgramCode.Error.invalidJumpTableEntriesCount) { try ProgramCode(blob) }
     }
 
     @Test func invalidJumpTableEntriesCount() {
-        let highValue = Data(UInt64(0x1000000).encode(method: .variableWidth))
+        let highValue = Data(UInt64(0x1000001).encode(method: .variableWidth))
         let data = highValue + Data([0, 0])
         #expect(throws: ProgramCode.Error.invalidJumpTableEntriesCount) { try ProgramCode(data) }
     }
@@ -21,7 +55,7 @@ struct ProgramTests {
     }
 
     @Test func invalidCodeLength() {
-        let highValue = Data(UInt64(0x1000000).encode(method: .variableWidth))
+        let highValue = Data(UInt64(0x2000001).encode(method: .variableWidth))
         let data = Data([0, 0]) + highValue
         #expect(throws: ProgramCode.Error.invalidCodeLength) { try ProgramCode(data) }
     }

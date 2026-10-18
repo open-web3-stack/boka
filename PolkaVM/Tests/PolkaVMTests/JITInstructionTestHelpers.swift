@@ -188,7 +188,8 @@ enum ProgramBlobBuilder {
     /// - Parameter instructionBytes: Raw instruction bytes
     /// - Returns: Complete program blob ready for execution
     static func createSingleInstructionProgram(_ instructionBytes: [UInt8]) -> Data {
-        createProgramCode(instructionBytes)
+        // Whole programs must end with a basic-block terminator.
+        createProgramCode(instructionBytes + [0])
     }
 
     /// Create ProgramCode blob (jump table + code + bitmask) from instructions

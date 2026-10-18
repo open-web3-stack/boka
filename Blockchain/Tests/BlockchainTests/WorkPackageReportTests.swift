@@ -9,17 +9,18 @@ struct WorkPackageReportTests {
     func refinementContextOrderingAndEncodedSize() throws {
         let anchor = RefinementContext.Anchor(
             headerHash: data32(1),
+            timeslot: 0,
             stateRoot: data32(2),
             beefyRoot: data32(3),
         )
 
-        #expect(anchor < RefinementContext.Anchor(headerHash: data32(2), stateRoot: data32(0), beefyRoot: data32(0)))
-        #expect(anchor < RefinementContext.Anchor(headerHash: data32(1), stateRoot: data32(4), beefyRoot: data32(0)))
-        #expect(anchor < RefinementContext.Anchor(headerHash: data32(1), stateRoot: data32(2), beefyRoot: data32(4)))
+        #expect(anchor < RefinementContext.Anchor(headerHash: data32(2), timeslot: 0, stateRoot: data32(0), beefyRoot: data32(0)))
+        #expect(anchor < RefinementContext.Anchor(headerHash: data32(1), timeslot: 0, stateRoot: data32(4), beefyRoot: data32(0)))
+        #expect(anchor < RefinementContext.Anchor(headerHash: data32(1), timeslot: 0, stateRoot: data32(2), beefyRoot: data32(4)))
 
-        let lookup = RefinementContext.LookupAnchor(headerHash: data32(4), timeslot: 10)
-        #expect(lookup < RefinementContext.LookupAnchor(headerHash: data32(5), timeslot: 0))
-        #expect(lookup < RefinementContext.LookupAnchor(headerHash: data32(4), timeslot: 11))
+        let lookup = RefinementContext.LookupAnchor(headerHash: data32(4), timeslot: 10, stateRoot: data32(0))
+        #expect(lookup < RefinementContext.LookupAnchor(headerHash: data32(5), timeslot: 0, stateRoot: data32(0)))
+        #expect(lookup < RefinementContext.LookupAnchor(headerHash: data32(4), timeslot: 11, stateRoot: data32(0)))
 
         let context = RefinementContext(
             anchor: anchor,
@@ -28,7 +29,7 @@ struct WorkPackageReportTests {
         )
         let laterContext = RefinementContext(
             anchor: anchor,
-            lookupAnchor: RefinementContext.LookupAnchor(headerHash: data32(4), timeslot: 11),
+            lookupAnchor: RefinementContext.LookupAnchor(headerHash: data32(4), timeslot: 11, stateRoot: data32(0)),
             prerequisiteWorkPackages: [],
         )
 
@@ -89,8 +90,8 @@ struct WorkPackageReportTests {
             configurationBlob: configurationBlob,
             workItemCount: 1,
         )
-        let accounts = StubServiceAccounts(preimages: [
-            .init(serviceAccount: 42, timeslot: 33, hash: codeHash): try encodeCodeAndMeta(codeBlob: codeBlob),
+        let accounts = try StubServiceAccounts(preimages: [
+            .init(serviceAccount: 42, timeslot: 33, hash: codeHash): encodeCodeAndMeta(codeBlob: codeBlob),
         ])
 
         #expect(try await package.authorizationCode(serviceAccounts: accounts) == codeBlob)
@@ -147,12 +148,14 @@ struct WorkPackageReportTests {
         RefinementContext(
             anchor: RefinementContext.Anchor(
                 headerHash: data32(1),
+                timeslot: 0,
                 stateRoot: data32(2),
                 beefyRoot: data32(3),
             ),
             lookupAnchor: RefinementContext.LookupAnchor(
                 headerHash: data32(4),
                 timeslot: lookupTimeslot,
+                stateRoot: data32(0),
             ),
             prerequisiteWorkPackages: prerequisiteWorkPackages,
         )
@@ -166,13 +169,13 @@ struct WorkPackageReportTests {
         configurationBlob: Data = Data([5, 6]),
         workItemCount: Int,
     ) throws -> WorkPackage {
-        WorkPackage(
+        try WorkPackage(
             authorizationToken: Data([7]),
             authorizationServiceIndex: serviceIndex,
             authorizationCodeHash: codeHash,
             configurationBlob: configurationBlob,
             context: context ?? makeContext(),
-            workItems: try ConfigLimitedSizeArray(
+            workItems: ConfigLimitedSizeArray(
                 config: config,
                 array: Array(repeating: WorkItem.dummy(config: config), count: workItemCount),
             ),

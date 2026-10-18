@@ -22,16 +22,18 @@ public enum GuaranteeingError: Error {
     case invalidPublicKey
     case invalidSegmentLookup
     case futureReportSlot
+    case refineLoadTooHigh
+    case badExportsCount
+    case bundleTooBig
+    case authGasTooHigh
+    case badAnchorSlot
+    case badErasureShards
 }
 
 public protocol Guaranteeing {
     var entropyPool: EntropyPool { get }
-    var currentValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    > { get }
-    var previousValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    > { get }
+    var currentValidators: ValidatorKeys { get }
+    var previousValidators: ValidatorKeys { get }
     var availabilityAssignments: ConfigFixedSizeArray<
         ReportItem?,
         ProtocolConfig.TotalNumberOfCores,
@@ -73,16 +75,17 @@ extension Guaranteeing {
         source.map { CoreIndex(($0 + n) % max) }
     }
 
-    public func getCoreAssignment(config: ProtocolConfigRef, randomness: Data32, timeslot: TimeslotIndex) -> [CoreIndex] {
-        var source = Array(repeating: UInt32(0), count: config.value.totalNumberOfValidators)
-        for i in 0 ..< config.value.totalNumberOfValidators {
-            source[i] = UInt32(config.value.totalNumberOfCores * i / config.value.totalNumberOfValidators)
+    public func getCoreAssignment(config: ProtocolConfigRef, randomness: Data32, timeslot: TimeslotIndex, validatorCount: Int? = nil) -> [CoreIndex] {
+        let count = validatorCount ?? currentValidators.count
+        var source = Array(repeating: UInt32(0), count: count)
+        for i in 0 ..< count {
+            source[i] = UInt32(i / 3)
         }
         source.shuffle(randomness: randomness)
 
         let n = timeslot % UInt32(config.value.epochLength) / UInt32(config.value.coreAssignmentRotationPeriod)
 
-        return toCoreAssignment(source, n: n, max: UInt32(config.value.totalNumberOfCores))
+        return toCoreAssignment(source, n: n, max: UInt32(count / 3))
     }
 
     public func requiredStorageKeys(extrinsic: ExtrinsicGuarantees) -> [any StateKey] {
@@ -131,7 +134,7 @@ extension Guaranteeing {
         var additionalCachedAccounts: [(ServiceIndex, ServiceAccountDetails)] = []
 
         for guarantee in extrinsic.guarantees {
-            var totalGasUsage = Gas(0)
+            var accumulationGasRemaining = config.value.workReportAccumulationGas
             let report = guarantee.workReport
 
             guard !report.digests.isEmpty else {
@@ -164,11 +167,48 @@ extension Guaranteeing {
                     throw .invalidServiceGas
                 }
 
-                totalGasUsage += digest.gasLimit
+                guard digest.gasLimit <= accumulationGasRemaining else {
+                    throw .outOfGas
+                }
+                accumulationGasRemaining -= digest.gasLimit
             }
 
-            guard totalGasUsage <= config.value.workReportAccumulationGas else {
-                throw .outOfGas
+            // Report loads must fit the corresponding work-package limits.
+            // Subtract from bounded budgets so malicious sums cannot overflow.
+            var refineGas = config.value.workPackageRefineGas.value
+            var imports = UInt(config.value.maxWorkPackageImports)
+            var exports = UInt(config.value.maxWorkPackageExports)
+            var extrinsics = UInt(config.value.maxWorkPackageExtrinsics)
+            var inputBytes = UInt(config.value.maxEncodedWorkPackageSize)
+            let footprint = UInt(config.value.segmentFootprint)
+            for digest in report.digests {
+                guard digest.gasUsed <= refineGas,
+                      digest.importsCount <= imports,
+                      digest.exportsCount <= exports,
+                      digest.extrinsicsCount <= extrinsics,
+                      digest.extrinsicsSize <= inputBytes
+                else {
+                    throw .refineLoadTooHigh
+                }
+                refineGas -= UInt64(digest.gasUsed)
+                imports -= digest.importsCount
+                exports -= digest.exportsCount
+                extrinsics -= digest.extrinsicsCount
+                inputBytes -= digest.extrinsicsSize
+                let (importBytes, overflow) = digest.importsCount.multipliedReportingOverflow(by: footprint)
+                guard !overflow, importBytes <= inputBytes else {
+                    throw .refineLoadTooHigh
+                }
+                inputBytes -= importBytes
+            }
+            guard UInt(report.packageSpecification.segmentCount) == UInt(config.value.maxWorkPackageExports) - exports else {
+                throw .badExportsCount
+            }
+            guard report.packageSpecification.length <= config.value.maxWorkBundleSize else {
+                throw .bundleTooBig
+            }
+            guard report.authGasUsed <= config.value.workPackageIsAuthorizedGas.value else {
+                throw .authGasTooHigh
             }
         }
     }
@@ -178,6 +218,7 @@ extension Guaranteeing {
         timeslot: TimeslotIndex,
         extrinsic: ExtrinsicGuarantees,
         ancestry: ConfigLimitedSizeArray<AncestryItem, ProtocolConfig.Int0, ProtocolConfig.MaxLookupAnchorAge>?,
+        parentStateRoot: (hash: Data32, root: Data32)? = nil,
     ) async throws(GuaranteeingError) -> (
         newAvailabilityAssignments: ConfigFixedSizeArray<
             ReportItem?,
@@ -199,6 +240,7 @@ extension Guaranteeing {
             config: config,
             randomness: previousRandomness,
             timeslot: UInt32(max(0, Int(timeslot) - Int(coreAssignmentRotationPeriod))),
+            validatorCount: previousValidators.count,
         )
         let previousCoreKeys = withoutOffenders(keys: previousValidators.map(\.ed25519))
 
@@ -219,10 +261,21 @@ extension Guaranteeing {
         let ancestryLookup = ancestry.map {
             Set($0.array.map { AncestryLookupKey(timeslot: $0.timeslot, headerHash: $0.headerHash) })
         }
+        var ancestryStateRoots = ancestry.map { items in
+            Dictionary(items.array.map { ($0.parentHash, $0.priorStateRoot) }, uniquingKeysWith: { first, _ in first })
+        }
+        // The current header is also in GP's ancestor set and commits to its
+        // parent's posterior state, before it is appended to retained ancestry.
+        if let parentStateRoot {
+            ancestryStateRoots?[parentStateRoot.hash] = parentStateRoot.root
+        }
 
         for guarantee in extrinsic.guarantees {
             let report = guarantee.workReport
 
+            guard report.packageSpecification.erasureShards == currentValidators.count else {
+                throw .badErasureShards
+            }
             guard guarantee.timeslot <= timeslot else {
                 throw .futureReportSlot
             }
@@ -244,7 +297,14 @@ extension Guaranteeing {
             let reportHash = report.hash()
             let payload = SigningContext.guarantee + reportHash.data
 
+            guard report.coreIndex < currentValidators.count / 3 else {
+                throw .invalidGuaranteeCore
+            }
+
             for credential in guarantee.credential {
+                guard Int(credential.index) < keys.count else {
+                    throw .invalidGuaranteeCore
+                }
                 let key = keys[Int(credential.index)]
                 let pubkey = try Result(catching: { try Ed25519.PublicKey(from: key) })
                     .mapError { _ in GuaranteeingError.invalidPublicKey }
@@ -265,10 +325,8 @@ extension Guaranteeing {
 
             let coreIndex = Int(report.coreIndex)
 
-            if let existingReport = availabilityAssignments[coreIndex] {
-                guard timeslot >= (existingReport.timeslot + UInt32(config.value.preimageReplacementPeriod)) else {
-                    throw .coreNotAvailable
-                }
+            guard availabilityAssignments[coreIndex] == nil else {
+                throw .coreNotAvailable
             }
 
             guard coreAuthorizationPool[coreIndex].contains(report.authorizerHash) else {
@@ -295,6 +353,9 @@ extension Guaranteeing {
             guard context.anchor.beefyRoot == history.superPeak else {
                 throw .invalidContext
             }
+            guard context.anchor.timeslot == history.timeslot else {
+                throw .badAnchorSlot
+            }
             guard context.lookupAnchor.timeslot >= Int64(timeslot) - Int64(config.value.maxLookupAnchorAge) else {
                 throw .invalidContext
             }
@@ -304,6 +365,9 @@ extension Guaranteeing {
                 let lookupHeaderHash = context.lookupAnchor.headerHash
 
                 guard ancestryLookup.contains(AncestryLookupKey(timeslot: lookupTimeslot, headerHash: lookupHeaderHash)) else {
+                    throw .invalidContext
+                }
+                guard ancestryStateRoots?[lookupHeaderHash] == context.lookupAnchor.stateRoot else {
                     throw .invalidContext
                 }
             }
@@ -330,7 +394,7 @@ extension Guaranteeing {
             let report = guarantee.workReport
             let coreIndex = Int(report.coreIndex)
             newAvailabilityAssignments[coreIndex] = ReportItem(
-                workReport: report,
+                guarantee: guarantee,
                 timeslot: timeslot,
             )
             reported.append(report)

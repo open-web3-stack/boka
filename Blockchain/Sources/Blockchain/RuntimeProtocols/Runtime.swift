@@ -6,10 +6,14 @@ import Utils
 public struct AncestryItem: Codable {
     public let timeslot: TimeslotIndex
     public let headerHash: Data32
+    public let parentHash: Data32
+    public let priorStateRoot: Data32
 
-    public init(timeslot: TimeslotIndex, headerHash: Data32) {
+    public init(timeslot: TimeslotIndex, headerHash: Data32, parentHash: Data32, priorStateRoot: Data32) {
         self.timeslot = timeslot
         self.headerHash = headerHash
+        self.parentHash = parentHash
+        self.priorStateRoot = priorStateRoot
     }
 }
 
@@ -64,7 +68,12 @@ public final class Runtime {
     public func updateAncestry(with block: BlockRef) {
         guard var currentAncestry = ancestry else { return }
 
-        let newItem = AncestryItem(timeslot: block.header.timeslot, headerHash: block.hash)
+        let newItem = AncestryItem(
+            timeslot: block.header.timeslot,
+            headerHash: block.hash,
+            parentHash: block.header.parentHash,
+            priorStateRoot: block.header.priorStateRoot,
+        )
         currentAncestry.safeAppend(newItem)
         ancestry = currentAncestry
     }
@@ -99,7 +108,7 @@ public final class Runtime {
         let vrfOutput: Data32
         // H_a
         let blockAuthorKey = try Result {
-            try Bandersnatch.PublicKey(data: state.currentValidators[Int(block.header.authorIndex)].bandersnatch)
+            try Bandersnatch.PublicKey(data: state.currentValidators.at(Int(block.header.authorIndex)).bandersnatch)
         }.mapError(Error.invalidBlockSeal).get()
 
         let index = block.header.timeslot % UInt32(config.value.epochLength)
@@ -188,6 +197,9 @@ public final class Runtime {
         logger.debug("H_t=\(block.header.timeslot)")
 
         do {
+            // Verdicts use the prior epoch and validator sets. Safrole consumes
+            // the resulting punish set when rotating the pending validators.
+            try updateDisputes(block: block, state: &newState)
             try updateSafrole(block: block, state: &newState)
 
             if newState.ticketsOrKeys != prevState.value.ticketsOrKeys {
@@ -199,10 +211,10 @@ public final class Runtime {
 
             try validateHeaderSeal(block: block, state: newState)
 
-            try updateDisputes(block: block, state: &newState)
-
             // depends on Safrole and Disputes
-            let availableReports = try await updateAssurances(block: block, state: &newState)
+            let availableReports = try await updateAssurances(
+                block: block, state: &newState, priorValidatorCount: prevState.value.currentValidators.count,
+            )
 
             // accumulate
             let (accumulateRoot, commitments, accumulateStats) = try await newState.update(
@@ -271,6 +283,7 @@ public final class Runtime {
         newState.recentHistory.update(
             headerHash: block.hash,
             accumulateRoot: accumulateRoot,
+            timeslot: block.header.timeslot,
             lookup: lookup,
         )
     }
@@ -304,13 +317,14 @@ public final class Runtime {
     }
 
     /// returns available reports
-    public func updateAssurances(block: BlockRef, state newState: inout State) async throws -> [WorkReport] {
+    public func updateAssurances(block: BlockRef, state newState: inout State, priorValidatorCount: Int? = nil) async throws -> [WorkReport] {
         let (
             newAvailabilityAssignments: newAvailabilityAssignments, availableReports: availableReports,
         ) = try newState.update(
             config: config,
             timeslot: block.header.timeslot,
             extrinsic: block.extrinsic.availability,
+            priorValidatorCount: priorValidatorCount,
         )
 
         newState.availabilityAssignments = newAvailabilityAssignments
@@ -320,6 +334,7 @@ public final class Runtime {
     public func updateReports(block: BlockRef, state newState: inout State) async throws -> [Ed25519PublicKey] {
         let result = try await newState.update(
             config: config, timeslot: newState.timeslot, extrinsic: block.extrinsic.reports, ancestry: ancestry,
+            parentStateRoot: (block.header.parentHash, block.header.priorStateRoot),
         )
         newState.availabilityAssignments = result.newAvailabilityAssignments
         return result.reporters

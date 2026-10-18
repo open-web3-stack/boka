@@ -4,7 +4,6 @@ import TracingUtils
 import Utils
 
 private let logger = Logger(label: "BatchOperations")
-private let cEcOriginalCount = 342
 
 /// Service for batch operations on segments and reconstruction
 public actor BatchOperations {
@@ -52,7 +51,7 @@ public actor BatchOperations {
     ///   - originalLengths: Mapping of erasure root to original length
     ///   - validators: Optional validator addresses for network fallback
     ///   - coreIndex: Core index for shard assignment (default: 0)
-    ///   - totalValidators: Total number of validators (default: 1023)
+    ///   - validatorCounts: Coding counts from validated reports, keyed by erasure root.
     /// - Returns: Dictionary mapping erasure root to reconstructed data
     public func batchReconstruct(
         erasureRoots: [Data32],
@@ -61,7 +60,7 @@ public actor BatchOperations {
         fetchStrategy: FetchStrategy,
         validators: [UInt16: NetAddr]? = nil,
         coreIndex: UInt16 = 0,
-        totalValidators: UInt16 = 1023,
+        validatorCounts: [Data32: UInt16] = [:],
     ) async throws -> [Data32: Data] {
         // Capture state for TaskGroup closures
         let dataStore = dataStore
@@ -87,6 +86,12 @@ public actor BatchOperations {
                         logger.warning("Missing original length for erasureRoot=\(erasureRoot.toHexString())")
                         throw ErasureCodingStoreError.missingOriginalLength(erasureRoot: erasureRoot)
                     }
+
+                    if let count = validatorCounts[erasureRoot] {
+                        try await dataStore.setErasureValidatorCount(erasureRoot: erasureRoot, count: Int(count))
+                    }
+                    let count = try await dataStore.getErasureValidatorCount(erasureRoot: erasureRoot)
+                    let requiredShardCount = ErasureCodingService.originalShards(validators: count)
 
                     // Check local availability first
                     let canReconstructLocally = try await self.reconstructionService.canReconstructLocally(erasureRoot: erasureRoot)
@@ -122,20 +127,15 @@ public actor BatchOperations {
                                 shardIndices: missingShards,
                                 validators: validatorAddrs,
                                 coreIndex: coreIndex,
-                                totalValidators: totalValidators,
-                                requiredShards: max(0, cEcOriginalCount - localShardCount),
+                                totalValidators: UInt16(count),
+                                requiredShards: max(0, requiredShardCount - localShardCount),
                             )
 
-                            // Store fetched shards locally
-                            // NOTE: Currently storing to dataStore (RocksDB) for simplicity
-                            // TODO: For D³L segments (which this is), should ideally use filesystemStore
-                            // for consistency with storeExportedSegments. However:
-                            // 1. D3LSegmentStore.storeSegments() expects all 1023 shards together
-                            // 2. Individual shard storage to filesystemStore bypasses erasure coding metadata
-                            // 3. Proper fix requires either:
-                            //    - Adding batch store method to D3LSegmentStore
-                            //    - Or implementing D³L shard lifecycle management
-                            // See GP spec sections 10.3-10.4 for D³L retention requirements
+                            // The coding count is persisted before storing downloaded shards.
+                            // Network-fetched shards currently enter the generic shard store, whereas
+                            // locally encoded D³L shards live in the filesystem. Reconstruction combines
+                            // those sources. A shard index alone does not identify its kind: callers
+                            // must not mix audit shards and segment shards for the same reconstruction.
                             for (shardIndex, shardData) in fetchedShards {
                                 try await dataStore.storeShard(
                                     shardData: shardData,
@@ -159,7 +159,7 @@ public actor BatchOperations {
                     } else {
                         // No network fallback available, throw error
                         let localShardCount = try await self.shardRetrieval.getLocalShardCount(erasureRoot: erasureRoot)
-                        throw ErasureCodingStoreError.insufficientShards(available: localShardCount, required: cEcOriginalCount)
+                        throw ErasureCodingStoreError.insufficientShards(available: localShardCount, required: requiredShardCount)
                     }
                 }
             }

@@ -59,9 +59,51 @@ public protocol DataStoreProtocol: Sendable {
 
     func setMetadata(key: Data, value: Data) async throws
     func getMetadata(key: Data) async throws -> Data?
+    func deleteMetadata(key: Data) async throws
+
+    /// Atomically insert absent metadata, or return whether the existing value matches.
+    func setMetadataIfAbsent(key: Data, value: Data) async throws -> Bool
 }
 
 // MARK: - Supporting Types
+
+extension DataStoreProtocol {
+    /// Retain coding dimensions while either availability store still references the root.
+    public func deleteErasureValidatorCountIfUnused(erasureRoot: Data32) async throws {
+        guard try await getAuditEntry(erasureRoot: erasureRoot) == nil,
+              try await getD3LEntry(erasureRoot: erasureRoot) == nil
+        else { return }
+        try await deleteMetadata(key: Data("ec-validator-count:".utf8) + erasureRoot.data)
+    }
+
+    /// Record the encoding count from locally encoded data or a validated report.
+    /// Store it before publishing shards for reconstruction.
+    public func setErasureValidatorCount(erasureRoot: Data32, count: Int) async throws {
+        guard count >= 6, count <= 1023, count.isMultiple(of: 3) else {
+            throw ErasureCodingStoreError.invalidValidatorCount(count)
+        }
+        let value = UInt16(count)
+        let key = Data("ec-validator-count:".utf8) + erasureRoot.data
+        let encoded = Data([UInt8(truncatingIfNeeded: value), UInt8(value >> 8)])
+        guard try await setMetadataIfAbsent(key: key, value: encoded) else {
+            throw ErasureCodingStoreError.conflictingValidatorCount(erasureRoot: erasureRoot)
+        }
+    }
+
+    public func getErasureValidatorCount(erasureRoot: Data32) async throws -> Int {
+        guard let value = try await getMetadata(key: Data("ec-validator-count:".utf8) + erasureRoot.data) else {
+            throw ErasureCodingStoreError.metadataNotFound(erasureRoot: erasureRoot)
+        }
+        guard value.count == 2 else {
+            throw ErasureCodingStoreError.metadataNotFound(erasureRoot: erasureRoot)
+        }
+        let count = Int(value[value.startIndex]) | Int(value[value.startIndex + 1]) << 8
+        guard count >= 6, count <= 1023, count.isMultiple(of: 3) else {
+            throw ErasureCodingStoreError.metadataNotFound(erasureRoot: erasureRoot)
+        }
+        return count
+    }
+}
 
 public struct AuditEntry: Sendable, Codable {
     public var workPackageHash: Data32

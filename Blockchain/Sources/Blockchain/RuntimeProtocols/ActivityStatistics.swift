@@ -4,7 +4,7 @@ import Utils
 public protocol ActivityStatistics {
     var activityStatistics: Statistics { get }
     var timeslot: TimeslotIndex { get }
-    var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators> { get }
+    var currentValidators: ValidatorKeys { get }
 }
 
 extension ActivityStatistics {
@@ -16,22 +16,25 @@ extension ActivityStatistics {
         authorIndex: ValidatorIndex,
         availableReports: [WorkReport],
         accumulateStats: AccumulationStats,
-        activeValidators: ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-        >? = nil,
+        activeValidators: ValidatorKeys? = nil,
     ) throws -> Statistics {
         let epochLength = UInt32(config.value.epochLength)
         let currentEpoch = timeslot / epochLength
         let newEpoch = newTimeslot / epochLength
         let isEpochChange = currentEpoch != newEpoch
 
+        let validators = activeValidators ?? currentValidators
+        var priorAccumulator = activityStatistics.accumulator
+        for assurance in extrinsic.availability.assurances {
+            priorAccumulator[assurance.validatorIndex].assurances += 1
+        }
         var acc = try isEpochChange
-            ? ConfigFixedSizeArray<_, ProtocolConfig.TotalNumberOfValidators>(
+            ? ConfigLimitedSizeArray<_, ProtocolConfig.MinValidators, ProtocolConfig.MaxValidators>(
                 config: config,
-                defaultValue: Statistics.Validator.dummy(config: config),
-            ) : activityStatistics.accumulator
+                array: Array(repeating: Statistics.Validator.dummy(config: config), count: validators.count),
+            ) : priorAccumulator
 
-        let prev = isEpochChange ? activityStatistics.accumulator : activityStatistics.previous
+        let prev = isEpochChange ? priorAccumulator : activityStatistics.previous
 
         var item = acc[authorIndex]
         item.blocks += 1
@@ -40,15 +43,10 @@ extension ActivityStatistics {
         item.preimagesBytes += UInt32(extrinsic.preimages.preimages.reduce(into: 0) { $0 += $1.data.count })
         acc[authorIndex] = item
 
-        let validators = activeValidators ?? currentValidators
         for reporter in reporters {
             if let index = validators.firstIndex(where: { $0.ed25519 == reporter }) {
                 acc[index].guarantees += 1
             }
-        }
-
-        for assurance in extrinsic.availability.assurances {
-            acc[assurance.validatorIndex].assurances += 1
         }
 
         // service indices (to be used in the service statistics)
@@ -104,6 +102,7 @@ extension ActivityStatistics {
         for accumulateItem in accumulateStats {
             let index = UInt32(accumulateItem.key)
             serviceStats[index]!.accumulates.count += UInt(accumulateItem.value.1)
+            serviceStats[index]!.accumulates.transferCount += UInt(accumulateItem.value.transfers)
             serviceStats[index]!.accumulates.gasUsed += UInt(accumulateItem.value.0.value)
         }
 

@@ -117,12 +117,14 @@ struct ErasureCodingBatchOperationsTests {
             shardIndex: 0,
         )
 
-        await expectStoreError(.insufficientShards(available: 1, required: 342)) {
+        await expectStoreError(.insufficientShards(available: 1, required: 3)) {
             _ = try await fixture.store.batchReconstruct(
                 erasureRoots: [erasureRoot],
                 originalLengths: [erasureRoot: 684],
+                validatorCounts: [erasureRoot: 6],
             )
         }
+        #expect(try await fixture.dataStore.getErasureValidatorCount(erasureRoot: erasureRoot) == 6)
     }
 
     private enum ExpectedStoreError {

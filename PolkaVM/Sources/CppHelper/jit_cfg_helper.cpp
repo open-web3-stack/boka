@@ -146,10 +146,8 @@ uint32_t ControlFlowGraph::getInstrSize(uint32_t pc) const {
 
     uint8_t opcode = codeBuffer[pc];
 
-    // Handle old opcode numbers for backwards compatibility
-    // Old JumpInd = opcode 2 (2 bytes: [opcode][reg_index])
-    if (opcode == 2) {
-        return 2;
+    if (skipTable && pc < skipTableSize) {
+        return skipTable[pc] + 1;
     }
 
     // Use bitmask to find the next instruction boundary.
@@ -209,24 +207,15 @@ uint32_t ControlFlowGraph::getJumpTarget(uint32_t pc, uint32_t instrSize) const 
         return pc + instrSize;
     }
 
-    // Jump: [opcode][offset_32bit] = 5 bytes
+    // Jump: opcode followed by a signed variable-width relative offset.
     if (opcode_is(opcode, Opcode::Jump)) {
-        if (pc + 5 > codeSize) {
-            return pc + instrSize; // Fallthrough on error
-        }
-        uint32_t offset;
-        memcpy(&offset, &codeBuffer[pc + 1], 4);
-        return pc + int32_t(offset);
+        return pc + uint32_t(decode_immediate_signed32(codeBuffer, pc + 1, clamp_imm_len(instrSize - 1), codeSize));
     }
 
-    // Branch register instructions (7 bytes): [opcode][reg1][reg2][offset_32bit]
-    if (instrSize == 7) {
-        if (pc + 7 > codeSize) {
-            return pc + instrSize;
-        }
-        uint32_t offset;
-        memcpy(&offset, &codeBuffer[pc + 3], 4);
-        return pc + int32_t(offset);
+    // Register branches use two packed register indices followed by a relative offset.
+    if (opcode >= 170 && opcode <= 175) {
+        const uint32_t length = instrSize > 2 ? clamp_imm_len(instrSize - 2) : 0;
+        return pc + uint32_t(decode_immediate_signed32(codeBuffer, pc + 2, length, codeSize));
     }
 
     // Branch immediate instructions:

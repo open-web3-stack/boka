@@ -56,19 +56,6 @@ extension Instructions {
     static func isBranchValid(context: ExecutionContext, offset: UInt32) -> Bool {
         let targetPC = context.state.pc &+ offset
 
-        // Check if target is within code bounds
-        guard targetPC < UInt32(context.state.program.code.count) else {
-            return false
-        }
-
-        // Check if target points to a valid instruction (has skip value > 0 or within basic blocks)
-        // Due to test vector bitmask issues, we check both conditions
-        let skip = context.state.program.skip(targetPC)
-        if skip > 0 {
-            return true
-        }
-
-        // Fallback: check if target is in basicBlockIndices (for properly formed programs)
         return context.state.program.basicBlockIndices.contains(targetPC)
     }
 

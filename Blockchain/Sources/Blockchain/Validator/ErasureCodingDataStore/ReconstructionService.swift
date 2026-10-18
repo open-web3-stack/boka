@@ -1,8 +1,6 @@
 import Foundation
 import Utils
 
-private let cEcOriginalCount = 342
-
 /// Service for reconstructing data from erasure-coded shards
 ///
 /// Handles checking reconstruction potential and performing data reconstruction
@@ -23,10 +21,11 @@ public actor ReconstructionService {
 
     /// Check if we can reconstruct data from local shards
     /// - Parameter erasureRoot: Erasure root identifying the data
-    /// - Returns: True if at least 342 shards are available
+    /// - Returns: True if enough shards for the stored assurer set are available
     public func canReconstructLocally(erasureRoot: Data32) async throws -> Bool {
         let shardCount = try await getLocalShardCount(erasureRoot: erasureRoot)
-        return shardCount >= cEcOriginalCount
+        let requiredShardCount = try await requiredShards(erasureRoot: erasureRoot)
+        return shardCount >= requiredShardCount
     }
 
     /// Get reconstruction potential
@@ -34,7 +33,8 @@ public actor ReconstructionService {
     /// - Returns: Percentage of required shards available (capped at 100%)
     public func getReconstructionPotential(erasureRoot: Data32) async throws -> Double {
         let shardCount = try await getLocalShardCount(erasureRoot: erasureRoot)
-        let percentage = Double(shardCount) / Double(cEcOriginalCount) * 100.0
+        let requiredShardCount = try await requiredShards(erasureRoot: erasureRoot)
+        let percentage = Double(shardCount) / Double(requiredShardCount) * 100.0
         return min(percentage, 100.0)
     }
 
@@ -46,7 +46,8 @@ public actor ReconstructionService {
         let availableSet = Set(availableIndices)
         var missing: [UInt16] = []
 
-        for i in 0 ..< 1023 where !availableSet.contains(UInt16(i)) {
+        let count = try await validatorCount(erasureRoot: erasureRoot)
+        for i in 0 ..< count where !availableSet.contains(UInt16(i)) {
             missing.append(UInt16(i))
         }
 
@@ -58,15 +59,17 @@ public actor ReconstructionService {
     /// - Returns: Reconstruction plan with status and recommendations
     public func getReconstructionPlan(erasureRoot: Data32) async throws -> ReconstructionPlan {
         let localShards = try await getLocalShardCount(erasureRoot: erasureRoot)
-        let missingShards = 1023 - localShards
-        let canReconstruct = localShards >= cEcOriginalCount
+        let count = try await validatorCount(erasureRoot: erasureRoot)
+        let requiredShardCount = ErasureCodingService.originalShards(validators: count)
+        let missingShards = max(0, count - localShards)
+        let canReconstruct = localShards >= requiredShardCount
 
         return ReconstructionPlan(
             erasureRoot: erasureRoot,
             localShards: localShards,
             missingShards: missingShards,
             canReconstructLocally: canReconstruct,
-            reconstructionPercentage: Double(localShards) / Double(cEcOriginalCount) * 100.0,
+            reconstructionPercentage: Double(localShards) / Double(requiredShardCount) * 100.0,
         )
     }
 
@@ -76,27 +79,39 @@ public actor ReconstructionService {
     ///   - originalLength: Expected original data length
     /// - Returns: Reconstructed data
     public func reconstructFromLocalShards(erasureRoot: Data32, originalLength: Int) async throws -> Data {
+        let count = try await validatorCount(erasureRoot: erasureRoot)
+        let requiredShardCount = ErasureCodingService.originalShards(validators: count)
         guard try await canReconstructLocally(erasureRoot: erasureRoot) else {
             let available = try await getLocalShardCount(erasureRoot: erasureRoot)
             throw ErasureCodingStoreError.insufficientShards(
                 available: available,
-                required: cEcOriginalCount,
+                required: requiredShardCount,
             )
         }
 
         let availableIndices = try await getLocalShardIndices(erasureRoot: erasureRoot)
         let shards = try await getLocalShards(
             erasureRoot: erasureRoot,
-            indices: Array(availableIndices.prefix(cEcOriginalCount)),
+            indices: Array(availableIndices.prefix(requiredShardCount)),
         )
-        guard shards.count >= cEcOriginalCount else {
+        guard shards.count >= requiredShardCount else {
             throw ErasureCodingStoreError.insufficientShards(
                 available: shards.count,
-                required: cEcOriginalCount,
+                required: requiredShardCount,
             )
         }
 
-        return try await erasureCoding.reconstruct(shards: shards, originalLength: originalLength)
+        let coding = await erasureCoding.forValidators(count)
+        return try await coding.reconstruct(shards: shards, originalLength: originalLength)
+    }
+
+    private func validatorCount(erasureRoot: Data32) async throws -> Int {
+        try await dataStore.getErasureValidatorCount(erasureRoot: erasureRoot)
+    }
+
+    private func requiredShards(erasureRoot: Data32) async throws -> Int {
+        let count = try await validatorCount(erasureRoot: erasureRoot)
+        return ErasureCodingService.originalShards(validators: count)
     }
 
     private func getLocalShardCount(erasureRoot: Data32) async throws -> Int {

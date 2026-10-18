@@ -4,12 +4,11 @@ import TracingUtils
 import Utils
 
 private let logger = Logger(label: "D3LSegmentStore")
-private let cEcOriginalCount = 342
 
 /// Service for storing and retrieving D³L segments with erasure coding
 ///
 /// Per GP spec: Stores exported segments with Paged-Proofs metadata
-/// - Erasure-codes each segment individually (4,104 bytes → 1,023 shards of 12 bytes)
+/// - Erasure-codes segments into one shard per assuring validator
 /// - Stores shards in filesystem under d3l/ directory
 /// - Generates and stores Paged-Proofs metadata
 /// - Sets timestamp for retention tracking (672 epochs = 28 days)
@@ -42,7 +41,9 @@ public actor D3LSegmentStore {
         segments: [Data4104],
         workPackageHash: Data32,
         segmentsRoot: Data32,
+        validatorCount: Int? = nil,
     ) async throws -> Data32 {
+        let erasureCoding = await erasureCoding.forValidators(validatorCount)
         guard !segments.isEmpty else {
             throw ErasureCodingStoreError.noSegmentsToStore
         }
@@ -74,6 +75,7 @@ public actor D3LSegmentStore {
             segmentsRoot: segmentsRoot,
             shards: shards,
         )
+        try await dataStore.setErasureValidatorCount(erasureRoot: erasureRoot, count: erasureCoding.validatorCount)
 
         // Store each shard's individual data in parallel using TaskGroup
         // This is much more efficient than sequential await for 1023 shards
@@ -120,6 +122,9 @@ public actor D3LSegmentStore {
     ///   - indices: Array of segment indices to retrieve (0-based)
     /// - Returns: Array of retrieved segments
     public func getSegments(erasureRoot: Data32, indices: [Int]) async throws -> [Data4104] {
+        let count = try await dataStore.getErasureValidatorCount(erasureRoot: erasureRoot)
+        let erasureCoding = await erasureCoding.forValidators(count)
+        let requiredShardCount = await erasureCoding.requiredShardCount
         guard !indices.isEmpty else {
             return []
         }
@@ -133,15 +138,15 @@ public actor D3LSegmentStore {
         let availableShardIndices = Set(dataStoreShardIndices + filesystemShardIndices).sorted()
 
         // Check if we can reconstruct
-        guard availableShardIndices.count >= cEcOriginalCount else {
+        guard availableShardIndices.count >= requiredShardCount else {
             throw ErasureCodingStoreError.insufficientShards(
                 available: availableShardIndices.count,
-                required: cEcOriginalCount,
+                required: requiredShardCount,
             )
         }
 
         // Get shards for reconstruction from both stores.
-        let selectedShardIndices = Array(availableShardIndices.prefix(cEcOriginalCount))
+        let selectedShardIndices = Array(availableShardIndices.prefix(requiredShardCount))
         let dataStoreShards = try await dataStore.getShards(
             erasureRoot: erasureRoot,
             shardIndices: selectedShardIndices,
@@ -157,10 +162,10 @@ public actor D3LSegmentStore {
                 shardTuples.append((index: shardIndex, data: shardData))
             }
         }
-        guard shardTuples.count >= cEcOriginalCount else {
+        guard shardTuples.count >= requiredShardCount else {
             throw ErasureCodingStoreError.insufficientShards(
                 available: shardTuples.count,
-                required: cEcOriginalCount,
+                required: requiredShardCount,
             )
         }
 
@@ -181,7 +186,7 @@ public actor D3LSegmentStore {
         // Split into individual segments
         var result: [Data4104] = []
         for index in indices {
-            guard index >= 0 && index < segmentCount else {
+            guard index >= 0, index < segmentCount else {
                 continue
             }
 
