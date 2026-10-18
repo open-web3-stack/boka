@@ -530,7 +530,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         // Skip PCs that are not reachable
         if (!reachablePCs.contains(pc)) {
             pc++;
-            goto next_instruction;
+            continue;
         }
 
         opcode = codeBuffer[pc];
@@ -543,7 +543,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // This shouldn't happen in valid reachable code, but handle gracefully
             fprintf(stderr, "[JIT] Unknown opcode %d (0x%02X) at reachable PC %u, skipping\n", opcode, opcode, pc);
             pc++;
-            goto next_instruction;
+            continue;
         }
 
         // Bind label for this PC if:

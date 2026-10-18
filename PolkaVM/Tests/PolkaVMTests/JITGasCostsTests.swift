@@ -37,31 +37,29 @@ struct JITGasCostsTests {
         }
     }
 
-    @Test(arguments: [1, 2, 3, 4])
-    func denseAndSparseCompileAndExecuteIdentically(jumpWidth: Int) throws {
+    @Test(arguments: [1, 2, 3, 4], [UInt32(0), 1, 64, 65, 127])
+    func denseAndSparseCompileAndExecuteIdentically(jumpWidth: Int, pc: UInt32) throws {
         let program = try Self.program(size: 128, blockSize: 64, jumpWidth: jumpWidth)
         let skips = program.skipValues
         let total = program.basicBlockIndices.reduce(Gas(0)) { $0 + program.getBlockGasCosts(pc: $1) }
         for representation in [JITGasCosts.Representation.dense, .sparse] {
-            for pc: UInt32 in [0, 1, 64, 65] {
-                let compiler = JITCompiler()
-                defer { withExtendedLifetime(compiler) {} }
-                let function = try compiler.compile(
-                    blob: program.code, initialPC: pc, config: DefaultPvmConfig(),
-                    targetArchitecture: JITPlatform.getCurrentTargetArchitecture(), jitMemorySize: 4096,
-                    skipTable: skips, bitmask: program.bitmask,
-                    blockGasCosts: JITGasCosts(program: program, representation: representation),
-                )
-                var registers = Registers()
-                var gas = pc < 64 ? total : program.getBlockGasCosts(pc: 64)
-                let (exit, memory) = try JITExecutor().execute(
-                    functionPtr: function, registers: &registers, jitMemorySize: 4096,
-                    gas: &gas, initialPC: pc, invocationContext: nil,
-                )
-                memory.deallocate()
-                #expect(exit == .panic(.trap))
-                #expect(gas == Gas(0))
-            }
+            let compiler = JITCompiler()
+            defer { withExtendedLifetime(compiler) {} }
+            let function = try compiler.compile(
+                blob: program.code, initialPC: pc, config: DefaultPvmConfig(),
+                targetArchitecture: JITPlatform.getCurrentTargetArchitecture(), jitMemorySize: 4096,
+                skipTable: skips, bitmask: program.bitmask,
+                blockGasCosts: JITGasCosts(program: program, representation: representation),
+            )
+            var registers = Registers()
+            var gas = pc < 64 ? total : program.getBlockGasCosts(pc: 64)
+            let (exit, memory) = try JITExecutor().execute(
+                functionPtr: function, registers: &registers, jitMemorySize: 4096,
+                gas: &gas, initialPC: pc, invocationContext: nil,
+            )
+            memory.deallocate()
+            #expect(exit == .panic(.trap))
+            #expect(gas == Gas(0))
         }
     }
 }

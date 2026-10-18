@@ -4,6 +4,39 @@ import Testing
 import Utils
 
 struct InMemoryDataStoreBackendTests {
+    @Test
+    func concurrentCodingMetadataIsImmutableUntilDeleted() async throws {
+        let backend = InMemoryDataStoreBackend()
+        let root = Data32(repeating: 17)
+        let accepted = await withTaskGroup(of: Int?.self, returning: Set<Int>.self) { group in
+            for count in [6, 9, 6, 9, 6, 9] {
+                group.addTask {
+                    do {
+                        try await backend.setErasureValidatorCount(erasureRoot: root, count: count)
+                        return count
+                    } catch {
+                        return nil
+                    }
+                }
+            }
+            var values = Set<Int>()
+            for await count in group {
+                if let count {
+                    values.insert(count)
+                }
+            }
+            return values
+        }
+        let stored = try await backend.getErasureValidatorCount(erasureRoot: root)
+        #expect(accepted == [stored])
+        try await backend.deleteErasureValidatorCountIfUnused(erasureRoot: root)
+        await #expect(throws: ErasureCodingStoreError.self) {
+            try await backend.getErasureValidatorCount(erasureRoot: root)
+        }
+        try await backend.setErasureValidatorCount(erasureRoot: root, count: 6)
+        #expect(try await backend.getErasureValidatorCount(erasureRoot: root) == 6)
+    }
+
     @Test func deletesErasureRootMappingsAndAssociatedData() async throws {
         let backend = InMemoryDataStoreBackend()
         let segmentRoot = Data32.random()
