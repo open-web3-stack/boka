@@ -6,9 +6,10 @@ import Utils
 private let logger = Logger(label: "RefineContext")
 
 public struct InnerPvm {
-    public var code: Data
+    public let program: ProgramCode
     public var memory: GeneralMemory
     public var pc: UInt32
+    public var blockGasCharged = false
 }
 
 public final class RefineContext: InvocationContext {
@@ -59,9 +60,11 @@ public final class RefineContext: InvocationContext {
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
-        switch UInt8(index) {
+        switch UInt8(clamping: index) {
         case GasFn.identifier:
             return await GasFn().call(config: config, state: state)
+        case GrowHeap.identifier:
+            return await GrowHeap().call(config: config, state: state)
         case HistoricalLookup.identifier:
             return await HistoricalLookup(
                 context: context,
@@ -97,9 +100,9 @@ public final class RefineContext: InvocationContext {
         case Log.identifier:
             return await Log(service: service).call(config: config, state: state)
         default:
-            state.consumeGas(Gas(10))
+            state.consumeGas(Gas(1000))
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)
-            return .continued
+            return state.getGas() < GasInt(0) ? .exit(.outOfGas) : .continued
         }
     }
 }

@@ -11,7 +11,7 @@ private let logger = Logger(label: "HostCalls.Accumulate")
 /// Set privileged services details
 public class Bless: HostCall {
     public static var identifier: UInt8 {
-        14
+        15
     }
 
     public let x: AccumulateResultContext
@@ -68,7 +68,7 @@ public class Bless: HostCall {
 /// Assign the authorization queue for a core
 public class Assign: HostCall {
     public static var identifier: UInt8 {
-        15
+        16
     }
 
     public let x: AccumulateResultContext
@@ -115,7 +115,7 @@ public class Assign: HostCall {
 /// Designate the new validator queue
 public class Designate: HostCall {
     public static var identifier: UInt8 {
-        16
+        17
     }
 
     public let x: AccumulateResultContext
@@ -128,7 +128,11 @@ public class Designate: HostCall {
         let startAddr: UInt32 = state.readRegister(Registers.Index(raw: 7))
 
         var validatorQueue: [ValidatorKey]?
-        let length = 336 * config.value.totalNumberOfValidators
+        let count: UInt64 = state.readRegister(Registers.Index(raw: 8))
+        let (byteCount, overflow) = count.multipliedReportingOverflow(by: 336)
+        guard !overflow, let length = Int(exactly: byteCount) else {
+            throw VMInvocationsError.panic
+        }
         if state.isMemoryReadable(address: startAddr, length: length) {
             validatorQueue = []
             let data = try state.readMemory(address: startAddr, length: length)
@@ -139,11 +143,13 @@ public class Designate: HostCall {
 
         if validatorQueue == nil {
             throw VMInvocationsError.panic
-        } else if x.serviceIndex != x.state.designator {
+        } else if count < 6 || count > UInt64(config.value.totalNumberOfCores * 3)
+            || !count.isMultiple(of: 3) || x.serviceIndex != x.state.designator
+        {
             logger.debug("Designate HUH: \(x.serviceIndex) != \(x.state.designator)")
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
         } else {
-            x.state.validatorQueue = try ConfigFixedSizeArray(config: config, array: validatorQueue!)
+            x.state.validatorQueue = try ValidatorKeys(config: config, array: validatorQueue!)
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.OK.rawValue)
         }
     }
@@ -152,7 +158,7 @@ public class Designate: HostCall {
 /// Save a checkpoint
 public class Checkpoint: HostCall {
     public static var identifier: UInt8 {
-        17
+        18
     }
 
     public let x: AccumulateResultContext
@@ -178,7 +184,7 @@ public class Checkpoint: HostCall {
 /// Create a new service account
 public class New: HostCall {
     public static var identifier: UInt8 {
-        18
+        19
     }
 
     public let x: AccumulateResultContext
@@ -269,7 +275,7 @@ public class New: HostCall {
 /// Upgrade a service account
 public class Upgrade: HostCall {
     public static var identifier: UInt8 {
-        19
+        20
     }
 
     public let x: AccumulateResultContext
@@ -300,7 +306,7 @@ public class Upgrade: HostCall {
 /// Make a transfer
 public class Transfer: HostCall {
     public static var identifier: UInt8 {
-        20
+        21
     }
 
     public let x: AccumulateResultContext
@@ -309,13 +315,12 @@ public class Transfer: HostCall {
         self.x = x
     }
 
-    /// GP v0.7.2: g = 10 + t, where t = gasLimit when OK, 0 otherwise
+    /// g = 575 + t, where t = gasLimit when OK, 0 otherwise
     /// We override call() to implement conditional gas charging
     public func call(config: ProtocolConfigRef, state: VMState) async -> ExecOutcome {
         logger.debug("===== host call: \(Self.self) =====")
 
-        state.consumeGas(Gas(10))
-        logger.debug("consumed base 10 gas, \(state.getGas()) left")
+        state.consumeGas(gasCost(state: state))
 
         guard state.getGas() >= GasInt(0) else {
             logger.debug("not enough gas")
@@ -380,7 +385,7 @@ public class Transfer: HostCall {
 /// Eject (remove) a service account
 public class Eject: HostCall {
     public static var identifier: UInt8 {
-        21
+        22
     }
 
     public let x: AccumulateResultContext
@@ -439,7 +444,7 @@ public class Eject: HostCall {
 /// Query preimage lookup history
 public class Query: HostCall {
     public static var identifier: UInt8 {
-        22
+        23
     }
 
     public let x: AccumulateResultContext
@@ -449,7 +454,11 @@ public class Query: HostCall {
     }
 
     public func _callImpl(config _: ProtocolConfigRef, state: VMState) async throws {
-        let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+        let (startAddr, rawLength): (UInt64, UInt64) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+        guard let length = UInt32(exactly: rawLength) else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
+            return
+        }
         let preimageHash = try? state.readMemory(address: startAddr, length: 32)
         guard let preimageHash else {
             throw VMInvocationsError.panic
@@ -485,7 +494,7 @@ public class Query: HostCall {
 /// Solicit data to be made available in-core (through preimage lookups)
 public class Solicit: HostCall {
     public static var identifier: UInt8 {
-        23
+        24
     }
 
     public let x: AccumulateResultContext
@@ -497,7 +506,11 @@ public class Solicit: HostCall {
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
-        let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+        let (startAddr, rawLength): (UInt64, UInt64) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+        guard let length = UInt32(exactly: rawLength) else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
+            return
+        }
         let hashData = try? state.readMemory(address: startAddr, length: 32)
         let hash = Data32(hashData ?? Data())
 
@@ -561,7 +574,7 @@ public class Solicit: HostCall {
 /// Cancel, mark unavailable, or expunge a preimage lookup
 public class Forget: HostCall {
     public static var identifier: UInt8 {
-        24
+        25
     }
 
     public let x: AccumulateResultContext
@@ -573,7 +586,11 @@ public class Forget: HostCall {
     }
 
     public func _callImpl(config: ProtocolConfigRef, state: VMState) async throws {
-        let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+        let (startAddr, rawLength): (UInt64, UInt64) = state.readRegister(Registers.Index(raw: 7), Registers.Index(raw: 8))
+        guard let length = UInt32(exactly: rawLength) else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
+            return
+        }
         let hashData = try? state.readMemory(address: startAddr, length: 32)
         let hash = Data32(hashData ?? Data())
 
@@ -626,7 +643,7 @@ public class Forget: HostCall {
 /// Set the service's accumulation output hash
 public class Yield: HostCall {
     public static var identifier: UInt8 {
-        25
+        26
     }
 
     public let x: AccumulateResultContext
@@ -650,7 +667,7 @@ public class Yield: HostCall {
 /// Queue a requested preimage for integration after accumulation
 public class Provide: HostCall {
     public static var identifier: UInt8 {
-        26
+        27
     }
 
     public let x: AccumulateResultContext
@@ -665,7 +682,12 @@ public class Provide: HostCall {
         } else {
             state.readRegister(.init(raw: 7))
         }
-        let (startAddr, length): (UInt32, UInt32) = state.readRegister(Registers.Index(raw: 8), Registers.Index(raw: 9))
+        let startAddr: UInt32 = state.readRegister(Registers.Index(raw: 8))
+        let rawLength: UInt64 = state.readRegister(Registers.Index(raw: 9))
+        guard let length = UInt32(exactly: rawLength) else {
+            state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.HUH.rawValue)
+            return
+        }
         let preimage = try? state.readMemory(address: startAddr, length: Int(length))
         let accountDetails = try await x.state.accounts.value.get(serviceAccount: serviceIndex)
         var preimageLookupOk = false

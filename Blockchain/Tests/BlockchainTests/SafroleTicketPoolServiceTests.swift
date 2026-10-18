@@ -15,8 +15,7 @@ struct SafroleTicketPoolServiceTests {
     let ringContext: Bandersnatch.RingContext
 
     init() async throws {
-        config = ProtocolConfigRef.dev.mutate { config in
-            config.ticketEntriesPerValidator = 4
+        config = ProtocolConfigRef.dev.mutate { _ in
         }
         timeProvider = MockTimeProvider(time: 1000)
 
@@ -31,11 +30,11 @@ struct SafroleTicketPoolServiceTests {
             handlerMiddleware: Middleware(logMiddleware),
         )
 
-        keystore = try await DevKeyStore(devKeysCount: config.value.totalNumberOfValidators)
+        keystore = try await DevKeyStore(devKeysCount: config.value.initialValidatorCount)
 
         poolService = await SafroleTicketPoolService(config: config, dataProvider: dataProvider, eventBus: eventBus)
 
-        ringContext = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
+        ringContext = try Bandersnatch.RingContext(size: UInt(ProtocolConfig.MaxValidators.read(config: config)))
 
         // setupTestLogger()
     }
@@ -52,7 +51,7 @@ struct SafroleTicketPoolServiceTests {
             let secretKey = try #require(keySecret)
 
             let tickets = try SafroleService.generateTickets(
-                count: TicketIndex(config.value.ticketEntriesPerValidator),
+                count: (2 * config.value.epochLength + state.value.nextValidators.count - 1) / state.value.nextValidators.count,
                 validators: state.value.nextValidators.array,
                 entropy: state.value.entropyPool.t3,
                 ringContext: ringContext,
@@ -90,7 +89,7 @@ struct SafroleTicketPoolServiceTests {
         let secretKey = try #require(keySecret)
 
         var tickets = try SafroleService.generateTickets(
-            count: TicketIndex(config.value.ticketEntriesPerValidator) + 2,
+            count: (2 * config.value.epochLength + state.value.nextValidators.count - 1) / state.value.nextValidators.count + 2,
             validators: state.value.nextValidators.array,
             entropy: state.value.entropyPool.t3,
             ringContext: ringContext,
@@ -109,7 +108,8 @@ struct SafroleTicketPoolServiceTests {
         )
         tickets.append(invalidTicket)
 
-        allTickets.append(contentsOf: tickets[..<config.value.ticketEntriesPerValidator]) // only valid tickets
+        let attempts = (2 * config.value.epochLength + state.value.nextValidators.count - 1) / state.value.nextValidators.count
+        allTickets.append(contentsOf: tickets[..<attempts]) // only valid tickets
 
         let event = RuntimeEvents.SafroleTicketsReceived(items: tickets.map(\.ticket))
         await eventBus.publish(event)
@@ -229,6 +229,7 @@ struct SafroleTicketPoolServiceTests {
                 headerHash: newBlock.hash,
                 superPeak: Data32(),
                 stateRoot: Data32(),
+                timeslot: nextTimeslot,
                 lookup: .init(),
             ))
         }

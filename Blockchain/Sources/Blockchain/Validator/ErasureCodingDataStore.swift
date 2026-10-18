@@ -139,12 +139,18 @@ public actor ErasureCodingDataStore {
         bundle: Data,
         workPackageHash: Data32,
         segmentsRoot: Data32,
+        validatorCount: Int? = nil,
     ) async throws -> Data32 {
         try await auditBundleStore.storeBundle(
             bundle: bundle,
             workPackageHash: workPackageHash,
             segmentsRoot: segmentsRoot,
+            validatorCount: validatorCount,
         )
+    }
+
+    public func getErasureValidatorCount(erasureRoot: Data32) async throws -> Int {
+        try await dataStore.getErasureValidatorCount(erasureRoot: erasureRoot)
     }
 
     /// Retrieve audit bundle by erasure root
@@ -163,11 +169,13 @@ public actor ErasureCodingDataStore {
         segments: [Data4104],
         workPackageHash: Data32,
         segmentsRoot: Data32,
+        validatorCount: Int? = nil,
     ) async throws -> Data32 {
         try await d3lSegmentStore.storeSegments(
             segments: segments,
             workPackageHash: workPackageHash,
             segmentsRoot: segmentsRoot,
+            validatorCount: validatorCount,
         )
     }
 
@@ -566,7 +574,7 @@ public actor ErasureCodingDataStore {
         originalLengths: [Data32: Int],
         validators: [UInt16: NetAddr]? = nil,
         coreIndex: UInt16 = 0,
-        totalValidators: UInt16 = 1023,
+        validatorCounts: [Data32: UInt16] = [:],
     ) async throws -> [Data32: Data] {
         try await batchOperations.batchReconstruct(
             erasureRoots: erasureRoots,
@@ -575,7 +583,7 @@ public actor ErasureCodingDataStore {
             fetchStrategy: fetchStrategy,
             validators: validators,
             coreIndex: coreIndex,
-            totalValidators: totalValidators,
+            validatorCounts: validatorCounts,
         )
     }
 }
@@ -787,6 +795,8 @@ public enum ErasureCodingStoreError: Error {
     case tooManySegments(count: Int, max: Int)
     case insufficientShards(available: Int, required: Int)
     case metadataNotFound(erasureRoot: Data32)
+    case invalidValidatorCount(Int)
+    case conflictingValidatorCount(erasureRoot: Data32)
     case missingOriginalLength(erasureRoot: Data32)
     case reconstructionFailed(underlying: Error)
     case segmentNotFound

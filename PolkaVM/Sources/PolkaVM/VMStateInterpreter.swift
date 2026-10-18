@@ -2,6 +2,18 @@ import Foundation
 import Utils
 
 public class VMStateInterpreter: VMState {
+    public var blockGasCharged = false
+    public var heapPages: (current: UInt32, limit: UInt32)? {
+        (memory as? StandardMemory)?.heapPages
+    }
+
+    public func growHeap(to pages: UInt32) throws {
+        guard let memory = memory as? StandardMemory else {
+            throw VMError.invalidInstructionMemoryAccess
+        }
+        memory.growHeap(to: pages)
+    }
+
     public let program: ProgramCode
 
     private var _pc: UInt32
@@ -73,7 +85,9 @@ public class VMStateInterpreter: VMState {
     }
 
     public func readMemory(address: some FixedWidthInteger, length: Int) throws -> Data {
-        if length == 0 { return Data() }
+        if length == 0 {
+            return Data()
+        }
         let addr = UInt32(truncatingIfNeeded: address)
         try validateAddress(addr)
         return try memory.read(address: addr, length: length)
@@ -109,7 +123,13 @@ public class VMStateInterpreter: VMState {
     }
 
     public func consumeGas(_ amount: Gas) {
-        gas -= GasInt(amount)
+        // An unsigned charge larger than the signed counter range must exhaust
+        // gas, rather than clamp to an affordable charge at Int64.max.
+        gas = amount.value > UInt64(Int64.max) ? .min : gas - GasInt(amount)
+    }
+
+    public func refundGas(_ amount: Gas) {
+        gas += GasInt(amount)
     }
 
     public func consumeInstructionGas() {
@@ -124,10 +144,14 @@ public class VMStateInterpreter: VMState {
         // using wrapped add
         // so that it can also be used for jumps which are negative
         _pc &+= amount
+        if program.basicBlockIndices.contains(_pc) {
+            blockGasCharged = false
+        }
     }
 
     public func updatePC(_ newPC: UInt32) {
         _pc = newPC
+        blockGasCharged = false
     }
 
     public func readRegister<T: FixedWidthInteger>(_ index: Registers.Index) -> T {

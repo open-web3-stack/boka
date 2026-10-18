@@ -10,6 +10,8 @@ public enum SafroleError: Error {
     case extrinsicsNotSorted
     case extrinsicsTooLow
     case extrinsicsNotUnique
+    case invalidValidatorCount
+    case invalidAttempt
     case bandersnatchError(Bandersnatch.Error)
     case other(any Swift.Error)
 }
@@ -42,18 +44,10 @@ public typealias SafroleTicketsOrKeys = Either<
 public struct SafrolePostState: Sendable, Equatable {
     public var timeslot: TimeslotIndex
     public var entropyPool: EntropyPool
-    public var previousValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
-    public var currentValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
-    public var nextValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
-    public var validatorQueue: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
+    public var previousValidators: ValidatorKeys
+    public var currentValidators: ValidatorKeys
+    public var nextValidators: ValidatorKeys
+    public var validatorQueue: ValidatorKeys
     public var ticketsAccumulator: ConfigLimitedSizeArray<
         Ticket,
         ProtocolConfig.Int0,
@@ -65,18 +59,10 @@ public struct SafrolePostState: Sendable, Equatable {
     public init(
         timeslot: TimeslotIndex,
         entropyPool: EntropyPool,
-        previousValidators: ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-        >,
-        currentValidators: ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-        >,
-        nextValidators: ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-        >,
-        validatorQueue: ConfigFixedSizeArray<
-            ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-        >,
+        previousValidators: ValidatorKeys,
+        currentValidators: ValidatorKeys,
+        nextValidators: ValidatorKeys,
+        validatorQueue: ValidatorKeys,
         ticketsAccumulator: ConfigLimitedSizeArray<
             Ticket,
             ProtocolConfig.Int0,
@@ -109,18 +95,10 @@ public struct SafrolePostState: Sendable, Equatable {
 public protocol Safrole {
     var timeslot: TimeslotIndex { get }
     var entropyPool: EntropyPool { get }
-    var previousValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    > { get }
-    var currentValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    > { get }
-    var nextValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    > { get }
-    var validatorQueue: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    > { get }
+    var previousValidators: ValidatorKeys { get }
+    var currentValidators: ValidatorKeys { get }
+    var nextValidators: ValidatorKeys { get }
+    var validatorQueue: ValidatorKeys { get }
     var ticketsAccumulator: ConfigLimitedSizeArray<
         Ticket,
         ProtocolConfig.Int0,
@@ -179,7 +157,7 @@ func generateFallbackIndices(entropy: Data32, count: Int, length: Int) throws ->
 
 func pickFallbackValidators(
     entropy: Data32,
-    validators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>,
+    validators: ValidatorKeys,
     count: Int,
 ) throws -> [BandersnatchPublicKey] {
     let indices = try generateFallbackIndices(entropy: entropy, count: count, length: validators.count)
@@ -188,8 +166,8 @@ func pickFallbackValidators(
 
 func withoutOffenders(
     offenders: Set<Ed25519PublicKey>,
-    validators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>,
-) -> ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators> {
+    validators: ValidatorKeys,
+) -> ValidatorKeys {
     var validators = validators
 
     for i in validators.indices {
@@ -250,8 +228,23 @@ extension Safrole {
         let newPhase = slot % epochLength
         let isEpochChange = currentEpoch != newEpoch
 
+        for validators in [validatorQueue, nextValidators, currentValidators, previousValidators] {
+            guard validators.count >= 6,
+                  validators.count <= config.value.totalNumberOfCores * 3,
+                  validators.count.isMultiple(of: 3)
+            else {
+                throw .invalidValidatorCount
+            }
+        }
+        let pendingCount = isEpochChange ? validatorQueue.count : nextValidators.count
+        let attempts = (2 * config.value.epochLength + pendingCount - 1) / pendingCount
+        guard extrinsics.tickets.allSatisfy({ Int($0.attempt) < attempts }) else {
+            throw .invalidAttempt
+        }
+
         do {
-            let ctx = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
+            // The proof domain is fixed by capacity; resizing the ring changes its members, not its domain.
+            let ctx = try Bandersnatch.RingContext(size: UInt(ProtocolConfig.MaxValidators.read(config: config)))
 
             let validatorQueueWithoutOffenders = withoutOffenders(offenders: offenders, validators: validatorQueue)
 
@@ -309,7 +302,7 @@ extension Safrole {
             let epochMark = try isEpochChange ? EpochMarker(
                 entropy: newEntropyPool.1,
                 ticketsEntropy: newEntropyPool.2,
-                validators: ConfigFixedSizeArray(
+                validators: ConfigLimitedSizeArray(
                     config: config,
                     array: newNextValidators.map { .init(bandersnatch: $0.bandersnatch, ed25519: $0.ed25519) },
                 ),

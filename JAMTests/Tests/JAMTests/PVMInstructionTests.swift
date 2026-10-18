@@ -6,7 +6,7 @@ import Utils
 
 /// PVM interpreter instruction and edge-case smoke tests.
 struct PVMInstructionTests {
-    @Test func conditionalBranch_interpreter() async throws {
+    @Test func conditionalBranch_interpreter() async {
         _ = await invokePVM(
             config: DefaultPvmConfig(),
             executionMode: [],
@@ -18,7 +18,7 @@ struct PVMInstructionTests {
         )
     }
 
-    @Test func loadStore_interpreter() async throws {
+    @Test func loadStore_interpreter() {
         // Placeholder for low-level load/store vectors.
     }
 
@@ -26,7 +26,7 @@ struct PVMInstructionTests {
         let (exitReason, _, _) = await invokePVM(
             config: DefaultPvmConfig(),
             executionMode: [],
-            blob: Data([0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0]),
+            blob: Data([0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 1, 0, 1]),
             pc: 0,
             gas: Gas(0),
             argumentData: Data(),

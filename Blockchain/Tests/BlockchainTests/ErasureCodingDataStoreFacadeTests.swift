@@ -35,6 +35,35 @@ struct ErasureCodingDataStoreFacadeTests {
     }
 
     @Test
+    func concurrentCodingCountsCannotOverwriteEachOther() async throws {
+        let store = InMemoryDataStore()
+        let root = data32(56)
+        let accepted = await withTaskGroup(of: Int?.self, returning: Set<Int>.self) { group in
+            for i in 0 ..< 32 {
+                group.addTask {
+                    let count = i.isMultiple(of: 2) ? 6 : 9
+                    do {
+                        try await store.setErasureValidatorCount(erasureRoot: root, count: count)
+                        return count
+                    } catch {
+                        return nil
+                    }
+                }
+            }
+            var counts = Set<Int>()
+            for await value in group {
+                if let value {
+                    counts.insert(value)
+                }
+            }
+            return counts
+        }
+        #expect(accepted.count == 1)
+        let stored = try await store.getErasureValidatorCount(erasureRoot: root)
+        #expect(accepted == [stored])
+    }
+
+    @Test
     func storesAuditBundleAndReconstructsWhenFilesystemCopyIsMissing() async throws {
         let fixture = try makeFixture()
         defer { removeFixtureDirectory(fixture) }
@@ -55,7 +84,7 @@ struct ErasureCodingDataStoreFacadeTests {
         #expect(entry.bundleSize == bundle.count)
         #expect(try await fixture.dataStore.getErasureRoot(forSegmentRoot: segmentsRoot) == erasureRoot)
         #expect(try await fixture.store.getAuditBundle(erasureRoot: erasureRoot) == bundle)
-        #expect(try await fixture.store.getLocalShardCount(erasureRoot: erasureRoot) == 1023)
+        #expect(try await fixture.store.getLocalShardCount(erasureRoot: erasureRoot) == ProtocolConfigRef.dev.value.initialValidatorCount)
         #expect(try await fixture.store.canReconstructLocally(erasureRoot: erasureRoot))
         #expect(try await fixture.store.getReconstructionPotential(erasureRoot: erasureRoot) == 100.0)
 
@@ -89,7 +118,7 @@ struct ErasureCodingDataStoreFacadeTests {
         #expect(try await fixture.store.getD3LErasureRoot(forSegmentsRoot: segmentsRoot) == erasureRoot)
         #expect(try await fixture.store.getPageCount(erasureRoot: erasureRoot) == 1)
         #expect(try await fixture.store.getPagedProofsMetadata(erasureRoot: erasureRoot) != nil)
-        #expect(try await fixture.store.getLocalShardCount(erasureRoot: erasureRoot) == 1023)
+        #expect(try await fixture.store.getLocalShardCount(erasureRoot: erasureRoot) == ProtocolConfigRef.dev.value.initialValidatorCount)
         #expect(try await fixture.store.canReconstructLocally(erasureRoot: erasureRoot))
         #expect(try await fixture.store.getReconstructionPotential(erasureRoot: erasureRoot) == 100.0)
         #expect(try await fixture.store.getMissingShardIndices(erasureRoot: erasureRoot).isEmpty)
@@ -97,16 +126,16 @@ struct ErasureCodingDataStoreFacadeTests {
         #expect(try await fixture.store.getShard(erasureRoot: erasureRoot, shardIndex: 0) != nil)
 
         let plan = try await fixture.store.getReconstructionPlan(erasureRoot: erasureRoot)
-        #expect(plan.localShards == 1023)
+        #expect(plan.localShards == ProtocolConfigRef.dev.value.initialValidatorCount)
         #expect(plan.missingShards == 0)
         #expect(plan.canReconstructLocally)
         #expect(!plan.needsNetworkFetch)
 
         let localShards = try await fixture.store.getLocalShards(
             erasureRoot: erasureRoot,
-            indices: [0, 1, 1022],
+            indices: [0, 1, 5],
         )
-        #expect(localShards.map(\.index) == [0, 1, 1022])
+        #expect(localShards.map(\.index) == [0, 1, 5])
 
         let reconstructedData = try await fixture.store.reconstructFromLocalShards(
             erasureRoot: erasureRoot,
@@ -145,14 +174,16 @@ struct ErasureCodingDataStoreFacadeTests {
         }
     }
 
-    @Test
-    func storageUsageAndCleanupOperateThroughFacade() async throws {
+    @Test(arguments: [6, 1023])
+    func storageUsageAndCleanupOperateThroughFacade(validatorCount: Int) async throws {
         let fixture = try makeFixture()
         defer { removeFixtureDirectory(fixture) }
 
         let auditRoot = data32(10)
         let d3lRoot = data32(11)
-        let oldTimestamp = Date().addingTimeInterval(-3_600)
+        let oldTimestamp = Date().addingTimeInterval(-3600)
+        try await fixture.dataStore.setErasureValidatorCount(erasureRoot: auditRoot, count: validatorCount)
+        try await fixture.dataStore.setErasureValidatorCount(erasureRoot: d3lRoot, count: validatorCount)
 
         try await fixture.filesystemStore.storeAuditBundle(erasureRoot: auditRoot, data: Data(count: 1234))
         try await fixture.dataStore.setAuditEntry(
@@ -180,16 +211,21 @@ struct ErasureCodingDataStoreFacadeTests {
         )
 
         let usage = try await fixture.store.getStorageUsage()
-        let expectedTotalBytes = 1234 + 1023 * 684 + 2 * 4104
+        // Payload estimates assume complete shard sets, even with partial local data.
+        let expectedAuditBytes = validatorCount == 6 ? 3706 : 5326
+        let expectedD3LBytes = validatorCount == 6 ? 16416 : 24552
+        let expectedTotalBytes = expectedAuditBytes + expectedD3LBytes
         #expect(usage.auditEntryCount == 1)
         #expect(usage.d3lEntryCount == 1)
         #expect(usage.totalBytes == expectedTotalBytes)
+        #expect(usage.auditStoreBytes == expectedAuditBytes)
+        #expect(usage.d3lStoreBytes == expectedD3LBytes)
         #expect(StoragePressure.from(usage: usage, maxBytes: usage.totalBytes + 1) == .emergency)
 
         let progress = try await fixture.store.incrementalCleanup(batchSize: 1, retentionEpochs: 1)
         #expect(progress.totalEntries == 1)
         #expect(progress.processedEntries == 1)
-        #expect(progress.bytesReclaimed == 1234)
+        #expect(progress.bytesReclaimed == expectedAuditBytes)
         #expect(progress.isComplete)
         #expect(try await fixture.store.getAuditEntry(erasureRoot: auditRoot) == nil)
 
@@ -206,6 +242,13 @@ struct ErasureCodingDataStoreFacadeTests {
         defer { removeFixtureDirectory(fixture) }
 
         let erasureRoot = data32(15)
+        await #expect(throws: ErasureCodingStoreError.self) {
+            try await fixture.store.getReconstructionPlan(erasureRoot: erasureRoot)
+        }
+        try await fixture.dataStore.setErasureValidatorCount(erasureRoot: erasureRoot, count: 1023)
+        await #expect(throws: ErasureCodingStoreError.self) {
+            try await fixture.dataStore.setErasureValidatorCount(erasureRoot: erasureRoot, count: 6)
+        }
         for shardIndex in [UInt16(0), 2, 5] {
             try await fixture.dataStore.storeShard(
                 shardData: Data([UInt8(shardIndex)]),

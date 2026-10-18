@@ -14,9 +14,9 @@ public class ProgramCode {
     }
 
     public enum Constants {
-        public static let maxJumpTableEntriesCount: UInt64 = 0x100000
+        public static let maxJumpTableEntriesCount: UInt64 = 1 << 24
         public static let maxEncodeSize: UInt8 = 8
-        public static let maxCodeLength: UInt64 = 0x400000
+        public static let maxCodeLength: UInt64 = 1 << 25
         public static let maxInstructionLength: UInt32 = 24
     }
 
@@ -26,7 +26,7 @@ public class ProgramCode {
     public let code: Data
     let bitmask: Data
 
-    /// parsed stuff
+    /// Instruction offsets that begin basic blocks.
     public private(set) var basicBlockIndices: Set<UInt32> = []
 
     private final class InstRef {
@@ -40,6 +40,7 @@ public class ProgramCode {
     private var skipCache: [UInt8] = []
 
     private var blockGasCosts: [UInt32: Gas] = [:]
+    private var hasValidStructure = false
 
     private static let cachedTrapInst = CppHelper.Instructions.Trap()
     private static let uncachedSkip = UInt8.max
@@ -128,6 +129,7 @@ public class ProgramCode {
         basicBlockIndices = other.basicBlockIndices
         skipCache = other.skipCache
         blockGasCosts = other.blockGasCosts
+        hasValidStructure = other.hasValidStructure
         instCache = Array(repeating: nil, count: other.instCache.count)
     }
 
@@ -135,32 +137,33 @@ public class ProgramCode {
         var i = UInt32(0)
         basicBlockIndices.insert(0)
         var currentBlockStart = i
-        var currentBlockGasCost = Gas(0)
+        hasValidStructure = !code.isEmpty
 
         while i < code.count {
             let skip = ProgramCode.skip(start: i, bitmask: bitmask)
             skipCache[Int(i)] = UInt8(skip)
 
             let opcode = code[relative: Int(i)]
-            currentBlockGasCost += gasFromOpcode(opcode)
+            let recognized = InstructionTable.table[Int(opcode)] != nil
+            let terminates = BASIC_BLOCK_INSTRUCTIONS.contains(opcode)
+            let next = i + skip + 1
+            if bitmask[Int(i / 8)] & (1 << (i % 8)) == 0 || !recognized
+                || next > code.count || (next == code.count && !terminates)
+            {
+                hasValidStructure = false
+            }
 
-            if BASIC_BLOCK_INSTRUCTIONS.contains(opcode) {
+            if terminates || !recognized {
                 // block end
-                blockGasCosts[currentBlockStart] = currentBlockGasCost
+                blockGasCosts[currentBlockStart] = BlockGas.cost(program: self, start: currentBlockStart)
                 // next block
                 basicBlockIndices.insert(i + skip + 1)
                 currentBlockStart = i + skip + 1
-                currentBlockGasCost = Gas(0)
             }
             i += skip + 1
         }
-        blockGasCosts[currentBlockStart] = currentBlockGasCost + Gas(1)
-        basicBlockIndices.insert(i)
-    }
-
-    private func gasFromOpcode(_: UInt8) -> Gas {
-        // TODO: use a switch opcode later
-        Gas(1)
+        blockGasCosts[currentBlockStart] = BlockGas.cost(program: self, start: currentBlockStart)
+        basicBlockIndices = basicBlockIndices.filter { isValidInstructionPC($0) }
     }
 
     private func parseInstruction(startIndex: Int, skip: UInt32) throws(Error) -> Instruction {
@@ -174,6 +177,28 @@ public class ProgramCode {
             throw Error.invalidInstruction
         }
         return inst
+    }
+
+    /// Structural validity is computed during metadata construction and reused on invocation.
+    public func validate(pc: UInt32) throws(Error) {
+        guard hasValidStructure, isValidInstructionPC(pc) else {
+            throw .invalidInstruction
+        }
+    }
+
+    /// Whether the offset starts a recognized instruction within the code.
+    public func isValidInstructionPC(_ pc: UInt32) -> Bool {
+        pc < code.count
+            && bitmask[Int(pc / 8)] & (1 << (pc % 8)) != 0
+            && InstructionTable.table[Int(code[relative: Int(pc)])] != nil
+    }
+
+    /// Reject invalid execution positions before gas charging, with one instruction-cache lookup.
+    public func getInstructionForExecution(pc: UInt32) -> Instruction? {
+        guard pc < code.count, bitmask[Int(pc / 8)] & (1 << (pc % 8)) != 0 else {
+            return nil
+        }
+        return getInstructionAt(pc: pc)
     }
 
     public func getInstructionAt(pc: UInt32) -> Instruction? {
@@ -202,7 +227,14 @@ public class ProgramCode {
     }
 
     public func getBlockGasCosts(pc: UInt32) -> Gas {
-        blockGasCosts[pc] ?? Gas(0)
+        guard pc < code.count else {
+            return Gas(1)
+        }
+        if let cost = blockGasCosts[pc] {
+            return cost
+        }
+        let start = blockGasCosts.keys.filter { $0 <= pc }.max() ?? 0
+        return blockGasCosts[start] ?? Gas(1)
     }
 
     public func skip(_ pc: UInt32) -> UInt32 {

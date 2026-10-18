@@ -45,12 +45,10 @@ extension CppHelper.Instructions.Fallthrough: Instruction {
         self.init()
     }
 
-    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
-        // Fallthrough (opcode 0x01):
-        // Just continue to next instruction.
-        // Per spec pvm.tex line 89, executing beyond program code
-        // will hit implicit zeros (Trap instructions).
-        .continued
+    public func _executeImpl(context: ExecutionContext) -> ExecOutcome {
+        let offset = context.state.program.skip(context.state.pc) + 1
+        return Instructions.isBranchValid(context: context, offset: offset)
+            ? .continued : .exit(.panic(.invalidBranch))
     }
 }
 
@@ -560,16 +558,15 @@ extension CppHelper.Instructions.MoveReg: Instruction {
     }
 }
 
-extension CppHelper.Instructions.Sbrk: Instruction {
-    public init(data: Data) throws {
-        let (dest, src) = try Instructions.decodeRegisters(data)
-        self.init(src: src, dest: dest)
+public struct Unlikely: Instruction {
+    public static let opcode: UInt8 = 2
+    public init(data _: Data) {}
+    public func _executeImpl(context _: ExecutionContext) -> ExecOutcome {
+        .continued
     }
 
-    public func _executeImpl(context: ExecutionContext) throws -> ExecOutcome {
-        let increment: UInt32 = context.state.readRegister(src)
-        let startAddr = try context.state.sbrk(increment)
-        context.state.writeRegister(dest, startAddr)
+    public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
+        context.state.increasePC(skip + 1)
         return .continued
     }
 }

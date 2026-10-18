@@ -140,7 +140,28 @@ extension Accumulation {
             servicePreimageSet.formUnion(singleOutput.provide)
 
             // collect batch account changes
-            try batchAccountChanges.checkAndMerge(with: singleOutput.state.accounts.changes)
+            var changes = singleOutput.state.accounts.changes
+            // A foreign account recreated within an invocation is present in its
+            // posterior state, so it is neither removed nor contributed as new.
+            // Its prior state (or its own accumulation result) survives the merge.
+            for index in changes.newAccounts.keys where index != service && changes.removed.contains(index) {
+                guard try await batchState.accounts.value.get(serviceAccount: index) != nil,
+                      try await singleOutput.state.accounts.value.get(serviceAccount: index) != nil
+                else {
+                    continue
+                }
+                changes.newAccounts[index] = nil
+                changes.removed.remove(index)
+                changes.altered.remove(index)
+                changes.updates.removeAll { update in
+                    switch update {
+                    case let .newAccount(target, _), let .removeAccount(target), let .updateAccount(target, _),
+                         let .updateStorage(target, _, _), let .updatePreimage(target, _, _), let .updateLookup(target, _, _, _):
+                        target == index
+                    }
+                }
+            }
+            try batchAccountChanges.checkAndMerge(with: changes)
         }
 
         Self.mergePrivilegedUpdates(into: &currentState, from: batchResults)
@@ -228,7 +249,8 @@ extension Accumulation {
         timeslot: TimeslotIndex,
     ) async throws -> AccumulationOutput {
         var i = 0
-        var sumGasRequired = Gas(0)
+        var sumGasRequired = transfers.reduce(Gas(0)) { $0 + $1.gasLimit }
+            + alwaysAcc.values.reduce(Gas(0), +)
 
         for report in workReports {
             var canAccumulate = true
@@ -254,6 +276,7 @@ extension Accumulation {
                 state: state,
                 commitments: Set(),
                 gasUsed: [],
+                processedTransfers: [],
             )
         } else {
             logger.debug("[∆+] can accumulate until index: \(i)")
@@ -267,7 +290,7 @@ extension Accumulation {
                 timeslot: timeslot,
             )
             let parallelGasUsed = parallelOutput.gasUsed.reduce(Gas(0)) { $0 + $1.gas }
-            let transfersGas = transfers.reduce(Gas(0)) { $0 + $1.gasLimit }
+            let transfersGas = parallelOutput.transfers.reduce(Gas(0)) { $0 + $1.gasLimit }
             let outerOutput = try await outerAccumulate(
                 config: config,
                 state: parallelOutput.state,
@@ -282,6 +305,7 @@ extension Accumulation {
                 state: outerOutput.state,
                 commitments: parallelOutput.commitments.union(outerOutput.commitments),
                 gasUsed: parallelOutput.gasUsed + outerOutput.gasUsed,
+                processedTransfers: transfers + outerOutput.processedTransfers,
             )
         }
     }
@@ -490,13 +514,20 @@ extension Accumulation {
             gasUsedMap[service, default: Gas(0)] += gas
         }
 
-        for (service, gasUsed) in gasUsedMap {
+        var transferCounts: [ServiceIndex: UInt32] = [:]
+        for transfer in accumulateOutput.processedTransfers {
+            transferCounts[transfer.destination, default: 0] += 1
+        }
+        let accumulatedServices = Set(gasUsedMap.keys).union(digestCounts.keys).union(transferCounts.keys)
+        for service in accumulatedServices {
+            let gasUsed = gasUsedMap[service] ?? Gas(0)
             let num = digestCounts[service] ?? 0
-            if Int(gasUsed.value) + num == 0 {
+            let transfers = transferCounts[service] ?? 0
+            if gasUsed.value == 0, num == 0, transfers == 0 {
                 continue
             }
 
-            accumulateStats[service] = (gasUsed, UInt32(num))
+            accumulateStats[service] = (gasUsed, UInt32(num), transfers)
         }
 
         // update lastAccAt

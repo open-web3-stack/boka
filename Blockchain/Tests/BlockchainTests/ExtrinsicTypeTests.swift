@@ -73,7 +73,7 @@ struct ExtrinsicTypeTests {
             try makeGuarantees(config: config, [
                 makeGuarantee(config: config, coreIndex: 0, packageHash: data32(6), credential: [
                     makeCredential(index: 0),
-                    makeCredential(index: ValidatorIndex(config.value.totalNumberOfValidators)),
+                    makeCredential(index: ValidatorIndex(config.value.initialValidatorCount)),
                 ]),
             ]).validate(config: config)
             Issue.record("Expected invalidValidatorIndex")
@@ -135,25 +135,23 @@ struct ExtrinsicTypeTests {
         do {
             try unsorted.validate(config: config)
             Issue.record("Expected assurancesNotSorted")
-        } catch ExtrinsicAvailability.Error.assurancesNotSorted {
-        }
+        } catch ExtrinsicAvailability.Error.assurancesNotSorted {}
 
         let invalid = try ExtrinsicAvailability(assurances: ConfigLimitedSizeArray(config: config, array: [
-            makeAssurance(config: config, validatorIndex: ValidatorIndex(config.value.totalNumberOfValidators)),
+            makeAssurance(config: config, validatorIndex: ValidatorIndex(config.value.initialValidatorCount)),
         ]))
         do {
             try invalid.validate(config: config)
             Issue.record("Expected invalidValidatorIndex")
-        } catch ExtrinsicAvailability.Error.invalidValidatorIndex {
-        }
+        } catch ExtrinsicAvailability.Error.invalidValidatorIndex {}
     }
 
     @Test
     func privilegedServicesCodecsRoundTripCompactGas() throws {
         let config = ProtocolConfigRef.tiny
-        let services = PrivilegedServices(
+        let services = try PrivilegedServices(
             manager: 1,
-            assigners: try ConfigFixedSizeArray(config: config, array: [2, 3]),
+            assigners: ConfigFixedSizeArray(config: config, array: [2, 3]),
             designator: 4,
             registrar: 5,
             alwaysAcc: [6: Gas(7), 8: Gas(9)],
@@ -212,7 +210,7 @@ struct ExtrinsicTypeTests {
 
         do {
             try ExtrinsicTickets.TicketItem(
-                attempt: TicketIndex(config.value.ticketEntriesPerValidator),
+                attempt: TicketIndex((2 * config.value.epochLength + 5) / 6),
                 signature: Data784(),
             ).validate(config: config)
             Issue.record("Expected invalidAttempt")
@@ -236,7 +234,7 @@ struct ExtrinsicTypeTests {
         credential: LimitedSizeArray<
             ExtrinsicGuarantees.IndexAndSignature,
             ConstInt2,
-            ConstInt3
+            ConstInt3,
         > = [
             ExtrinsicGuarantees.IndexAndSignature(index: 0, signature: data64(1)),
             ExtrinsicGuarantees.IndexAndSignature(index: 1, signature: data64(2)),

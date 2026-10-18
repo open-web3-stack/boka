@@ -83,11 +83,11 @@ struct AccumulationMergeTests {
 
     private func makeValidatorQueue(
         startingAt start: UInt8,
-    ) throws -> ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators> {
-        let validators = try (0 ..< config.value.totalNumberOfValidators).map {
+    ) throws -> ValidatorKeys {
+        let validators = try (0 ..< config.value.initialValidatorCount).map {
             try ValidatorKey(data: Data(repeating: start + UInt8($0), count: 336))
         }
-        return try ConfigFixedSizeArray(config: config, array: validators)
+        return try ValidatorKeys(config: config, array: validators)
     }
 
     private func makeAuthorizationQueue(

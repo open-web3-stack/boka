@@ -516,6 +516,16 @@ final class ExecutorBackendJIT {
                 )
             }
 
+            guard (try? standardProgram.code.validate(pc: pc)) != nil else {
+                return VMExecutionResult(
+                    exitReason: .panic(.trap),
+                    gasUsed: Gas(0),
+                    outputData: nil,
+                    finalRegisters: standardProgram.initialRegisters,
+                    finalPC: pc,
+                )
+            }
+
             // CRITICAL FIX: Pass the extracted bytecode, not the raw blob!
             // The blob contains headers (jump table count, encode size, code length, etc.)
             // but the JIT compiler expects just the bytecode portion.
@@ -612,6 +622,7 @@ final class ExecutorBackendJIT {
                     jitMemorySize: totalMemorySize,
                     skipTable: skipTable,
                     bitmask: bitmask,
+                    blockGasCosts: JITGasCosts(program: programCode),
                 )
 
                 // Retrieve dispatcher jump table for this compiled function
@@ -690,6 +701,16 @@ final class ExecutorBackendJIT {
                         jitGasPtr: guestGasPtr,
                         programCode: programCode,
                         initialPC: 0,
+                        standardMemory: standardProgram.initialMemory as? StandardMemory,
+                        heapGrowth: { previous, current in
+                            for page in previous ..< current {
+                                let byte = Int(page / 8)
+                                let bit = UInt8(1 << (page % 8))
+                                context.readMapBitmap?[byte] |= bit
+                                context.writeMapBitmap?[byte] |= bit
+                            }
+                            context.jitHostFunctionTablePtr.pointee.heapEnd = current * UInt32(config.pvmMemoryPageSize)
+                        },
                     )
 
                     // Convert async operation to sync using semaphore + lock

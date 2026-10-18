@@ -3,12 +3,11 @@ import TracingUtils
 import Utils
 
 private let logger = Logger(label: "AuditBundleStore")
-private let cEcOriginalCount = 342
 
 /// Service for storing and retrieving audit bundles with erasure coding
 ///
 /// Per GP 14.3.1: Stores work-package + extrinsics + imports + proofs
-/// - Erasure-codes the bundle into 1,023 shards
+/// - Erasure-codes the bundle into one shard per assuring validator
 /// - Stores in filesystem under audit/ directory
 /// - Records metadata in RocksDB
 /// - Sets timestamp for retention tracking (6 epochs)
@@ -38,19 +37,20 @@ public actor AuditBundleStore {
         bundle: Data,
         workPackageHash: Data32,
         segmentsRoot: Data32,
+        validatorCount: Int? = nil,
     ) async throws -> Data32 {
+        let erasureCoding = await erasureCoding.forValidators(validatorCount)
         logger.debug("Storing audit bundle: workPackageHash=\(workPackageHash.toHexString()), size=\(bundle.count)")
 
-        // Validate bundle size (GP spec: max ~13.6 MB)
-        let maxBundleSize = 13_791_360 // From GP spec
+        // Encoded bundle limit, including framing and references (GP #563).
+        let maxBundleSize = 13_904_950
         guard bundle.count <= maxBundleSize else {
             throw ErasureCodingStoreError.bundleTooLarge(size: bundle.count, maxSize: maxBundleSize)
         }
 
-        // Pad bundle to 684-byte boundary (required by encodeBlob)
-        // The erasure coding process requires data to be aligned to pieceSize (684 bytes)
+        // Align the bundle to the coding width for this assurer set.
         // Original size is stored in metadata to truncate padding during reconstruction
-        let pieceSize = 684
+        let pieceSize = await erasureCoding.inputPieceSize
         let remainder = bundle.count % pieceSize
         let paddingNeeded = remainder == 0 ? 0 : (pieceSize - remainder)
 
@@ -68,6 +68,7 @@ public actor AuditBundleStore {
             segmentsRoot: segmentsRoot,
             shards: shards,
         )
+        try await dataStore.setErasureValidatorCount(erasureRoot: erasureRoot, count: erasureCoding.validatorCount)
 
         // Store bundle in filesystem (for quick retrieval)
         try await filesystemStore.storeAuditBundle(erasureRoot: erasureRoot, data: bundle)
@@ -99,6 +100,9 @@ public actor AuditBundleStore {
     /// - Parameter erasureRoot: Erasure root identifying the bundle
     /// - Returns: Bundle data or nil if not found
     public func getBundle(erasureRoot: Data32) async throws -> Data? {
+        let count = try await dataStore.getErasureValidatorCount(erasureRoot: erasureRoot)
+        let erasureCoding = await erasureCoding.forValidators(count)
+        let requiredShardCount = await erasureCoding.requiredShardCount
         // Try filesystem first (faster)
         if let bundle = try await filesystemStore.getAuditBundle(erasureRoot: erasureRoot) {
             return bundle
@@ -106,12 +110,12 @@ public actor AuditBundleStore {
 
         // Fallback to reconstruction from shards
         let indices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
-        guard indices.count >= cEcOriginalCount else {
-            logger.warning("Insufficient shards for reconstruction: \(indices.count)/\(cEcOriginalCount)")
+        guard indices.count >= requiredShardCount else {
+            logger.warning("Insufficient shards for reconstruction: \(indices.count)/\(requiredShardCount)")
             return nil
         }
 
-        let shards = try await dataStore.getShards(erasureRoot: erasureRoot, shardIndices: Array(indices.prefix(cEcOriginalCount)))
+        let shards = try await dataStore.getShards(erasureRoot: erasureRoot, shardIndices: Array(indices.prefix(requiredShardCount)))
 
         // Determine original size from audit metadata
         guard let auditEntry = try await dataStore.getAuditEntry(erasureRoot: erasureRoot) else {

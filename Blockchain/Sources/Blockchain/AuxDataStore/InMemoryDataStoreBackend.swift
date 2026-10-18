@@ -239,6 +239,14 @@ extension InMemoryDataStoreBackend: DataStoreProtocol {
     public func getMetadata(key: Data) async throws -> Data? {
         genericMetadata[key]
     }
+
+    public func setMetadataIfAbsent(key: Data, value: Data) async throws -> Bool {
+        if let existing = genericMetadata[key] {
+            return existing == value
+        }
+        genericMetadata[key] = value
+        return true
+    }
 }
 
 extension InMemoryDataStoreBackend: DataStoreNetworkProtocol {

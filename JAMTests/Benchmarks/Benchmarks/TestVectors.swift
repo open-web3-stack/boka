@@ -545,8 +545,8 @@ func testVectorsBenchmarks() {
     }
     if !erasureCases.isEmpty {
         let config = TestVariants.full.config
-        let basicSize = config.value.erasureCodedPieceSize
-        let recoveryCount = config.value.totalNumberOfValidators
+        let basicSize = 2 * ErasureCodingService.originalShards(validators: config.value.initialValidatorCount)
+        let recoveryCount = config.value.initialValidatorCount
         let originalCount = basicSize / 2
 
         // Pre-decode test cases to avoid including decoding time in benchmark

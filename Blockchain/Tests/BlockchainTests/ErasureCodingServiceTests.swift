@@ -6,7 +6,7 @@ import Utils
 
 struct ErasureCodingServiceTests {
     func makeService() -> ErasureCodingService {
-        ErasureCodingService(config: .dev)
+        ErasureCodingService(config: .mainnet)
     }
 
     // MARK: - Encoding Tests

@@ -56,7 +56,9 @@ extension ExtrinsicTickets.TicketItem: Validate {
 
     public typealias Config = ProtocolConfigRef
     public func validate(config: Config) throws {
-        guard attempt < UInt32(config.value.ticketEntriesPerValidator) else {
+        // The tighter bound depends on the posterior pending validator set and
+        // is checked by Safrole. Six validators is the smallest valid set.
+        guard Int(attempt) < (2 * config.value.epochLength + 5) / 6 else {
             throw Error.invalidAttempt
         }
     }

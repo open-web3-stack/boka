@@ -14,12 +14,7 @@ public protocol Assurances {
         >
     { get }
 
-    var currentValidators:
-        ConfigFixedSizeArray<
-            ValidatorKey,
-            ProtocolConfig.TotalNumberOfValidators,
-        >
-    { get }
+    var currentValidators: ValidatorKeys { get }
 }
 
 extension Assurances {
@@ -46,6 +41,7 @@ extension Assurances {
         config: ProtocolConfigRef,
         timeslot: TimeslotIndex,
         extrinsic: ExtrinsicAvailability,
+        priorValidatorCount: Int? = nil,
     ) throws -> (
         newAvailabilityAssignments: ConfigFixedSizeArray<
             ReportItem?,
@@ -57,7 +53,9 @@ extension Assurances {
 
         for i in 0 ..< newAvailabilityAssignments.count {
             if let report = newAvailabilityAssignments[i] {
-                if (report.timeslot + UInt32(config.value.preimageReplacementPeriod)) <= timeslot {
+                if UInt64(report.timeslot) + UInt64(config.value.preimageReplacementPeriod) <= UInt64(timeslot)
+                    || (priorValidatorCount ?? currentValidators.count) != currentValidators.count
+                {
                     newAvailabilityAssignments[i] = nil
                 }
             }
@@ -77,7 +75,7 @@ extension Assurances {
             guard let report = availabilityAssignments[idx] else {
                 throw AssurancesError.assuranceForEmptyCore
             }
-            if count >= ProtocolConfig.TwoThirdValidatorsPlusOne.read(config: config) {
+            if count > (priorValidatorCount ?? currentValidators.count) * 2 / 3 {
                 availableReports.append(report.workReport)
                 newAvailabilityAssignments[idx] = nil // remove available report from pending assignments
             }

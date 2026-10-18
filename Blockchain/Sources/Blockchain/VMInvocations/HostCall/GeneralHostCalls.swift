@@ -22,7 +22,7 @@ public class GasFn: HostCall {
 /// Fetch
 public class Fetch: HostCall {
     public static var identifier: UInt8 {
-        1
+        2
     }
 
     public let serviceAccounts: ServiceAccountsRef?
@@ -89,7 +89,7 @@ public class Fetch: HostCall {
         var value: Data?
         switch reg10 {
         case 0:
-            value = config.value.encoded
+            value = config.value.serviceConstants
         case 1:
             if let entropy {
                 value = entropy.data
@@ -195,7 +195,7 @@ public class Fetch: HostCall {
 /// Lookup a preimage from a service account
 public class Lookup: HostCall {
     public static var identifier: UInt8 {
-        2
+        3
     }
 
     public let serviceIndex: ServiceIndex
@@ -254,7 +254,7 @@ public class Lookup: HostCall {
 /// Read a service account storage
 public class Read: HostCall {
     public static var identifier: UInt8 {
-        3
+        4
     }
 
     public let serviceIndex: ServiceIndex
@@ -325,7 +325,7 @@ public class Read: HostCall {
 /// Write to a service account storage
 public class Write: HostCall {
     public static var identifier: UInt8 {
-        4
+        5
     }
 
     public let serviceIndex: ServiceIndex
@@ -364,11 +364,10 @@ public class Write: HostCall {
             throw VMInvocationsError.panic
         }
 
-        let newValue: Data?
-        if valueLength == 0 {
-            newValue = nil
+        let newValue: Data? = if valueLength == 0 {
+            nil
         } else {
-            newValue = try state.readMemory(address: valueAddr, length: Int(valueLength))
+            try state.readMemory(address: valueAddr, length: Int(valueLength))
         }
 
         // update footprint for threshold balance check
@@ -403,7 +402,7 @@ public class Write: HostCall {
 /// Get information about a service account
 public class Info: HostCall {
     public static var identifier: UInt8 {
-        5
+        6
     }
 
     public let serviceIndex: ServiceIndex
@@ -469,7 +468,7 @@ public class Info: HostCall {
 /// Historical lookup
 public class HistoricalLookup: HostCall {
     public static var identifier: UInt8 {
-        6
+        7
     }
 
     public let context: RefineContext.ContextType

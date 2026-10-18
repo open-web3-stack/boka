@@ -7,10 +7,10 @@ import Utils
 
 /// NOTE: the statistics tests only test the validator stats
 struct TestStatsState: Equatable, Codable {
-    var current: ConfigFixedSizeArray<Statistics.Validator, ProtocolConfig.TotalNumberOfValidators>
-    var previous: ConfigFixedSizeArray<Statistics.Validator, ProtocolConfig.TotalNumberOfValidators>
+    var current: ConfigLimitedSizeArray<Statistics.Validator, ProtocolConfig.MinValidators, ProtocolConfig.MaxValidators>
+    var previous: ConfigLimitedSizeArray<Statistics.Validator, ProtocolConfig.MinValidators, ProtocolConfig.MaxValidators>
     var timeslot: TimeslotIndex
-    var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var currentValidators: ValidatorKeys
 }
 
 struct StatsInput: Codable {
@@ -28,7 +28,7 @@ struct StatsTestcase: Codable {
 struct StatsState: ActivityStatistics {
     var activityStatistics: Statistics
     var timeslot: TimeslotIndex
-    var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var currentValidators: ValidatorKeys
 }
 
 struct StatisticsTests {

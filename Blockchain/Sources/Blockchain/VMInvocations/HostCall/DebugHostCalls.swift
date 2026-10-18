@@ -20,10 +20,6 @@ public class Log: HostCall {
         return formatter
     }()
 
-    public func gasCost(state _: VMState) -> Gas {
-        Gas(10)
-    }
-
     public enum Level: UInt32, Codable {
         case error = 0
         case warn = 1

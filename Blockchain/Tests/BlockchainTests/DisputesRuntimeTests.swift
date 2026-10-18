@@ -135,7 +135,7 @@ struct DisputesRuntimeTests {
     }
 
     @Test
-    func updateRejectsInvalidVerdictWithoutCulprits() throws {
+    func updateAcceptsInvalidVerdictWithoutCulprits() throws {
         let keys = try makeValidatorKeys()
         let state = try DisputesState(config: config, keys: keys)
         let disputes = try ExtrinsicDisputes(
@@ -146,9 +146,8 @@ struct DisputesRuntimeTests {
             faults: [],
         )
 
-        expectDisputesError(.expectInCulprits) {
-            _ = try state.update(config: config, disputes: disputes)
-        }
+        let result = try state.update(config: config, disputes: disputes)
+        #expect(result.state.judgements.badSet.contains(data32(47)))
     }
 
     @Test
@@ -178,7 +177,7 @@ struct DisputesRuntimeTests {
         let verdict = try ExtrinsicDisputes.VerdictItem(
             reportHash: data32(49),
             epoch: 1,
-            judgements: ConfigFixedSizeArray(config: config, array: [first, second, first, second, first]),
+            judgements: ConfigLimitedSizeArray(config: config, array: [first, second, first, second, first]),
         )
         let disputes = ExtrinsicDisputes(verdicts: [verdict], culprits: [], faults: [])
 
@@ -228,8 +227,8 @@ private struct DisputesState: Disputes {
     var judgements: JudgementsState
     var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var timeslot: TimeslotIndex
-    var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
-    var previousValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var currentValidators: ValidatorKeys
+    var previousValidators: ValidatorKeys
 
     init(
         config: ProtocolConfigRef,
@@ -240,12 +239,15 @@ private struct DisputesState: Disputes {
     ) throws {
         self.judgements = judgements
         self.timeslot = timeslot
-        currentValidators = try ConfigFixedSizeArray(config: config, array: keys.map(\.validatorKey))
+        currentValidators = try ValidatorKeys(config: config, array: keys.map(\.validatorKey))
         previousValidators = currentValidators
 
         var reportSlots = [ReportItem?](repeating: nil, count: config.value.totalNumberOfCores)
         if let report {
-            reportSlots[0] = ReportItem(workReport: report, timeslot: timeslot)
+            reportSlots[0] = ReportItem(guarantee: .init(
+                workReport: report, timeslot: timeslot,
+                credential: [.init(index: 0, signature: data64(0)), .init(index: 1, signature: data64(0))],
+            ), timeslot: timeslot)
         }
         availabilityAssignments = try ConfigFixedSizeArray(config: config, array: reportSlots)
     }
@@ -256,7 +258,7 @@ private struct DisputesState: Disputes {
     }
 }
 
-private func makeValidatorKeys(count: Int = ProtocolConfigRef.tiny.value.totalNumberOfValidators) throws -> [DisputeValidatorKey] {
+private func makeValidatorKeys(count: Int = ProtocolConfigRef.tiny.value.initialValidatorCount) throws -> [DisputeValidatorKey] {
     try (0 ..< count).map { index in
         let seed = data32(UInt8(index + 1))
         let secret = try Ed25519.SecretKey(from: seed)
@@ -288,7 +290,7 @@ private func makeVerdict(
     return try ExtrinsicDisputes.VerdictItem(
         reportHash: reportHash,
         epoch: epoch,
-        judgements: ConfigFixedSizeArray(config: ProtocolConfigRef.tiny, array: judgements),
+        judgements: ConfigLimitedSizeArray(config: ProtocolConfigRef.tiny, array: judgements),
     )
 }
 

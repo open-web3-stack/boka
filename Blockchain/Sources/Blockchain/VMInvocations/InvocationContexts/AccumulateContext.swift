@@ -1,6 +1,7 @@
 import Foundation
 import PolkaVM
 import TracingUtils
+import Utils
 
 private let logger = Logger(label: "AccumulateContext")
 
@@ -32,9 +33,11 @@ public final class AccumulateContext: InvocationContext {
     }
 
     public func dispatch(index: UInt32, state: VMState) async -> ExecOutcome {
-        switch UInt8(index) {
+        switch UInt8(clamping: index) {
         case GasFn.identifier:
             return await GasFn().call(config: config, state: state)
+        case GrowHeap.identifier:
+            return await GrowHeap().call(config: config, state: state)
         case Fetch.identifier:
             return await Fetch(entropy: context.x.state.entropy, inputs: inputs)
                 .call(config: config, state: state)
@@ -79,9 +82,9 @@ public final class AccumulateContext: InvocationContext {
         case Log.identifier:
             return await Log(service: context.x.serviceIndex).call(config: config, state: state)
         default:
-            state.consumeGas(Gas(10))
+            state.consumeGas(Gas(1000))
             state.writeRegister(Registers.Index(raw: 7), HostCallResultCode.WHAT.rawValue)
-            return .continued
+            return state.getGas() < GasInt(0) ? .exit(.outOfGas) : .continued
         }
     }
 

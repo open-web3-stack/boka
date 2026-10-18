@@ -1665,16 +1665,6 @@ bool emit_instruction_decoded(
                 decoded.src1_reg
             );
 
-        case Opcode::Sbrk:
-            // Sbrk format: sbrk dest, src
-            // dest = register to store result (previous heap end)
-            // src = register containing allocation size
-            return jit_instruction::jit_emit_sbrk(
-                assembler, target_arch,
-                decoded.dest_reg,  // destination register (store result)
-                decoded.src1_reg   // source register (allocation size)
-            );
-
         case Opcode::CountSetBits64:
             return jit_instruction::jit_emit_pop_count(
                 assembler, target_arch,
@@ -2350,7 +2340,6 @@ bool emit_basic_block_instructions(
                 decoded_ok = decode_2_reg(bytecode, current_pc, decoded);
                 break;
 
-            case Opcode::Sbrk:
             case Opcode::CountSetBits64:
             case Opcode::CountSetBits32:
             case Opcode::LeadingZeroBits64:

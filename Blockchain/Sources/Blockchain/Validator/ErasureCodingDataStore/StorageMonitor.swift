@@ -32,24 +32,30 @@ public actor StorageMonitor {
         self.cleanupService = cleanupService
     }
 
-    /// Get storage usage statistics
+    /// Estimate payload storage assuming complete shard sets and an audit bundle copy.
+    /// Excludes metadata and filesystem/database overhead; partial or duplicate
+    /// shard copies can make actual usage differ.
     ///
     /// - Returns: Storage usage information
     public func getStorageUsage() async throws -> StorageUsage {
         let auditEntries = try await dataStore.listAuditEntries(before: Date())
         let d3lEntries = try await dataStore.listD3LEntries(before: Date())
 
-        let auditBundleBytes = auditEntries.reduce(into: 0) { $0 += $1.bundleSize }
-        let auditShardBytes = auditEntries.count * 1023 * 684 // 1023 shards per entry
+        var auditBytes = 0
+        for entry in auditEntries {
+            auditBytes += try await estimatedAuditBytes(entry)
+        }
+        var d3lShardBytes = 0
+        for entry in d3lEntries {
+            d3lShardBytes += try await estimatedD3LBytes(entry)
+        }
 
-        let d3lShardBytes = d3lEntries.reduce(into: 0) { $0 += Int($1.segmentCount) * 4104 }
-
-        let totalBytes = auditBundleBytes + auditShardBytes + d3lShardBytes
+        let totalBytes = auditBytes + d3lShardBytes
         let entryCount = auditEntries.count + d3lEntries.count
 
         return StorageUsage(
             totalBytes: totalBytes,
-            auditStoreBytes: auditBundleBytes + auditShardBytes,
+            auditStoreBytes: auditBytes,
             d3lStoreBytes: d3lShardBytes,
             entryCount: entryCount,
             auditEntryCount: auditEntries.count,
@@ -64,7 +70,7 @@ public actor StorageMonitor {
     /// - Parameters:
     ///   - batchSize: Maximum number of entries to process per call
     ///   - retentionEpochs: Number of epochs to retain
-    /// - Returns: Cleanup progress and statistics
+    /// - Returns: Cleanup progress with estimated reclaimed payload bytes
     public func incrementalCleanup(
         batchSize: Int = 100,
         retentionEpochs: UInt32 = 6,
@@ -81,12 +87,13 @@ public actor StorageMonitor {
         var bytesReclaimed = 0
 
         for entry in batch {
+            let size = try await estimatedAuditBytes(entry)
             try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
             try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
             try await dataStore.deleteShards(erasureRoot: entry.erasureRoot)
 
             deletedCount += 1
-            bytesReclaimed += entry.bundleSize
+            bytesReclaimed += size
         }
 
         return IncrementalCleanupProgress(
@@ -101,10 +108,10 @@ public actor StorageMonitor {
     /// Aggressive cleanup when under storage pressure
     ///
     /// Deletes young data if necessary to free up space.
-    /// Uses priority queue to delete oldest and largest entries first.
+    /// Processes audit entries first, then D³L entries, oldest first within each batch.
     ///
-    /// - Parameter targetBytes: Target bytes to free (will attempt to free at least this much)
-    /// - Returns: Number of bytes actually reclaimed
+    /// - Parameter targetBytes: Target estimated payload bytes to free
+    /// - Returns: Estimated reclaimed payload bytes, using the same assumptions as getStorageUsage
     public func aggressiveCleanup(targetBytes: Int) async throws -> Int {
         // Use a local actor to protect the shared counter
         actor Counter {
@@ -139,7 +146,7 @@ public actor StorageMonitor {
                 }
 
                 do {
-                    let size = entry.bundleSize + 1023 * 684 // 1023 shards per entry
+                    let size = try await self.estimatedAuditBytes(entry)
 
                     try await filesystemStore.deleteAuditBundle(erasureRoot: entry.erasureRoot)
                     try await dataStore.deleteAuditEntry(erasureRoot: entry.erasureRoot)
@@ -152,7 +159,7 @@ public actor StorageMonitor {
                     logger.trace(
                         """
                         Aggressive cleanup: deleted audit entry \(entry.erasureRoot), \
-                        freed \(size) bytes (total: \(updated)/\(targetBytes))
+                         estimated freed payload: \(size) bytes (total: \(updated)/\(targetBytes))
                         """,
                     )
                 } catch {
@@ -188,7 +195,7 @@ public actor StorageMonitor {
                 }
 
                 do {
-                    let size = Int(entry.segmentCount) * 4104
+                    let size = try await self.estimatedD3LBytes(entry)
 
                     try await filesystemStore.deleteD3LShards(erasureRoot: entry.erasureRoot)
                     try await dataStore.deleteD3LEntry(erasureRoot: entry.erasureRoot)
@@ -201,7 +208,7 @@ public actor StorageMonitor {
                     logger.trace(
                         """
                         Aggressive cleanup: deleted D³L entry \(entry.erasureRoot), \
-                        freed \(size) bytes (total: \(updated)/\(targetBytes))
+                         estimated freed payload: \(size) bytes (total: \(updated)/\(targetBytes))
                         """,
                     )
                 } catch {
@@ -218,5 +225,18 @@ public actor StorageMonitor {
         logger.warning("Aggressive cleanup: reclaimed \(finalTotal) bytes (target: \(targetBytes))")
 
         return finalTotal
+    }
+
+    private func estimatedAuditBytes(_ entry: AuditEntry) async throws -> Int {
+        let validators = try await dataStore.getErasureValidatorCount(erasureRoot: entry.erasureRoot)
+        let width = 2 * ErasureCodingService.originalShards(validators: validators)
+        let pieces = entry.bundleSize / width + (entry.bundleSize % width == 0 ? 0 : 1)
+        return entry.bundleSize + validators * 2 * pieces
+    }
+
+    private func estimatedD3LBytes(_ entry: D3LEntry) async throws -> Int {
+        let validators = try await dataStore.getErasureValidatorCount(erasureRoot: entry.erasureRoot)
+        let required = ErasureCodingService.originalShards(validators: validators)
+        return validators * Int(entry.segmentCount) * (4104 / required)
     }
 }

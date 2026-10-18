@@ -8,17 +8,19 @@ public struct EpochMarker: Sendable, Equatable, Codable {
 
     public var entropy: Data32
     public var ticketsEntropy: Data32
-    public var validators: ConfigFixedSizeArray<
+    public var validators: ConfigLimitedSizeArray<
         Keys,
-        ProtocolConfig.TotalNumberOfValidators,
+        ProtocolConfig.MinValidators,
+        ProtocolConfig.MaxValidators,
     >
 
     public init(
         entropy: Data32,
         ticketsEntropy: Data32,
-        validators: ConfigFixedSizeArray<
+        validators: ConfigLimitedSizeArray<
             Keys,
-            ProtocolConfig.TotalNumberOfValidators,
+            ProtocolConfig.MinValidators,
+            ProtocolConfig.MaxValidators,
         >,
     ) {
         self.entropy = entropy
@@ -34,7 +36,10 @@ extension EpochMarker: Dummy {
         EpochMarker(
             entropy: Data32(),
             ticketsEntropy: Data32(),
-            validators: try! ConfigFixedSizeArray(config: config, defaultValue: Keys(bandersnatch: Data32(), ed25519: Data32())),
+            validators: try! ConfigLimitedSizeArray(
+                config: config,
+                array: Array(repeating: Keys(bandersnatch: Data32(), ed25519: Data32()), count: config.value.initialValidatorCount),
+            ),
         )
     }
 }

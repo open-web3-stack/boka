@@ -69,7 +69,11 @@ struct AssurancesRuntimeTests {
     private func makeReport(coreIndex: UInt, timeslot: TimeslotIndex) -> ReportItem {
         var workReport = WorkReport.dummy(config: config)
         workReport.coreIndex = coreIndex
-        return ReportItem(workReport: workReport, timeslot: timeslot)
+        return ReportItem(guarantee: .init(
+            workReport: workReport,
+            timeslot: timeslot,
+            credential: [.init(index: 0, signature: data64(0)), .init(index: 1, signature: data64(0))],
+        ), timeslot: timeslot)
     }
 
     private func makeAvailabilityAssignments(
@@ -78,8 +82,8 @@ struct AssurancesRuntimeTests {
         try ConfigFixedSizeArray(config: config, array: assignments)
     }
 
-    private func makeValidators() throws -> ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators> {
-        try ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey())
+    private func makeValidators() throws -> ValidatorKeys {
+        try ValidatorKeys(config: config, defaultValue: ValidatorKey())
     }
 
     private func makeAvailability(_ assurances: [ExtrinsicAvailability.AssuranceItem]) throws -> ExtrinsicAvailability {
@@ -103,5 +107,5 @@ struct AssurancesRuntimeTests {
 
 private struct AssuranceState: Assurances {
     var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
-    var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var currentValidators: ValidatorKeys
 }

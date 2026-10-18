@@ -218,7 +218,7 @@ extension Header: Validate {
     }
 
     public func validateSelf(config: ProtocolConfigRef) throws(Error) {
-        guard authorIndex < UInt32(config.value.totalNumberOfValidators) else {
+        guard authorIndex < UInt32(config.value.totalNumberOfCores * 3) else {
             throw .invalidAuthorIndex
         }
     }

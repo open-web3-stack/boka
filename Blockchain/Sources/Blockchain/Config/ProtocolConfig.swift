@@ -56,9 +56,6 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// L = 14,400: The maximum age in timeslots of the lookup anchor.
     public var maxLookupAnchorAge: Int
 
-    /// N = 2: The number of ticket entries per validator.
-    public var ticketEntriesPerValidator: Int
-
     /// O = 8: The maximum number of items in the authorizations pool.
     public var maxAuthorizationsPoolItems: Int
 
@@ -80,32 +77,32 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
     /// U = 5: The period in timeslots after which reported but unavailable work may be replaced.
     public var preimageReplacementPeriod: Int
 
-    /// V = 1023: The total number of validators.
-    public var totalNumberOfValidators: Int
+    /// Initial validator count used to construct genesis and test state, not a protocol parameter.
+    public var initialValidatorCount: Int
 
     /// WA = 64,000: The maximum size of is-authorized code in octets.
     public var maxIsAuthorizedCodeSize: Int
 
-    /// WB = 13,791,360: The maximum size of an encoded work-package together with its extrinsic data and import implications, in octets.
+    /// WI = 13,791,360: The maximum size of work-package input data, including import implications.
     public var maxEncodedWorkPackageSize: Int
+
+    /// WB = 13,904,950: The maximum size of an encoded work-package bundle in octets.
+    public var maxWorkBundleSize: Int {
+        maxEncodedWorkPackageSize + 214 + 32 * maxDepsInWorkReport + 62 * maxWorkItems
+            + 35 * maxWorkPackageImports + 36 * maxWorkPackageExtrinsics
+    }
 
     /// WC = 4,000,000: The maximum size of service code in octets.
     public var maxServiceCodeSize: Int
 
-    /// WE = 684: The basic size of our erasure-coded pieces.
-    public var erasureCodedPieceSize: Int
-
-    /// WG = WP*WE = 4104: The size of a segment in octets.
+    /// WG = 4104: The size of a segment in octets.
     public var segmentSize: Int
 
-    /// WF = WG + 32 * ceil(log2(WM)) = 4488: The additional footprint in the Audits DA of a single imported segment.
+    /// WF = WG + 32 * ceil(log2(WX)) = 4488: The additional footprint in the Audits DA of a single imported segment.
     public var segmentFootprint: Int
 
     /// WM = 3,072: The maximum number of imports in a work-package.
     public var maxWorkPackageImports: Int
-
-    /// WP = 6: The number of erasure-coded pieces in a segment.
-    public var erasureCodedSegmentSize: Int
 
     /// WR = 48 * 2^10: The maximum total size of all unbounded blobs in a work-report, in octets.
     public var maxWorkReportBlobSize: Int
@@ -150,7 +147,6 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         maxTicketsPerExtrinsic: Int,
         maxLookupAnchorAge: Int,
         transferMemoSize: Int,
-        ticketEntriesPerValidator: Int,
         maxAuthorizationsPoolItems: Int,
         slotPeriodSeconds: Int,
         maxAuthorizationsQueueItems: Int,
@@ -160,15 +156,13 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         maxIsAuthorizedCodeSize: Int,
         maxServiceCodeSize: Int,
         preimageReplacementPeriod: Int,
-        totalNumberOfValidators: Int,
-        erasureCodedPieceSize: Int,
+        initialValidatorCount: Int,
         maxWorkPackageImports: Int,
         maxWorkPackageExports: Int,
         maxEncodedWorkPackageSize: Int,
         segmentSize: Int,
         segmentFootprint: Int,
         maxWorkReportBlobSize: Int,
-        erasureCodedSegmentSize: Int,
         ticketSubmissionEndSlot: Int,
         pvmDynamicAddressAlignmentFactor: Int,
         pvmProgramInitInputDataSize: Int,
@@ -193,7 +187,6 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.maxTicketsPerExtrinsic = maxTicketsPerExtrinsic
         self.maxLookupAnchorAge = maxLookupAnchorAge
         self.transferMemoSize = transferMemoSize
-        self.ticketEntriesPerValidator = ticketEntriesPerValidator
         self.maxAuthorizationsPoolItems = maxAuthorizationsPoolItems
         self.slotPeriodSeconds = slotPeriodSeconds
         self.maxAuthorizationsQueueItems = maxAuthorizationsQueueItems
@@ -203,15 +196,13 @@ public struct ProtocolConfig: Sendable, Codable, Equatable {
         self.maxIsAuthorizedCodeSize = maxIsAuthorizedCodeSize
         self.maxServiceCodeSize = maxServiceCodeSize
         self.preimageReplacementPeriod = preimageReplacementPeriod
-        self.totalNumberOfValidators = totalNumberOfValidators
-        self.erasureCodedPieceSize = erasureCodedPieceSize
+        self.initialValidatorCount = initialValidatorCount
         self.maxWorkPackageImports = maxWorkPackageImports
         self.maxWorkPackageExports = maxWorkPackageExports
         self.maxEncodedWorkPackageSize = maxEncodedWorkPackageSize
         self.segmentSize = segmentSize
         self.segmentFootprint = segmentFootprint
         self.maxWorkReportBlobSize = maxWorkReportBlobSize
-        self.erasureCodedSegmentSize = erasureCodedSegmentSize
         self.ticketSubmissionEndSlot = ticketSubmissionEndSlot
         self.pvmDynamicAddressAlignmentFactor = pvmDynamicAddressAlignmentFactor
         self.pvmProgramInitInputDataSize = pvmProgramInitInputDataSize
@@ -279,8 +270,6 @@ extension ProtocolConfig {
                 ? other.maxLookupAnchorAge : maxLookupAnchorAge,
             transferMemoSize: other.transferMemoSize != 0
                 ? other.transferMemoSize : transferMemoSize,
-            ticketEntriesPerValidator: other.ticketEntriesPerValidator != 0
-                ? other.ticketEntriesPerValidator : ticketEntriesPerValidator,
             maxAuthorizationsPoolItems: other.maxAuthorizationsPoolItems != 0
                 ? other.maxAuthorizationsPoolItems : maxAuthorizationsPoolItems,
             slotPeriodSeconds: other.slotPeriodSeconds != 0
@@ -299,10 +288,8 @@ extension ProtocolConfig {
                 ? other.maxServiceCodeSize : maxServiceCodeSize,
             preimageReplacementPeriod: other.preimageReplacementPeriod != 0
                 ? other.preimageReplacementPeriod : preimageReplacementPeriod,
-            totalNumberOfValidators: other.totalNumberOfValidators != 0
-                ? other.totalNumberOfValidators : totalNumberOfValidators,
-            erasureCodedPieceSize: other.erasureCodedPieceSize != 0
-                ? other.erasureCodedPieceSize : erasureCodedPieceSize,
+            initialValidatorCount: other.initialValidatorCount != 0
+                ? other.initialValidatorCount : initialValidatorCount,
             maxWorkPackageImports: other.maxWorkPackageImports != 0
                 ? other.maxWorkPackageImports : maxWorkPackageImports,
             maxWorkPackageExports: other.maxWorkPackageExports != 0
@@ -313,8 +300,6 @@ extension ProtocolConfig {
             segmentFootprint: other.segmentFootprint != 0 ? other.segmentFootprint : segmentFootprint,
             maxWorkReportBlobSize: other.maxWorkReportBlobSize != 0
                 ? other.maxWorkReportBlobSize : maxWorkReportBlobSize,
-            erasureCodedSegmentSize: other.erasureCodedSegmentSize != 0
-                ? other.erasureCodedSegmentSize : erasureCodedSegmentSize,
             ticketSubmissionEndSlot: other.ticketSubmissionEndSlot != 0
                 ? other.ticketSubmissionEndSlot : ticketSubmissionEndSlot,
             pvmDynamicAddressAlignmentFactor: other.pvmDynamicAddressAlignmentFactor != 0
@@ -371,9 +356,6 @@ extension ProtocolConfig {
         )
         maxLookupAnchorAge = try decode(.maxLookupAnchorAge, defaultValue: 0, required: required)
         transferMemoSize = try decode(.transferMemoSize, defaultValue: 0, required: required)
-        ticketEntriesPerValidator = try decode(
-            .ticketEntriesPerValidator, defaultValue: 0, required: required,
-        )
         maxAuthorizationsPoolItems = try decode(
             .maxAuthorizationsPoolItems, defaultValue: 0, required: required,
         )
@@ -395,10 +377,9 @@ extension ProtocolConfig {
         preimageReplacementPeriod = try decode(
             .preimageReplacementPeriod, defaultValue: 0, required: required,
         )
-        totalNumberOfValidators = try decode(
-            .totalNumberOfValidators, defaultValue: 0, required: required,
+        initialValidatorCount = try decode(
+            .initialValidatorCount, defaultValue: 0, required: required,
         )
-        erasureCodedPieceSize = try decode(.erasureCodedPieceSize, defaultValue: 0, required: required)
         maxWorkPackageImports = try decode(
             .maxWorkPackageImports, defaultValue: 0, required: required,
         )
@@ -412,9 +393,6 @@ extension ProtocolConfig {
         segmentFootprint = try decode(.segmentFootprint, defaultValue: 0, required: required)
         maxWorkReportBlobSize = try decode(
             .maxWorkReportBlobSize, defaultValue: 0, required: required,
-        )
-        erasureCodedSegmentSize = try decode(
-            .erasureCodedSegmentSize, defaultValue: 0, required: required,
         )
         ticketSubmissionEndSlot = try decode(
             .ticketSubmissionEndSlot, defaultValue: 0, required: required,
@@ -565,13 +543,6 @@ extension ProtocolConfig {
         }
     }
 
-    public enum TicketEntriesPerValidator: ReadInt {
-        public typealias TConfig = ProtocolConfigRef
-        public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.ticketEntriesPerValidator
-        }
-    }
-
     public enum MaxAuthorizationsPoolItems: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
@@ -635,20 +606,6 @@ extension ProtocolConfig {
         }
     }
 
-    public enum TotalNumberOfValidators: ReadInt {
-        public typealias TConfig = ProtocolConfigRef
-        public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.totalNumberOfValidators
-        }
-    }
-
-    public enum ErasureCodedPieceSize: ReadInt {
-        public typealias TConfig = ProtocolConfigRef
-        public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.erasureCodedPieceSize
-        }
-    }
-
     public enum MaxWorkPackageImports: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
@@ -684,13 +641,6 @@ extension ProtocolConfig {
         }
     }
 
-    public enum ErasureCodedSegmentSize: ReadInt {
-        public typealias TConfig = ProtocolConfigRef
-        public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.erasureCodedSegmentSize
-        }
-    }
-
     public enum TicketSubmissionEndSlot: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
@@ -715,7 +665,7 @@ extension ProtocolConfig {
     public enum TwoThirdValidatorsPlusOne: ReadInt {
         public typealias TConfig = ProtocolConfigRef
         public static func read(config: ProtocolConfigRef) -> Int {
-            config.value.totalNumberOfValidators * 2 / 3 + 1
+            config.value.totalNumberOfCores * 2 + 1
         }
     }
 }
@@ -737,7 +687,8 @@ extension ProtocolConfig {
 }
 
 extension ProtocolConfig {
-    public var encoded: Data {
+    /// Protocol constants exposed to services by the `fetch` host call.
+    public var serviceConstants: Data {
         try! JamEncoder.encode(
             UInt64(additionalMinBalancePerStateItem),
             UInt64(additionalMinBalancePerStateByte),
@@ -754,20 +705,16 @@ extension ProtocolConfig {
             UInt16(maxDepsInWorkReport),
             UInt16(maxTicketsPerExtrinsic),
             UInt32(maxLookupAnchorAge),
-            UInt16(ticketEntriesPerValidator),
             UInt16(maxAuthorizationsPoolItems),
             UInt16(slotPeriodSeconds),
             UInt16(maxAuthorizationsQueueItems),
             UInt16(coreAssignmentRotationPeriod),
             UInt16(maxWorkPackageExtrinsics),
             UInt16(preimageReplacementPeriod),
-            UInt16(totalNumberOfValidators),
             UInt32(maxIsAuthorizedCodeSize),
-            UInt32(maxEncodedWorkPackageSize),
+            UInt32(maxWorkBundleSize),
             UInt32(maxServiceCodeSize),
-            UInt32(erasureCodedPieceSize),
             UInt32(maxWorkPackageImports),
-            UInt32(erasureCodedSegmentSize),
             UInt32(maxWorkReportBlobSize),
             UInt32(transferMemoSize),
             UInt32(maxWorkPackageExports),
@@ -775,8 +722,16 @@ extension ProtocolConfig {
         )
     }
 
+    /// JIP-4 protocol parameters use the same encoding as fetch(0).
+    public var encoded: Data {
+        serviceConstants
+    }
+
     /// Decode ProtocolConfig from encoded parameters.
-    public static func decode(protocolParameters: Data) throws -> ProtocolConfig {
+    public static func decode(protocolParameters: Data, initialValidatorCount: Int) throws -> ProtocolConfig {
+        guard protocolParameters.count == 122 else {
+            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Expected 122 bytes of protocol parameters"))
+        }
         let decoder = JamDecoder(data: protocolParameters, config: ProtocolConfigRef.minimal)
 
         let additionalMinBalancePerStateItem = try decoder.decode(UInt64.self)
@@ -794,24 +749,27 @@ extension ProtocolConfig {
         let maxDepsInWorkReport = try decoder.decode(UInt16.self)
         let maxTicketsPerExtrinsic = try decoder.decode(UInt16.self)
         let maxLookupAnchorAge = try decoder.decode(UInt32.self)
-        let ticketEntriesPerValidator = try decoder.decode(UInt16.self)
         let maxAuthorizationsPoolItems = try decoder.decode(UInt16.self)
         let slotPeriodSeconds = try decoder.decode(UInt16.self)
         let maxAuthorizationsQueueItems = try decoder.decode(UInt16.self)
         let coreAssignmentRotationPeriod = try decoder.decode(UInt16.self)
         let maxWorkPackageExtrinsics = try decoder.decode(UInt16.self)
         let preimageReplacementPeriod = try decoder.decode(UInt16.self)
-        let totalNumberOfValidators = try decoder.decode(UInt16.self)
         let maxIsAuthorizedCodeSize = try decoder.decode(UInt32.self)
-        let maxEncodedWorkPackageSize = try decoder.decode(UInt32.self)
+        let maxWorkBundleSize = try decoder.decode(UInt32.self)
         let maxServiceCodeSize = try decoder.decode(UInt32.self)
-        let erasureCodedPieceSize = try decoder.decode(UInt32.self)
         let maxWorkPackageImports = try decoder.decode(UInt32.self)
-        let erasureCodedSegmentSize = try decoder.decode(UInt32.self)
         let maxWorkReportBlobSize = try decoder.decode(UInt32.self)
         let transferMemoSize = try decoder.decode(UInt32.self)
         let maxWorkPackageExports = try decoder.decode(UInt32.self)
         let ticketSubmissionEndSlot = try decoder.decode(UInt32.self)
+
+        let bundleOverhead = 214 + 32 * Int(maxDepsInWorkReport) + 62 * Int(maxWorkItems)
+            + 35 * Int(maxWorkPackageImports) + 36 * Int(maxWorkPackageExtrinsics)
+        guard Int(maxWorkBundleSize) >= bundleOverhead else {
+            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Bundle limit is smaller than its framing overhead"))
+        }
+        let maxEncodedWorkPackageSize = Int(maxWorkBundleSize) - bundleOverhead
 
         return ProtocolConfig(
             auditTranchePeriod: 8, // A = 8
@@ -832,7 +790,6 @@ extension ProtocolConfig {
             maxTicketsPerExtrinsic: Int(maxTicketsPerExtrinsic),
             maxLookupAnchorAge: Int(maxLookupAnchorAge),
             transferMemoSize: Int(transferMemoSize),
-            ticketEntriesPerValidator: Int(ticketEntriesPerValidator),
             maxAuthorizationsPoolItems: Int(maxAuthorizationsPoolItems),
             slotPeriodSeconds: Int(slotPeriodSeconds),
             maxAuthorizationsQueueItems: Int(maxAuthorizationsQueueItems),
@@ -842,15 +799,13 @@ extension ProtocolConfig {
             maxIsAuthorizedCodeSize: Int(maxIsAuthorizedCodeSize),
             maxServiceCodeSize: Int(maxServiceCodeSize),
             preimageReplacementPeriod: Int(preimageReplacementPeriod),
-            totalNumberOfValidators: Int(totalNumberOfValidators),
-            erasureCodedPieceSize: Int(erasureCodedPieceSize),
+            initialValidatorCount: initialValidatorCount,
             maxWorkPackageImports: Int(maxWorkPackageImports),
             maxWorkPackageExports: Int(maxWorkPackageExports),
             maxEncodedWorkPackageSize: Int(maxEncodedWorkPackageSize),
-            segmentSize: 4104, // WG = WP*WE = 4104
+            segmentSize: 4104, // WG = 4104
             segmentFootprint: 4488, // WF = 4488
             maxWorkReportBlobSize: Int(maxWorkReportBlobSize),
-            erasureCodedSegmentSize: Int(erasureCodedSegmentSize),
             ticketSubmissionEndSlot: Int(ticketSubmissionEndSlot),
             pvmDynamicAddressAlignmentFactor: 2, // ZA = 2
             pvmProgramInitInputDataSize: 1 << 24, // ZI = 2^24

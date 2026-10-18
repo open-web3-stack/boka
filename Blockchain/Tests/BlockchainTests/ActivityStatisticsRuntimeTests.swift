@@ -24,7 +24,7 @@ struct ActivityStatisticsRuntimeTests {
             reporters: [validators[3].ed25519, data32(200)],
             authorIndex: 2,
             availableReports: [report],
-            accumulateStats: [7: (Gas(13), 2)],
+            accumulateStats: [7: (Gas(13), 2, 0)],
         )
 
         #expect(stats.accumulator[2].blocks == 1)
@@ -90,15 +90,15 @@ struct ActivityStatisticsRuntimeTests {
 private struct ActivityStatisticsState: ActivityStatistics {
     var activityStatistics: Statistics
     var timeslot: TimeslotIndex
-    var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var currentValidators: ValidatorKeys
 }
 
 private func makeActivityValidators(
     config: ProtocolConfigRef,
-) throws -> ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators> {
-    try ConfigFixedSizeArray(
+) throws -> ValidatorKeys {
+    try ValidatorKeys(
         config: config,
-        array: (0 ..< config.value.totalNumberOfValidators).map { index in
+        array: (0 ..< config.value.initialValidatorCount).map { index in
             ValidatorKey(
                 bandersnatch: BandersnatchPublicKey(),
                 ed25519: data32(UInt8(10 + index)),
@@ -116,6 +116,7 @@ private func makeActivityReport(config: ProtocolConfigRef) throws -> WorkReport 
         workPackageHash: data32(21),
         length: 12,
         erasureRoot: data32(22),
+        erasureShards: UInt16(config.value.initialValidatorCount),
         segmentRoot: data32(23),
         segmentCount: 1,
     )

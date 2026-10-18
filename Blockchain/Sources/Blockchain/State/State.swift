@@ -286,17 +286,18 @@ extension State: Dummy {
                 headerHash: block.hash,
                 superPeak: Data32(),
                 stateRoot: Data32(),
+                timeslot: block.header.timeslot,
                 lookup: [Data32: Data32](),
             ))
         }
         let safroleState: StateKeys.SafroleStateKey.Value = SafroleState.dummy(config: config)
         let entropyPool: StateKeys.EntropyPoolKey.Value = EntropyPool((Data32(), Data32(), Data32(), Data32()))
         let validatorQueue: StateKeys.ValidatorQueueKey.Value =
-            try! ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config))
+            try! ValidatorKeys(config: config, array: Array(repeating: ValidatorKey.dummy(config: config), count: config.value.initialValidatorCount))
         let currentValidators: StateKeys.CurrentValidatorsKey.Value =
-            try! ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config))
+            validatorQueue
         let previousValidators: StateKeys.PreviousValidatorsKey.Value =
-            try! ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey.dummy(config: config))
+            validatorQueue
         let availabilityAssignments: StateKeys.AvailabilityAssignmentsKey.Value = try! ConfigFixedSizeArray(config: config, defaultValue: nil)
         let timeslot: StateKeys.TimeslotKey.Value = block?.header.timeslot ?? 0
         let authorizationQueue: StateKeys.AuthorizationQueueKey.Value =
@@ -495,9 +496,7 @@ extension State: ServiceAccounts {
 }
 
 extension State: Safrole {
-    public var nextValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    > {
+    public var nextValidators: ValidatorKeys {
         safroleState.nextValidators
     }
 

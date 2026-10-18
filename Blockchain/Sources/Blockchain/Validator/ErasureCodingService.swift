@@ -7,25 +7,52 @@ private let logger = Logger(label: "ErasureCodingService")
 
 /// Reed-Solomon erasure coding (GP spec section 10)
 ///
-/// Implements erasure coding in GF(2¹⁶) with rate 342:1023
+/// Uses GF(2¹⁶), with the coding rate derived from the assuring validator count.
 public actor ErasureCodingService {
     private let config: ProtocolConfigRef
 
-    // Constants from GP spec
-    private let originalShardCount = 342
-    private let totalShardCount = 1023
-    private let pieceSize = 684 // bytes (2 octet pairs)
+    // Coding dimensions for this assurer set.
+    private let originalShardCount: Int
+    private let totalShardCount: Int
+    private let pieceSize: Int
 
-    public init(config: ProtocolConfigRef) {
+    public init(config: ProtocolConfigRef, validatorCount: Int? = nil) {
         self.config = config
+        totalShardCount = validatorCount ?? config.value.initialValidatorCount
+        originalShardCount = Self.originalShards(validators: totalShardCount)
+        pieceSize = 2 * originalShardCount
+    }
+
+    public nonisolated static func originalShards(validators: Int) -> Int {
+        precondition(validators >= 6 && validators.isMultiple(of: 3))
+        return stride(from: validators / 3 + 1, through: 1, by: -1).first { 4104 % (2 * $0) == 0 }!
+    }
+
+    public func forValidators(_ count: Int?) -> ErasureCodingService {
+        guard let count else {
+            return self
+        }
+        return ErasureCodingService(config: config, validatorCount: count)
+    }
+
+    public var inputPieceSize: Int {
+        pieceSize
+    }
+
+    public var validatorCount: Int {
+        totalShardCount
+    }
+
+    public var requiredShardCount: Int {
+        originalShardCount
     }
 
     // MARK: - Encoding
 
     /// Encode segments into erasure-coded shards
     ///
-    /// Each segment is 4,104 bytes = 6 × 684-byte pieces.
-    /// Per GP spec: concatenates, transposes (^T operator), and erasure codes into 1,023 shards.
+    /// Concatenates and transposes 4,104-byte segments into one shard per assurer.
+    /// The source-shard count is chosen so segments require no padding.
     public func encodeSegments(_ segments: [Data4104]) throws -> [Data] {
         guard !segments.isEmpty else {
             throw ErasureCodingError.emptyInput

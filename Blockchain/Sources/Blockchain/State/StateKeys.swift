@@ -152,10 +152,7 @@ public enum StateKeys {
     }
 
     public struct ValidatorQueueKey: StateKey {
-        public typealias Value = ConfigFixedSizeArray<
-            ValidatorKey,
-            ProtocolConfig.TotalNumberOfValidators,
-        >
+        public typealias Value = ValidatorKeys
 
         public init() {}
 
@@ -165,10 +162,7 @@ public enum StateKeys {
     }
 
     public struct CurrentValidatorsKey: StateKey {
-        public typealias Value = ConfigFixedSizeArray<
-            ValidatorKey,
-            ProtocolConfig.TotalNumberOfValidators,
-        >
+        public typealias Value = ValidatorKeys
 
         public init() {}
 
@@ -178,10 +172,7 @@ public enum StateKeys {
     }
 
     public struct PreviousValidatorsKey: StateKey {
-        public typealias Value = ConfigFixedSizeArray<
-            ValidatorKey,
-            ProtocolConfig.TotalNumberOfValidators,
-        >
+        public typealias Value = ValidatorKeys
 
         public init() {}
 

@@ -2,6 +2,7 @@
 // Single-pass compilation with lazy label creation for maximum performance
 
 #include "helper.hh"
+#include "jit_gas_costs.hh"
 #include "runtime_context_internal.hh"
 #include "jit_label_manager.hh"
 #include "jit_control_flow.hh"
@@ -180,18 +181,12 @@ static uint32_t getInstructionSize(const uint8_t* bytecode, uint32_t pc, size_t 
 static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t instrSize, size_t bytecodeSize) {
     uint8_t opcode = bytecode[pc];
 
-    // Jump: [opcode][offset_32bit] = 5 bytes
+    // Jump: opcode followed by a signed variable-width relative offset.
     if (opcode_is(opcode, Opcode::Jump)) {
-        if (pc + 5 > bytecodeSize) {
-            fprintf(stderr, "[JIT] Jump instruction truncated at PC %u (need 5 bytes, have %zu)\n", pc, bytecodeSize);
-            return pc + instrSize; // Fallthrough on error
-        }
-        uint32_t offset;
-        memcpy(&offset, &bytecode[pc + 1], 4);
-        return pc + int32_t(offset);
+        return pc + uint32_t(decode_immediate_signed(bytecode, pc + 1, clamp_imm_len(instrSize - 1), uint32_t(bytecodeSize)));
     }
 
-    // Branch register instructions (fixed 7 bytes): [opcode][reg1][reg2][offset_32bit]
+    // Register branches: opcode, packed registers, signed relative offset.
     if (opcode_is(opcode, Opcode::BranchEq) ||
         opcode_is(opcode, Opcode::BranchNe) ||
         opcode_is(opcode, Opcode::BranchLtU) ||
@@ -199,13 +194,8 @@ static uint32_t getJumpTarget(const uint8_t* bytecode, uint32_t pc, uint32_t ins
         opcode_is(opcode, Opcode::BranchGeU) ||
         opcode_is(opcode, Opcode::BranchGeS))
     {
-        if (instrSize < 7 || pc + 7 > bytecodeSize) {
-            fprintf(stderr, "[JIT] Branch instruction truncated at PC %u (need 7 bytes, have %zu)\n", pc, bytecodeSize);
-            return pc + instrSize;
-        }
-        uint32_t offset = 0;
-        memcpy(&offset, &bytecode[pc + 3], 4);
-        return pc + int32_t(offset);
+        const uint32_t length = instrSize > 2 ? clamp_imm_len(instrSize - 2) : 0;
+        return pc + uint32_t(decode_immediate_signed(bytecode, pc + 2, length, uint32_t(bytecodeSize)));
     }
 
     // Branch immediate instructions:
@@ -278,6 +268,9 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     size_t skipTableSize,
     const uint8_t* _Nullable bitmask,
     size_t bitmaskSize,
+    const uint64_t* _Nonnull blockGasCosts,
+    const uint32_t* _Nullable blockStarts,
+    size_t blockStartCount,
     void* _Nullable * _Nonnull funcOut)
 {
     auto* ctx = static_cast<RuntimeContext*>(context);
@@ -467,7 +460,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
 
         if (isJumpInstruction || isBranchInstruction) {
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
-            if (targetPC != pc + instrSize) {
+            {
                 // This is a branch/jump instruction (not a fallthrough)
                 // VALIDATE: Check if target is within code bounds and at an instruction boundary
                 if (targetPC >= codeSize) {
@@ -496,7 +489,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     // CFG analysis ensures we only compile code reachable from entry point (PC=0)
     // This matches interpreter behavior and reduces semantic differences
     ControlFlowGraph cfg;
-    cfg.build(codeBuffer, codeSize, skipTable, skipTableSize, bitmask, /* entryPC= */ 0);
+    cfg.build(codeBuffer, codeSize, skipTable, skipTableSize, bitmask, initialPC);
 
     fprintf(stderr, "[JIT CFG] Found %zu reachable PCs out of %zu total PCs\n",
             cfg.getReachablePCs().size(), static_cast<size_t>(codeSize));
@@ -518,11 +511,17 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         a.mov(x86::rax, x86::qword_ptr(x86::r14));
         // Subtract gas cost (sets CF if borrow/underflow occurred)
         a.sub(x86::rax, gasCost);
-        // Store updated value back (preserves flags)
-        a.mov(x86::qword_ptr(x86::r14), x86::rax);
-        // Jump if borrow occurred (unsigned underflow)
         a.jb(outOfGasLabel);
+        a.mov(x86::qword_ptr(x86::r14), x86::rax);
     };
+
+    // A mid-block invocation pays once here, not whenever execution crosses its entry PC.
+    JITGasCostView gasCosts(blockGasCosts, blockStarts, blockStartCount, codeSize);
+    if (!gasCosts.at(initialPC)) {
+        deductGas(gasCosts.containing(initialPC));
+    }
+    labelManager.markJumpTarget(initialPC);
+    a.jmp(labelManager.getOrCreateLabel(&a, initialPC, "x86_64"));
 
     // === MAIN COMPILATION PASS: ONLY COMPILE REACHABLE CODE ===
     // Iterate through PCs in sequential order to ensure fallthrough works correctly
@@ -567,9 +566,26 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         // === GAS ACCOUNTING ===
-        // Deduct 1 gas for this instruction (default gas cost per PVM spec)
+        // Charge the pipeline cost once at each basic-block entry.
         // Check AFTER binding labels so jump targets don't double-deduct
-        deductGas(1);
+        if (const auto cost = gasCosts.sequential(pc)) deductGas(cost);
+        if (opcode == 2) {
+            pc += instrSize;
+            continue;
+        }
+
+        {
+            const bool conditional = (opcode >= 81 && opcode <= 90) || (opcode >= 170 && opcode <= 175);
+            const bool staticJump = opcode == 40;
+            if (conditional || staticJump || opcode == 1) {
+                const uint32_t target = opcode == 1 ? pc + instrSize : getJumpTarget(codeBuffer, pc, instrSize, codeSize);
+                if (!gasCosts.at(target) || (conditional && !gasCosts.at(pc + instrSize))) {
+                    a.jmp(panicLabel);
+                    pc += instrSize;
+                    continue;
+                }
+            }
+        }
 
         // Variable to track if we handled this instruction (for PC advancement)
         instructionHandled = false;
@@ -581,7 +597,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             // CRITICAL: Only compile jump if target was validated in pre-pass
             // If target is beyond code size or not a jump target, fall through
             if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
-                // Invalid jump target - treat as fallthrough (don't jump)
+                a.jmp(panicLabel);
                 goto next_instruction;
             }
 
@@ -591,13 +607,14 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode_is(opcode, Opcode::BranchEq)) {
-            uint8_t reg1 = codeBuffer[pc + 1];
-            uint8_t reg2 = codeBuffer[pc + 2];
+            const uint8_t packed = instrSize > 1 ? codeBuffer[pc + 1] : 0;
+            uint8_t reg1 = std::min(uint8_t(packed & 15), uint8_t(12));
+            uint8_t reg2 = std::min(uint8_t(packed >> 4), uint8_t(12));
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
 
             // CRITICAL: Only compile branch if target was validated in pre-pass
             if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
-                // Invalid jump target - treat as fallthrough
+                a.jmp(panicLabel);
                 goto next_instruction;
             }
 
@@ -608,13 +625,14 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
         }
 
         if (opcode_is(opcode, Opcode::BranchNe)) {
-            uint8_t reg1 = codeBuffer[pc + 1];
-            uint8_t reg2 = codeBuffer[pc + 2];
+            const uint8_t packed = instrSize > 1 ? codeBuffer[pc + 1] : 0;
+            uint8_t reg1 = std::min(uint8_t(packed & 15), uint8_t(12));
+            uint8_t reg2 = std::min(uint8_t(packed >> 4), uint8_t(12));
             uint32_t targetPC = getJumpTarget(codeBuffer, pc, instrSize, codeSize);
 
             // CRITICAL: Only compile branch if target was validated in pre-pass
             if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
-                // Invalid jump target - treat as fallthrough
+                a.jmp(panicLabel);
                 goto next_instruction;
             }
 
@@ -684,9 +702,8 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
             uint32_t targetPC = pc + uint32_t(int32_t(jumpOffset));  // Offset is relative
 
             // CRITICAL: Only compile jump if target is within bounds and was validated
-            if (targetPC >= codeSize || !labelManager.isJumpTarget(targetPC)) {
-                // Invalid jump target - treat as fallthrough (don't jump)
-                fprintf(stderr, "[JIT] LoadImmJump at PC %u: invalid target %u, treating as fallthrough\n", pc, targetPC);
+            if (!gasCosts.at(targetPC) || !labelManager.isJumpTarget(targetPC)) {
+                jit_emit_load_imm_jump_labeled(&a, "x86_64", destReg, immediate, panicLabel);
                 goto next_instruction;
             }
 

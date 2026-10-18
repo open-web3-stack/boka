@@ -8,6 +8,7 @@ public enum DisputesError: Error {
     case invalidFaultSigner
     case duplicatedReport
     case invalidJudgementsCount
+    case badVotesCount
     case expectInFaults
     case expectInCulprits
     case invalidPublicKey
@@ -16,14 +17,19 @@ public enum DisputesError: Error {
 }
 
 public struct ReportItem: Sendable, Equatable, Codable {
-    public var workReport: WorkReport
+    public var guarantee: ExtrinsicGuarantees.GuaranteeItem
     public var timeslot: TimeslotIndex
 
+    public var workReport: WorkReport {
+        get { guarantee.workReport }
+        set { guarantee.workReport = newValue }
+    }
+
     public init(
-        workReport: WorkReport,
+        guarantee: ExtrinsicGuarantees.GuaranteeItem,
         timeslot: TimeslotIndex,
     ) {
-        self.workReport = workReport
+        self.guarantee = guarantee
         self.timeslot = timeslot
     }
 }
@@ -58,12 +64,8 @@ public protocol Disputes {
         ProtocolConfig.TotalNumberOfCores,
     > { get }
     var timeslot: TimeslotIndex { get }
-    var currentValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    > { get }
-    var previousValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    > { get }
+    var currentValidators: ValidatorKeys { get }
+    var previousValidators: ValidatorKeys { get }
 
     func update(config: ProtocolConfigRef, disputes: ExtrinsicDisputes) throws(DisputesError) -> (
         state: DisputesPostState,
@@ -94,6 +96,9 @@ extension Disputes {
             }
 
             let validators = isCurrent ? currentValidators : previousValidators
+            guard verdict.judgements.count == validators.count * 2 / 3 + 1 else {
+                throw .badVotesCount
+            }
 
             for judgement in verdict.judgements {
                 guard let signer = validators[safe: Int(judgement.validatorIndex)]?.ed25519 else {
@@ -145,21 +150,15 @@ extension Disputes {
         }
 
         let votes = disputes.verdicts.map {
-            (hash: $0.reportHash, vote: $0.judgements.reduce(into: 0) { $0 += $1.isValid ? 1 : 0 })
+            (hash: $0.reportHash, vote: $0.judgements.reduce(into: 0) { $0 += $1.isValid ? 1 : 0 },
+             validatorCount: $0.epoch == currentEpoch ? currentValidators.count : previousValidators.count)
         }
 
         var tobeRemoved = Set<Data32>()
-        let third_validators = config.value.totalNumberOfValidators / 3
-        let two_third_plus_one_validators = config.value.totalNumberOfValidators * 2 / 3 + 1
-        for (hash, vote) in votes {
+        for (hash, vote, validatorCount) in votes {
+            let third_validators = validatorCount / 3
+            let two_third_plus_one_validators = validatorCount * 2 / 3 + 1
             if vote == 0 {
-                // Any verdict containing solely invalid judgements
-                // implies the same report having at least two valid entries in the culprits sequence c
-                let culprits = disputes.culprits.filter { $0.reportHash == hash }
-                guard culprits.count >= 2 else {
-                    throw .expectInCulprits
-                }
-
                 tobeRemoved.insert(hash)
                 newJudgements.badSet.insert(hash)
 

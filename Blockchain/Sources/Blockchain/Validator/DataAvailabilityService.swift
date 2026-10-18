@@ -252,13 +252,13 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     }
 
     /// Export segments to import store
-    public func exportSegments(data: [Data4104], erasureRoot: Data32) async throws -> Data32 {
-        try await workReportProcessor.exportSegments(data: data, erasureRoot: erasureRoot)
+    public func exportSegments(data: [Data4104], erasureRoot: Data32, validatorCount: Int? = nil) async throws -> Data32 {
+        try await workReportProcessor.exportSegments(data: data, erasureRoot: erasureRoot, validatorCount: validatorCount)
     }
 
     /// Export a work package bundle to audit store
-    public func exportWorkpackageBundle(bundle: WorkPackageBundle) async throws -> (erasureRoot: Data32, length: DataLength) {
-        try await workReportProcessor.exportWorkpackageBundle(bundle: bundle)
+    public func exportWorkpackageBundle(bundle: WorkPackageBundle, validatorCount: Int? = nil) async throws -> (erasureRoot: Data32, length: DataLength) {
+        try await workReportProcessor.exportWorkpackageBundle(bundle: bundle, validatorCount: validatorCount)
     }
 
     /// Verify that a segment belongs to an erasure root
@@ -280,10 +280,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     public func reconstructData(
         shards: [(index: UInt16, data: Data)],
         originalLength: Int,
+        validatorCount: Int,
     ) async throws -> Data {
         try await workReportProcessor.reconstructData(
             shards: shards,
             originalLength: originalLength,
+            validatorCount: validatorCount,
         )
     }
 
@@ -291,10 +293,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     public func reconstructSegments(
         shards: [(index: UInt16, data: Data)],
         segmentCount: Int,
+        validatorCount: Int,
     ) async throws -> [Data4104] {
         try await workReportProcessor.reconstructSegments(
             shards: shards,
             segmentCount: segmentCount,
+            validatorCount: validatorCount,
         )
     }
 

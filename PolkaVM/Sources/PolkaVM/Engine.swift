@@ -17,6 +17,9 @@ public class Engine {
     }
 
     public func execute(state: VMStateInterpreter) async -> ExitReason {
+        guard (try? state.program.validate(pc: state.pc)) != nil else {
+            return .panic(.invalidInstructionIndex)
+        }
         let context = ExecutionContext(state: state, config: config)
         while true {
             if case let .exit(reason) = step(program: state.program, state: state, context: context) {
@@ -33,6 +36,9 @@ public class Engine {
     }
 
     public func execute(state: any VMState) async -> ExitReason {
+        guard (try? state.program.validate(pc: state.pc)) != nil else {
+            return .panic(.invalidInstructionIndex)
+        }
         let context = ExecutionContext(state: state, config: config)
         while true {
             if case let .exit(reason) = step(program: state.program, context: context) {
@@ -50,7 +56,7 @@ public class Engine {
 
     func hostCall(state: any VMState, callIndex: UInt32) async -> ExecOutcome {
         guard let invocationContext else {
-            return .exit(.panic(.trap))
+            return .exit(.hostCall(callIndex))
         }
 
         let result = await invocationContext.dispatch(index: callIndex, state: state)
@@ -72,23 +78,18 @@ public class Engine {
 
     func step(program: ProgramCode, state: VMStateInterpreter, context: ExecutionContext) -> ExecOutcome {
         let pc = state.pc
-        let skip = program.skip(pc)
-
-        let inst = program.getInstructionAt(pc: pc)
-        guard let inst else {
+        guard let inst = program.getInstructionForExecution(pc: pc) else {
             return .exit(.panic(.invalidInstructionIndex))
         }
+        let skip = program.skip(pc)
 
-        state.consumeInstructionGas()
-
-        // TODO: Enable basic block based gas consumption when GP specifies it
-        // if context.state.program.basicBlockIndices.contains(pc) {
-        //     let blockGas = context.state.program.getBlockGasCosts(pc: pc)
-        //     context.state.consumeGas(blockGas)
-        // }
-
-        guard state.hasGasRemaining else {
-            return .exit(.outOfGas)
+        if !state.blockGasCharged {
+            let cost = program.getBlockGasCosts(pc: pc)
+            guard state.getGas() >= GasInt(cost) else {
+                return .exit(.outOfGas)
+            }
+            state.consumeGas(cost)
+            state.blockGasCharged = true
         }
 
         let result = inst.execute(context: context, skip: skip)
@@ -104,24 +105,18 @@ public class Engine {
 
     func step(program: ProgramCode, context: ExecutionContext) -> ExecOutcome {
         let pc = context.state.pc
-        let skip = program.skip(pc)
-
-        let inst = program.getInstructionAt(pc: pc)
-        guard let inst else {
+        guard let inst = program.getInstructionForExecution(pc: pc) else {
             return .exit(.panic(.invalidInstructionIndex))
         }
+        let skip = program.skip(pc)
 
-        // All current PVM instructions charge one gas. Avoid a protocol dispatch in the VM hot loop.
-        context.state.consumeGas(Gas(1))
-
-        // TODO: Enable basic block based gas consumption when GP specifies it
-        // if context.state.program.basicBlockIndices.contains(pc) {
-        //     let blockGas = context.state.program.getBlockGasCosts(pc: pc)
-        //     context.state.consumeGas(blockGas)
-        // }
-
-        guard context.state.getGas() >= GasInt(0) else {
-            return .exit(.outOfGas)
+        if !context.state.blockGasCharged {
+            let cost = program.getBlockGasCosts(pc: pc)
+            guard context.state.getGas() >= GasInt(cost) else {
+                return .exit(.outOfGas)
+            }
+            context.state.consumeGas(cost)
+            context.state.blockGasCharged = true
         }
 
         let result = inst.execute(context: context, skip: skip)

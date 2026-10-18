@@ -752,14 +752,15 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
 
         logger.debug("Exporting work package bundle to data availability")
 
-        let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: bundle)
+        let validatorCount = state.value.currentValidators.count
+        let (erasureRoot, length) = try await dataAvailability.exportWorkpackageBundle(bundle: bundle, validatorCount: validatorCount)
         if erasureRoot == Data32() {
             throw GuaranteeingServiceError.dataAvailabilityError
         }
 
         logger.debug("Exporting segments to data availability", metadata: ["segmentCount": "\(exportSegments.count)"])
 
-        let segmentRoot = try await dataAvailability.exportSegments(data: exportSegments, erasureRoot: erasureRoot)
+        let segmentRoot = try await dataAvailability.exportSegments(data: exportSegments, erasureRoot: erasureRoot, validatorCount: validatorCount)
         if segmentRoot == Data32() {
             throw GuaranteeingServiceError.dataAvailabilityError
         }
@@ -772,6 +773,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             workPackageHash: packageHash,
             length: length,
             erasureRoot: erasureRoot,
+            erasureShards: UInt16(state.value.currentValidators.count),
             segmentRoot: segmentRoot,
             segmentCount: exportSegmentOffset,
         )
