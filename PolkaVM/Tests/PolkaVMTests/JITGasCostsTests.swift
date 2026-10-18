@@ -5,16 +5,16 @@ import Utils
 
 @Suite(.serialized)
 struct JITGasCostsTests {
-    static func program(size: Int, blockSize: Int) throws -> ProgramCode {
+    static func program(size: Int, blockSize: Int, jumpWidth: Int = 4) throws -> ProgramCode {
         var code = Data(repeating: 2, count: size)
         var mask = Data(repeating: 255, count: (size + 7) / 8)
         for end in stride(from: blockSize, to: size, by: blockSize) {
-            code[end - 5] = 40 // jump to the next block, using a full-width offset
-            code[end - 4] = 5
-            for offset in (end - 3) ..< end {
+            code[end - jumpWidth - 1] = 40 // jump to the next block
+            code[end - jumpWidth] = UInt8(jumpWidth + 1)
+            for offset in (end - jumpWidth + 1) ..< end {
                 code[offset] = 0
             }
-            for offset in (end - 4) ..< end {
+            for offset in (end - jumpWidth) ..< end {
                 mask[offset / 8] &= ~(1 << (offset % 8))
             }
         }
@@ -37,9 +37,9 @@ struct JITGasCostsTests {
         }
     }
 
-    @Test
-    func denseAndSparseCompileAndExecuteIdentically() throws {
-        let program = try Self.program(size: 128, blockSize: 64)
+    @Test(arguments: [1, 2, 3, 4])
+    func denseAndSparseCompileAndExecuteIdentically(jumpWidth: Int) throws {
+        let program = try Self.program(size: 128, blockSize: 64, jumpWidth: jumpWidth)
         let skips = program.skipValues
         let total = program.basicBlockIndices.reduce(Gas(0)) { $0 + program.getBlockGasCosts(pc: $1) }
         for representation in [JITGasCosts.Representation.dense, .sparse] {

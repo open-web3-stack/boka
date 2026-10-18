@@ -171,6 +171,7 @@ static inline int64_t decode_immediate_signed(
 
 static inline bool is_variable_length_opcode(uint8_t opcode) {
     switch (static_cast<Opcode>(opcode)) {
+        case Opcode::Jump:
         case Opcode::Ecalli:
         case Opcode::StoreImmU8:
         case Opcode::StoreImmU16:
