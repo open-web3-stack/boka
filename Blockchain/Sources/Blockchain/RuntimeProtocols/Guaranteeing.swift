@@ -173,7 +173,7 @@ extension Guaranteeing {
                 accumulationGasRemaining -= digest.gasLimit
             }
 
-            // GP #563: report loads must fit the corresponding work-package limits.
+            // Report loads must fit the corresponding work-package limits.
             // Subtract from bounded budgets so malicious sums cannot overflow.
             var refineGas = config.value.workPackageRefineGas.value
             var imports = UInt(config.value.maxWorkPackageImports)

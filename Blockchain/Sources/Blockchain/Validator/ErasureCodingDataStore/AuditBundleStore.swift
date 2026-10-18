@@ -45,7 +45,7 @@ public actor AuditBundleStore {
         let erasureCoding = await erasureCoding.forValidators(validatorCount)
         logger.debug("Storing audit bundle: workPackageHash=\(workPackageHash.toHexString()), size=\(bundle.count)")
 
-        // Encoded bundle limit, including framing and references (GP #563).
+        // Encoded bundle limit, including framing and references.
         let maxBundleSize = config.value.maxWorkBundleSize
         guard bundle.count <= maxBundleSize else {
             throw ErasureCodingStoreError.bundleTooLarge(size: bundle.count, maxSize: maxBundleSize)

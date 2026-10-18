@@ -1,8 +1,8 @@
 import PolkaVM
 import Utils
 
-/// Grow the writable heap, draining gas on exhaustion (GP #533) and preserving
-/// the zone-aligned stack reservation (GP #538).
+/// Grow the writable heap, draining gas on exhaustion and preserving
+/// the zone-aligned stack reservation.
 public struct GrowHeap: HostCall {
     public static let identifier: UInt8 = 1
 

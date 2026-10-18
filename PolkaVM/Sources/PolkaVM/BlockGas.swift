@@ -1,7 +1,7 @@
 import Foundation
 import Utils
 
-/// GP 0.8.0 Appendix A pipeline model, including GP #559 cmov dependencies.
+/// Pipeline gas model, including conditional-move dependencies.
 enum BlockGas {
     private struct Operation {
         var cycles = 2
