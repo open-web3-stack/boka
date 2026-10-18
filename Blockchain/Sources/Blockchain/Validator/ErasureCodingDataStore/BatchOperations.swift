@@ -132,6 +132,10 @@ public actor BatchOperations {
                             )
 
                             // The coding count is persisted before storing downloaded shards.
+                            // Network-fetched shards currently enter the generic shard store, whereas
+                            // locally encoded D³L shards live in the filesystem. Reconstruction combines
+                            // those sources. A shard index alone does not identify its kind: callers
+                            // must not mix audit shards and segment shards for the same reconstruction.
                             for (shardIndex, shardData) in fetchedShards {
                                 try await dataStore.storeShard(
                                     shardData: shardData,

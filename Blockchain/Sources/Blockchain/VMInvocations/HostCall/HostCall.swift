@@ -41,6 +41,9 @@ extension HostCall {
         }
     }
 
+    /// GP 0.8.0 host-call charge, evaluated from input registers before executing the call.
+    /// Memory-dependent charges round byte lengths up to words; invoke additionally accounts
+    /// for the inner VM's forwarded gas in its own implementation.
     public func gasCost(state: VMState) -> Gas {
         func register(_ index: Int) -> UInt64 {
             state.readRegister(Registers.Index(raw: UInt8(index)))
