@@ -14,13 +14,13 @@ All paths below are relative to `JAMTests/`.
 | `jamduna/` | Jamduna traces | `Tests/JAMTests/jamtestnet/JamdunaTests.swift` |
 | `fuzz/crypto/ed25519/` | Crypto edge cases | `Tests/JAMTests/crypto/Ed25519Tests.swift` |
 
-`jamtestvectors/traces/` comes from **davxy/jam-test-vectors**, including its `fuzzy` suites. `fuzz/` contains separate cases copied from **davxy/jam-conformance** or local fuzz runs. Updating the submodule does not update `fuzz/`.
+`jamtestvectors/traces/` comes from **jam-conformance/jam-test-vectors**, including its `fuzzy` suites. `fuzz/` contains separate cases copied from **jam-conformance/jam-fuzzing** or local fuzz runs. Updating the submodule does not update `fuzz/`.
 
 The Swift loader uses `.w3f` for `jamtestvectors/` and `.fuzz` for `fuzz/`.
 
 ## Update released vectors
 
-Source: [davxy/jam-test-vectors](https://github.com/davxy/jam-test-vectors).
+Source: [jam-conformance/jam-test-vectors](https://github.com/jam-conformance/jam-test-vectors).
 
 Run from the boka root:
 
@@ -34,13 +34,13 @@ Replace `<tag-or-commit>` with a release tag or a chosen upstream commit SHA.
 
 ## Update copied fuzz cases
 
-Source: [davxy/jam-conformance](https://github.com/davxy/jam-conformance).
+Source: [jam-conformance/jam-fuzzing](https://github.com/jam-conformance/jam-fuzzing).
 
-1. Fetch jam-conformance separately and find cases for the target GP version.
+1. Fetch jam-fuzzing separately and find cases for the target GP version.
 2. Copy the selected case directories unchanged, including available parent/genesis steps and JSON files:
 
    ```text
-   jam-conformance/fuzz-reports/<gp-version>/traces/<case>/
+   jam-fuzzing/fuzz-reports/<gp-version>/traces/<case>/
        → boka/JAMTests/fuzz/<gp-version>/<case>/
    ```
 
