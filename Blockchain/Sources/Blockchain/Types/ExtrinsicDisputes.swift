@@ -20,16 +20,18 @@ public struct ExtrinsicDisputes: Sendable, Equatable, Codable {
 
         public var reportHash: Data32
         public var epoch: EpochIndex
-        public var judgements: ConfigFixedSizeArray<
+        public var judgements: ConfigLimitedSizeArray<
             SignatureItem,
+            ProtocolConfig.Int0,
             ProtocolConfig.TwoThirdValidatorsPlusOne,
         >
 
         public init(
             reportHash: Data32,
             epoch: EpochIndex,
-            judgements: ConfigFixedSizeArray<
+            judgements: ConfigLimitedSizeArray<
                 SignatureItem,
+                ProtocolConfig.Int0,
                 ProtocolConfig.TwoThirdValidatorsPlusOne,
             >,
         ) {
@@ -101,6 +103,9 @@ extension ExtrinsicDisputes: Dummy {
 
 extension ExtrinsicDisputes: Validate {
     public enum Error: Swift.Error {
+        case tooManyVerdicts
+        case tooManyCulprits
+        case tooManyFaults
         case verdictsNotSorted
         case culpritsNotSorted
         case faultsNotSorted
@@ -111,6 +116,15 @@ extension ExtrinsicDisputes: Validate {
     }
 
     public func validate(config _: Config) throws(Error) {
+        guard verdicts.count <= 16 else {
+            throw .tooManyVerdicts
+        }
+        guard culprits.count <= 16 else {
+            throw .tooManyCulprits
+        }
+        guard faults.count <= 16 else {
+            throw .tooManyFaults
+        }
         guard verdicts.isSortedAndUnique(by: { $0.reportHash < $1.reportHash }) else {
             throw .verdictsNotSorted
         }

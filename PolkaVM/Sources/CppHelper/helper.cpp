@@ -275,7 +275,6 @@ uint32_t get_instruction_size(const uint8_t* _Nonnull bytecode, uint32_t pc, siz
 
         // 2-register operations: [opcode][dest_reg][src_reg] = 3 bytes
         case Opcode::MoveReg:
-        case Opcode::Sbrk:
         case Opcode::CountSetBits64:
         case Opcode::CountSetBits32:
         case Opcode::LeadingZeroBits64:

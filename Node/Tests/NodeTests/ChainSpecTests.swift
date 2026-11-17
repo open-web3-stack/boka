@@ -31,7 +31,8 @@ struct ChainSpecTests {
         }
     }
 
-    @Test func chainSpecFiles() async throws {
+    @Test
+    func chainSpecFiles() async throws {
         // Test the JIP-4 compliant chainspec files
         let testCases = [
             ("spec-minimal.json", GenesisPreset.minimal),
@@ -48,6 +49,8 @@ struct ChainSpecTests {
 
             let config = try chainspec.getConfig()
             #expect(config == expectedPreset.config)
+            #expect(chainspec.protocolParameters == config.value.serviceConstants)
+            #expect(chainspec.protocolParameters.count == 122)
 
             let block = try chainspec.getBlock()
             #expect(block.extrinsic.tickets.tickets.isEmpty)
@@ -69,7 +72,7 @@ struct ChainSpecTests {
 
     @Test func protocolParametersDecoding() async throws {
         let testCases = [
-            ("spec-minimal.json", 3), // minimal has 3 validators
+            ("spec-minimal.json", 6), // minimal has 6 validators
             ("spec-dev.json", 6), // dev has 6 validators
             ("spec-tiny.json", 6), // tiny has 6 validators
         ]
@@ -80,7 +83,7 @@ struct ChainSpecTests {
             let chainspec = try await genesis.load()
             let config = try chainspec.getConfig()
 
-            #expect(config.value.totalNumberOfValidators == expectedValidators)
+            #expect(config.value.initialValidatorCount == expectedValidators)
         }
     }
 }

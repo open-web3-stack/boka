@@ -44,7 +44,16 @@ public struct ChainSpec: Codable, Equatable {
     }
 
     public func getConfig() throws -> ProtocolConfigRef {
-        let config = try ProtocolConfig.decode(protocolParameters: protocolParameters)
+        guard let encodedValidators = try getState()[StateKeys.CurrentValidatorsKey().encode()] else {
+            throw GenesisError.invalidFormat("Genesis state is missing the active validator set")
+        }
+        let validators = try JamDecoder.decode([ValidatorKey].self, from: encodedValidators)
+        let config = try ProtocolConfig.decode(protocolParameters: protocolParameters, initialValidatorCount: validators.count)
+        guard validators.count >= 6, validators.count <= 3 * config.totalNumberOfCores,
+              validators.count.isMultiple(of: 3)
+        else {
+            throw GenesisError.invalidFormat("Genesis validator count is outside protocol bounds")
+        }
         return Ref(config)
     }
 

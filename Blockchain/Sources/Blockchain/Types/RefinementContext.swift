@@ -7,6 +7,7 @@ public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
     public struct Anchor: Comparable, Sendable, Equatable, Codable, Hashable {
         /// a
         public var headerHash: Data32
+        public var timeslot: TimeslotIndex
         /// s
         public var stateRoot: Data32
         /// b
@@ -14,10 +15,12 @@ public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
 
         public init(
             headerHash: Data32,
+            timeslot: TimeslotIndex,
             stateRoot: Data32,
             beefyRoot: Data32,
         ) {
             self.headerHash = headerHash
+            self.timeslot = timeslot
             self.stateRoot = stateRoot
             self.beefyRoot = beefyRoot
         }
@@ -29,7 +32,10 @@ public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
             if lhs.stateRoot != rhs.stateRoot {
                 return lhs.stateRoot < rhs.stateRoot
             }
-            return lhs.beefyRoot < rhs.beefyRoot
+            if lhs.beefyRoot != rhs.beefyRoot {
+                return lhs.beefyRoot < rhs.beefyRoot
+            }
+            return lhs.timeslot < rhs.timeslot
         }
     }
 
@@ -38,20 +44,26 @@ public struct RefinementContext: Comparable, Sendable, Equatable, Codable {
         public var headerHash: Data32
         /// t
         public var timeslot: TimeslotIndex
+        public var stateRoot: Data32
 
         public init(
             headerHash: Data32,
             timeslot: TimeslotIndex,
+            stateRoot: Data32,
         ) {
             self.headerHash = headerHash
             self.timeslot = timeslot
+            self.stateRoot = stateRoot
         }
 
         public static func < (lhs: LookupAnchor, rhs: LookupAnchor) -> Bool {
             if lhs.headerHash != rhs.headerHash {
                 return lhs.headerHash < rhs.headerHash
             }
-            return lhs.timeslot < rhs.timeslot
+            if lhs.timeslot != rhs.timeslot {
+                return lhs.timeslot < rhs.timeslot
+            }
+            return lhs.stateRoot < rhs.stateRoot
         }
     }
 
@@ -82,12 +94,14 @@ extension RefinementContext: Dummy {
         RefinementContext(
             anchor: Anchor(
                 headerHash: Data32(),
+                timeslot: 0,
                 stateRoot: Data32(),
                 beefyRoot: Data32(),
             ),
             lookupAnchor: LookupAnchor(
                 headerHash: Data32(),
                 timeslot: 0,
+                stateRoot: Data32(),
             ),
             prerequisiteWorkPackages: Set(),
         )
@@ -96,7 +110,7 @@ extension RefinementContext: Dummy {
 
 extension RefinementContext.Anchor: EncodedSize {
     public var encodedSize: Int {
-        headerHash.encodedSize + stateRoot.encodedSize + beefyRoot.encodedSize
+        headerHash.encodedSize + timeslot.encodedSize + stateRoot.encodedSize + beefyRoot.encodedSize
     }
 
     public static var encodeedSizeHint: Int? {
@@ -106,7 +120,7 @@ extension RefinementContext.Anchor: EncodedSize {
 
 extension RefinementContext.LookupAnchor: EncodedSize {
     public var encodedSize: Int {
-        headerHash.encodedSize + timeslot.encodedSize
+        headerHash.encodedSize + timeslot.encodedSize + stateRoot.encodedSize
     }
 
     public static var encodeedSizeHint: Int? {

@@ -5,9 +5,6 @@ import Utils
 
 private let logger = Logger(label: "ShardDistributionManager")
 
-/// GP spec constants from definitions.tex
-private let cEcRecoveryCount = 1023 // Recovery shard count
-
 /// Manager for shard distribution and CE protocol message handlers
 ///
 /// Handles work report distribution (CE 135), shard distribution (CE 137),
@@ -16,7 +13,7 @@ public actor ShardDistributionManager {
     private let dataProvider: BlockchainDataProvider
     private let dataStore: DataStore
     private let erasureCodingDataStore: ErasureCodingDataStore?
-    private let erasureCodingService: ErasureCodingService
+    private let config: ProtocolConfigRef
 
     public init(
         dataProvider: BlockchainDataProvider,
@@ -27,7 +24,7 @@ public actor ShardDistributionManager {
         self.dataProvider = dataProvider
         self.dataStore = dataStore
         self.erasureCodingDataStore = erasureCodingDataStore
-        erasureCodingService = ErasureCodingService(config: config)
+        self.config = config
     }
 
     // MARK: - Work Report Distribution (CE 135)
@@ -213,7 +210,9 @@ public actor ShardDistributionManager {
 
         // Generate justification T(s, i, H) using ErasureCodingService
         // Get all shard hashes for justification generation using batch operation
-        let allShardIndices = Array(0 ..< UInt16(cEcRecoveryCount))
+        let validatorCount = try await ecStore.getErasureValidatorCount(erasureRoot: erasureRoot)
+        let coding = try ErasureCodingService(config: config, validatorCount: validatorCount)
+        let allShardIndices = Array(0 ..< UInt16(validatorCount))
         let allShards = try await ecStore.getShards(
             erasureRoot: erasureRoot,
             shardIndices: allShardIndices,
@@ -221,7 +220,7 @@ public actor ShardDistributionManager {
         let allShardHashes = allShards.map(\.data)
 
         // Generate co-path justification
-        let justificationSteps = try await erasureCodingService.generateJustification(
+        let justificationSteps = try await coding.generateJustification(
             shardIndex: shardIndex,
             segmentsRoot: d3lMetadata.segmentsRoot,
             shards: allShardHashes,
@@ -384,6 +383,8 @@ public actor ShardDistributionManager {
             throw DataAvailabilityError.segmentsRootMappingNotFound
         }
 
+        let validatorCount = try await ecStore.getErasureValidatorCount(erasureRoot: erasureRoot)
+        let coding = try ErasureCodingService(config: config, validatorCount: validatorCount)
         for segmentIndex in segmentIndices {
             // Find the segment shard for this segment index
             guard Int(segmentIndex) < segmentShards.count else {
@@ -392,7 +393,7 @@ public actor ShardDistributionManager {
 
             let shardData = segmentShards[Int(segmentIndex)]
 
-            let steps = try await erasureCodingService.generateSegmentJustification(
+            let steps = try await coding.generateSegmentJustification(
                 segmentIndex: segmentIndex,
                 bundleShardHash: bundleShardHash,
                 shardIndex: shardIndex,

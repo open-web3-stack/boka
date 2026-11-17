@@ -36,7 +36,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable, OnGenesis, 
         keystore: KeyStore,
     ) async {
         self.keystore = keystore
-        ringContext = try! Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
+        ringContext = try! Bandersnatch.RingContext(size: UInt(ProtocolConfig.MaxValidators.read(config: config)))
 
         super.init(id: "SafroleService", config: config, eventBus: eventBus)
     }
@@ -81,7 +81,8 @@ public final class SafroleService: ServiceBase, @unchecked Sendable, OnGenesis, 
 
             try withSpan("generateTickets") { _ in
                 let tickets = try SafroleService.generateTickets(
-                    count: TicketIndex(config.value.ticketEntriesPerValidator),
+                    count: (2 * config.value.epochLength + state.value.nextValidators.count - 1)
+                        / state.value.nextValidators.count,
                     validators: state.value.nextValidators.array,
                     entropy: state.value.entropyPool.t2,
                     ringContext: ringContext,
@@ -105,7 +106,7 @@ public final class SafroleService: ServiceBase, @unchecked Sendable, OnGenesis, 
     }
 
     public static func generateTickets(
-        count: TicketIndex,
+        count: Int,
         validators: [ValidatorKey],
         entropy: Data32,
         ringContext: Bandersnatch.RingContext,

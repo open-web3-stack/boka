@@ -2,7 +2,7 @@ import Foundation
 import TracingUtils
 import Utils
 
-public protocol VMState {
+public protocol VMState: AnyObject {
     // MARK: - Error Type
 
     typealias VMError = VMStateError
@@ -11,6 +11,9 @@ public protocol VMState {
 
     var program: ProgramCode { get }
     var pc: UInt32 { get }
+    var blockGasCharged: Bool { get set }
+    var heapPages: (current: UInt32, limit: UInt32)? { get }
+    func growHeap(to pages: UInt32) throws
 
     // MARK: - Methods
 
@@ -36,6 +39,7 @@ public protocol VMState {
     // VM State Control
     func getGas() -> GasInt
     func consumeGas(_ amount: Gas)
+    func refundGas(_ amount: Gas)
     func increasePC(_ amount: UInt32)
     func updatePC(_ newPC: UInt32)
 

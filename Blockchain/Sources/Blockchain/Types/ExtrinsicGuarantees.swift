@@ -103,7 +103,7 @@ extension ExtrinsicGuarantees: Validate {
             }
 
             for credential in guarantee.credential {
-                guard credential.index < UInt32(config.value.totalNumberOfValidators) else {
+                guard credential.index < UInt32(config.value.totalNumberOfCores * 3) else {
                     throw Error.invalidValidatorIndex
                 }
             }

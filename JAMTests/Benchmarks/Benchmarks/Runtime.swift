@@ -181,8 +181,8 @@ func runtimeBenchmarks() {
 
 private struct RuntimeGuaranteeingBenchmarkState: Guaranteeing {
     var entropyPool: EntropyPool
-    var currentValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
-    var previousValidators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var currentValidators: ValidatorKeys
+    var previousValidators: ValidatorKeys
     var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
     var coreAuthorizationPool: ConfigFixedSizeArray<
         ConfigLimitedSizeArray<Data32, ProtocolConfig.Int0, ProtocolConfig.MaxAuthorizationsPoolItems>,
@@ -199,8 +199,8 @@ private struct RuntimeGuaranteeingBenchmarkState: Guaranteeing {
         serviceAccounts: [ServiceIndex: ServiceAccountDetails] = [:],
     ) throws {
         entropyPool = EntropyPool((Data32(), Data32(), Data32(), Data32()))
-        currentValidators = try ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey())
-        previousValidators = try ConfigFixedSizeArray(config: config, defaultValue: ValidatorKey())
+        currentValidators = try ValidatorKeys(config: config, array: Array(repeating: ValidatorKey(), count: config.value.initialValidatorCount))
+        previousValidators = currentValidators
         availabilityAssignments = try ConfigFixedSizeArray(
             config: config,
             array: Array(repeating: nil, count: config.value.totalNumberOfCores),

@@ -14,12 +14,15 @@ extension Branch {
     }
 
     public func updatePC(context: ExecutionContext, skip: UInt32) -> ExecOutcome {
+        guard Instructions.isBranchValid(context: context, offset: offset),
+              Instructions.isBranchValid(context: context, offset: skip + 1)
+        else {
+            return .exit(.panic(.invalidBranch))
+        }
         let condition = condition(state: context.state)
         if !condition {
             // Branch not taken - fall through to next instruction
             context.state.increasePC(skip + 1)
-        } else if !Instructions.isBranchValid(context: context, offset: offset) {
-            return .exit(.panic(.invalidBranch))
         } else {
             // Branch taken - jump to target
             context.state.increasePC(offset)

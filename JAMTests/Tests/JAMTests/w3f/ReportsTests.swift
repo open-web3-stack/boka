@@ -7,10 +7,8 @@ import Utils
 
 struct ReportsTestcaseState: Codable, Equatable {
     var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
-    var currentValidators:
-        ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
-    var previousValidators:
-        ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var currentValidators: ValidatorKeys
+    var previousValidators: ValidatorKeys
     var entropyPool: EntropyPool
     var offenders: [Ed25519PublicKey]
     var recentHistory: RecentHistory
@@ -41,10 +39,8 @@ struct ReportsOutput: Codable, Equatable {
 
 struct ReportsState: Guaranteeing {
     var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
-    var currentValidators:
-        ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
-    var previousValidators:
-        ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var currentValidators: ValidatorKeys
+    var previousValidators: ValidatorKeys
     var entropyPool: EntropyPool
     var offenders: Set<Ed25519PublicKey>
     var recentHistory: RecentHistory

@@ -63,14 +63,14 @@ struct BlockAuthorTests {
 
         state.safroleState.ticketsVerifier = try Bandersnatch.RingCommitment(
             ring: state.currentValidators.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) },
-            ctx: Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators)),
+            ctx: Bandersnatch.RingContext(size: UInt(ProtocolConfig.MaxValidators.read(config: config))),
         ).data
 
         let timeslot = timeProvider.getTime().timeToTimeslot(config: config)
 
         // get the validator key
         let idx = timeslot % UInt32(config.value.epochLength)
-        let devKey = try DevKeyStore.getDevKey(seed: idx % UInt32(config.value.totalNumberOfValidators))
+        let devKey = try DevKeyStore.getDevKey(seed: idx % UInt32(config.value.initialValidatorCount))
         let keySecret = await keystore.get(Bandersnatch.self, publicKey: devKey.bandersnatch)
         let secretKey = try #require(keySecret)
 
@@ -78,7 +78,7 @@ struct BlockAuthorTests {
             count: 1,
             validators: state.currentValidators.array,
             entropy: state.entropyPool.t2,
-            ringContext: Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators)),
+            ringContext: Bandersnatch.RingContext(size: UInt(ProtocolConfig.MaxValidators.read(config: config))),
             secret: secretKey,
             idx: UInt32(idx),
         )[0]

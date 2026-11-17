@@ -13,8 +13,8 @@ struct AssurancesInput: Codable {
 
 struct AssuranceState: Equatable, Codable, Assurances {
     var availabilityAssignments: ConfigFixedSizeArray<ReportItem?, ProtocolConfig.TotalNumberOfCores>
-    var currentValidators:
-        ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var currentValidators: ValidatorKeys
+    var postValidators: ValidatorKeys
 }
 
 struct AssurancesTestcase: Codable {
@@ -41,9 +41,12 @@ struct AssurancesTests {
                 extrinsics: testcase.input.assurances,
                 parentHash: testcase.input.parentHash,
             )
-            return try state.update(
+            var posteriorState = state
+            posteriorState.currentValidators = state.postValidators
+            return try posteriorState.update(
                 config: config, timeslot: testcase.input.timeslot,
                 extrinsic: testcase.input.assurances,
+                priorValidatorCount: state.currentValidators.count,
             )
         }
         switch result {

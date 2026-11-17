@@ -141,8 +141,8 @@ func validatorBenchmarks() {
     Benchmark("erasure.encode.logic") { benchmark in
         // Create data to encode using actual config values
         let data = Data(repeating: 0x42, count: 1024)
-        let basicSize = config.value.erasureCodedPieceSize
-        let recoveryCount = config.value.totalNumberOfValidators
+        let basicSize = 2 * ErasureCodingService.originalShards(validators: config.value.initialValidatorCount)
+        let recoveryCount = config.value.initialValidatorCount
 
         benchmark.startMeasurement()
         // Use actual erasure encoding from Utils
@@ -154,8 +154,8 @@ func validatorBenchmarks() {
     Benchmark("erasure.full.chunk.logic", configuration: BokaBenchmark.milliseconds) { benchmark in
         let config = ProtocolConfigRef.mainnet
         let data = Data(repeating: 0x42, count: config.value.segmentSize)
-        let basicSize = config.value.erasureCodedPieceSize
-        let recoveryCount = config.value.totalNumberOfValidators
+        let basicSize = 2 * ErasureCodingService.originalShards(validators: config.value.initialValidatorCount)
+        let recoveryCount = config.value.initialValidatorCount
 
         benchmark.startMeasurement()
         let shards = try ErasureCoding.chunk(data: data, basicSize: basicSize, recoveryCount: recoveryCount)
@@ -168,8 +168,8 @@ func validatorBenchmarks() {
 
         // Create encoded shards for reconstruction using actual config values
         let originalData = Data(repeating: 0x42, count: 1024)
-        let basicSize = config.value.erasureCodedPieceSize
-        let recoveryCount = config.value.totalNumberOfValidators
+        let basicSize = 2 * ErasureCodingService.originalShards(validators: config.value.initialValidatorCount)
+        let recoveryCount = config.value.initialValidatorCount
         let originalCount = basicSize / 2
 
         let shardsData = try ErasureCoding.chunk(data: originalData, basicSize: basicSize, recoveryCount: recoveryCount)
@@ -191,8 +191,8 @@ func validatorBenchmarks() {
     Benchmark("erasure.reconstruct.originals.unordered", configuration: BokaBenchmark.configuration()) { benchmark in
         let config = ProtocolConfigRef.mainnet
         let originalData = Data(repeating: 0x42, count: config.value.segmentSize)
-        let basicSize = config.value.erasureCodedPieceSize
-        let recoveryCount = config.value.totalNumberOfValidators
+        let basicSize = 2 * ErasureCodingService.originalShards(validators: config.value.initialValidatorCount)
+        let recoveryCount = config.value.initialValidatorCount
         let originalCount = basicSize / 2
 
         let shardsData = try ErasureCoding.chunk(data: originalData, basicSize: basicSize, recoveryCount: recoveryCount)
@@ -216,8 +216,8 @@ func validatorBenchmarks() {
     Benchmark("erasure.full.reconstruct.recoveryPath", configuration: BokaBenchmark.milliseconds) { benchmark in
         let config = ProtocolConfigRef.mainnet
         let originalData = Data((0 ..< config.value.segmentSize).map { UInt8($0 & 0xFF) })
-        let basicSize = config.value.erasureCodedPieceSize
-        let recoveryCount = config.value.totalNumberOfValidators
+        let basicSize = 2 * ErasureCodingService.originalShards(validators: config.value.initialValidatorCount)
+        let recoveryCount = config.value.initialValidatorCount
         let originalCount = basicSize / 2
         let originalShardCount = originalCount / 2
         let parityShardCount = originalCount - originalShardCount

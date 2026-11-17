@@ -48,5 +48,7 @@ extern "C" int32_t compilePolkaVMCode_x64_labeled(
     size_t skipTableSize,                   // skip table size
     const uint8_t* _Nullable bitmask,      // bitmask for instruction boundaries
     size_t bitmaskSize,                    // bitmask size
+    const uint64_t* _Nonnull blockGasCosts,
+    const uint32_t* _Nullable blockStarts,
+    size_t blockStartCount,
     void* _Nullable * _Nonnull funcOut);
-

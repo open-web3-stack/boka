@@ -84,10 +84,12 @@ private func prepareTraceForAssurances(
     let previousTimeslot = state.timeslot
 
     do {
+        try runtime.updateDisputes(block: trace.block, state: &state)
         try runtime.updateSafrole(block: trace.block, state: &state)
         try runtime.validateHeaderSeal(block: trace.block, state: state)
-        try runtime.updateDisputes(block: trace.block, state: &state)
-        let availableReports = try await runtime.updateAssurances(block: trace.block, state: &state)
+        let availableReports = try await runtime.updateAssurances(
+            block: trace.block, state: &state, priorValidatorCount: previousState.currentValidators.count,
+        )
         return TraceApplyPreparation(
             testcase: trace.testcase,
             block: trace.block,
@@ -287,6 +289,11 @@ private func registerTracePhaseBenchmarks(
             guard var state = try? await trace.testcase.preState.toState(config: config) else {
                 continue
             }
+            do {
+                try runtime.updateDisputes(block: trace.block, state: &state)
+            } catch {
+                continue
+            }
 
             benchmark.startMeasurement()
             let succeeded: Bool
@@ -309,7 +316,12 @@ private func registerTracePhaseBenchmarks(
             guard var state = try? await trace.testcase.preState.toState(config: config) else {
                 continue
             }
-            try? runtime.updateSafrole(block: trace.block, state: &state)
+            do {
+                try runtime.updateDisputes(block: trace.block, state: &state)
+                try runtime.updateSafrole(block: trace.block, state: &state)
+            } catch {
+                continue
+            }
 
             benchmark.startMeasurement()
             let succeeded: Bool
@@ -331,13 +343,6 @@ private func registerTracePhaseBenchmarks(
             guard var state = try? await trace.testcase.preState.toState(config: config) else {
                 continue
             }
-            do {
-                try runtime.updateSafrole(block: trace.block, state: &state)
-                try runtime.validateHeaderSeal(block: trace.block, state: state)
-            } catch {
-                continue
-            }
-
             benchmark.startMeasurement()
             let succeeded: Bool
             do {
@@ -358,16 +363,19 @@ private func registerTracePhaseBenchmarks(
             guard var state = try? await trace.testcase.preState.toState(config: config) else {
                 continue
             }
+            let priorValidatorCount = state.currentValidators.count
             do {
+                try runtime.updateDisputes(block: trace.block, state: &state)
                 try runtime.updateSafrole(block: trace.block, state: &state)
                 try runtime.validateHeaderSeal(block: trace.block, state: state)
-                try runtime.updateDisputes(block: trace.block, state: &state)
             } catch {
                 continue
             }
 
             benchmark.startMeasurement()
-            let reports = try? await runtime.updateAssurances(block: trace.block, state: &state)
+            let reports = try? await runtime.updateAssurances(
+                block: trace.block, state: &state, priorValidatorCount: priorValidatorCount,
+            )
             benchmark.stopMeasurement()
 
             blackHole(reports)
@@ -545,8 +553,8 @@ func testVectorsBenchmarks() {
     }
     if !erasureCases.isEmpty {
         let config = TestVariants.full.config
-        let basicSize = config.value.erasureCodedPieceSize
-        let recoveryCount = config.value.totalNumberOfValidators
+        let basicSize = 2 * ErasureCodingService.originalShards(validators: config.value.initialValidatorCount)
+        let recoveryCount = config.value.initialValidatorCount
         let originalCount = basicSize / 2
 
         // Pre-decode test cases to avoid including decoding time in benchmark

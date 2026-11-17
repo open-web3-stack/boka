@@ -50,6 +50,22 @@ struct ServiceStatisticsMapEntry: Codable, Equatable {
     var record: Statistics.Service
 }
 
+/// STF fixtures use fixed-width gas values, unlike the compact state encoding.
+private struct AccumulatePrivileges: Equatable, Codable {
+    var manager: ServiceIndex
+    var assigners: ConfigFixedSizeArray<ServiceIndex, ProtocolConfig.TotalNumberOfCores>
+    var designator: ServiceIndex
+    var registrar: ServiceIndex
+    @CodingAs<SortedKeyValues<ServiceIndex, Gas>> var alwaysAcc: [ServiceIndex: Gas]
+
+    var value: PrivilegedServices {
+        PrivilegedServices(
+            manager: manager, assigners: assigners, designator: designator,
+            registrar: registrar, alwaysAcc: alwaysAcc,
+        )
+    }
+}
+
 private struct AccumulateState: Equatable, Codable {
     var timeslot: TimeslotIndex
     var entropy: Data32
@@ -61,7 +77,7 @@ private struct AccumulateState: Equatable, Codable {
         SortedUniqueArray<Data32>,
         ProtocolConfig.EpochLength,
     >
-    var privilegedServices: PrivilegedServices
+    var privilegedServices: AccumulatePrivileges
     var serviceStatistics: [ServiceStatisticsMapEntry]
     var accounts: [AccountsMapEntry]
 }
@@ -116,7 +132,7 @@ private struct AccumulateTestcase: Codable {
 private struct FullAccumulateState: Accumulation {
     var timeslot: TimeslotIndex
     var privilegedServices: PrivilegedServices
-    var validatorQueue: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>
+    var validatorQueue: ValidatorKeys
     var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<Data32, ProtocolConfig.MaxAuthorizationsQueueItems>,
         ProtocolConfig.TotalNumberOfCores,
@@ -226,7 +242,7 @@ struct AccumulateTests {
         let preState = testcase.preState
         var fullState = try FullAccumulateState(
             timeslot: preState.timeslot,
-            privilegedServices: preState.privilegedServices,
+            privilegedServices: preState.privilegedServices.value,
             validatorQueue: .init(config: config, defaultValue: .dummy(config: config)),
             authorizationQueue: .init(config: config, defaultValue: .init(config: config, defaultValue: Data32())),
             accumulationQueue: preState.accumulationQueue,
@@ -265,10 +281,16 @@ struct AccumulateTests {
                 #expect(content.root == expectedRoot)
                 #expect(fullState.accumulationQueue == testcase.postState.accumulationQueue)
                 #expect(fullState.accumulationHistory == testcase.postState.accumulationHistory)
-                #expect(fullState.privilegedServices == testcase.postState.privilegedServices)
+                #expect(fullState.privilegedServices == testcase.postState.privilegedServices.value)
+                for entry in testcase.postState.serviceStatistics {
+                    let actual = content.2[entry.id]
+                    #expect(UInt(actual?.items ?? 0) == entry.record.accumulates.count)
+                    #expect(UInt(actual?.transfers ?? 0) == entry.record.accumulates.transferCount)
+                    #expect(UInt(actual?.gas.value ?? 0) == entry.record.accumulates.gasUsed)
+                }
                 #expect(fullState.accounts.count == testcase.postState.accounts.count)
                 for entry in testcase.postState.accounts {
-                    let account = fullState.accounts[entry.index]!
+                    let account = try #require(fullState.accounts[entry.index])
                     #expect(account == entry.data.service)
                     for storage in entry.data.storage {
                         #expect(fullState.storages[entry.index]?[storage.key] == storage.value)

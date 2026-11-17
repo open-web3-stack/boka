@@ -598,6 +598,18 @@ extension RocksDBDataStore {
         return nil
     }
 
+    public func setMetadataIfAbsent(key: Data, value: Data) async throws -> Bool {
+        let hash = key.blake2b256hash()
+        if let existing = try metadata.get(key: hash) {
+            return existing.pagedProofsMetadata == value
+        }
+        try metadata.put(key: hash, value: AvailabilityMetadata(
+            timestamp: Date(), pagedProofsHash: hash,
+            pagedProofsMetadata: value, shardCount: UInt32(value.count),
+        ))
+        return true
+    }
+
     /// Delete metadata by custom key
     /// - Parameter key: Custom key for the metadata to delete
     public func deleteMetadata(key: Data) async throws {

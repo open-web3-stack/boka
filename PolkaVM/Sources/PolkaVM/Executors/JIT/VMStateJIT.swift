@@ -8,6 +8,22 @@ import Utils
 /// to conform to the VMState protocol, allowing InvocationContext.dispatch to be used
 /// with JIT-compiled code.
 final class VMStateJIT: VMState, @unchecked Sendable {
+    var blockGasCharged = false
+    private let standardMemory: StandardMemory?
+    private let heapGrowth: ((UInt32, UInt32) -> Void)?
+    var heapPages: (current: UInt32, limit: UInt32)? {
+        standardMemory?.heapPages
+    }
+
+    func growHeap(to pages: UInt32) throws {
+        guard let standardMemory else {
+            throw VMError.invalidInstructionMemoryAccess
+        }
+        let previous = standardMemory.heapPages.current
+        standardMemory.growHeap(to: pages)
+        heapGrowth?(previous, standardMemory.heapPages.current)
+    }
+
     private let logger = Logger(label: "VMStateJIT")
 
     private let jitMemoryBasePtr: UnsafeMutablePointer<UInt8>
@@ -47,6 +63,8 @@ final class VMStateJIT: VMState, @unchecked Sendable {
         jitGasPtr: UnsafeMutablePointer<UInt64>,
         programCode: ProgramCode,
         initialPC: UInt32,
+        standardMemory: StandardMemory? = nil,
+        heapGrowth: ((UInt32, UInt32) -> Void)? = nil,
     ) {
         self.jitMemoryBasePtr = jitMemoryBasePtr
         self.jitMemorySize = jitMemorySize
@@ -54,6 +72,8 @@ final class VMStateJIT: VMState, @unchecked Sendable {
         self.jitGasPtr = jitGasPtr
         self.programCode = programCode
         pcValue = initialPC
+        self.standardMemory = standardMemory
+        self.heapGrowth = heapGrowth
 
         logger.debug("VMStateJIT initialized with memSize: \(jitMemorySize), initialPC: \(initialPC)")
     }
@@ -208,17 +228,22 @@ final class VMStateJIT: VMState, @unchecked Sendable {
 
     func getGas() -> GasInt {
         // Get the current gas value from the JIT gas pointer
-        GasInt(jitGasPtr.pointee)
+        GasInt(Int64(bitPattern: jitGasPtr.pointee))
     }
 
     func consumeGas(_ amount: Gas) {
         // Deduct gas from the JIT gas counter
-        jitGasPtr.pointee -= amount.value
+        let remaining: GasInt = amount.value > UInt64(Int64.max) ? .min : getGas() - GasInt(amount)
+        jitGasPtr.pointee = UInt64(bitPattern: remaining.value)
     }
 
     func increasePC(_ amount: UInt32) {
         // Increment the PC by the specified amount
         pcValue += amount
+    }
+
+    func refundGas(_ amount: Gas) {
+        jitGasPtr.pointee = UInt64(bitPattern: (getGas() + GasInt(amount)).value)
     }
 
     func updatePC(_ newPC: UInt32) {

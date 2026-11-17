@@ -31,8 +31,8 @@ public actor NetworkManagerStorage {
     /// To prevent memory leaks, it tracks the current validator set and removes stale entries
     /// between updates.
     ///
-    /// - Parameter validators: ConfigFixedSizeArray of validators from onchain state
-    public func updateValidatorPeerMappings(validators: ConfigFixedSizeArray<ValidatorKey, ProtocolConfig.TotalNumberOfValidators>) async {
+    /// - Parameter validators: Bounded validator sequence from onchain state
+    public func updateValidatorPeerMappings(validators: ValidatorKeys) async {
         // Build set of new validator keys
         let newValidatorKeys = Set(validators.array.map(\.ed25519))
 

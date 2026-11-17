@@ -6,7 +6,7 @@ extension State {
 
         var state = State.dummy(config: config)
 
-        for i in 0 ..< config.value.totalNumberOfValidators {
+        for i in 0 ..< config.value.initialValidatorCount {
             let keySet = try DevKeyStore.getDevKey(seed: UInt32(i))
             let addr = "127.0.0.1:\(UInt16(i + 5000))"
             var addrData = Data(addr.utf8)
@@ -18,17 +18,17 @@ extension State {
                 metadata: Data128(addrData)!,
             ))
         }
-        state.safroleState.nextValidators = try ConfigFixedSizeArray(config: config, array: devKeys)
-        state.validatorQueue = try ConfigFixedSizeArray(config: config, array: devKeys)
-        state.currentValidators = try ConfigFixedSizeArray(config: config, array: devKeys)
+        state.safroleState.nextValidators = try ValidatorKeys(config: config, array: devKeys)
+        state.validatorQueue = try ValidatorKeys(config: config, array: devKeys)
+        state.currentValidators = try ValidatorKeys(config: config, array: devKeys)
 
         var epochKeys = [BandersnatchPublicKey]()
         for i in 0 ..< config.value.epochLength {
-            epochKeys.append(devKeys[i % config.value.totalNumberOfValidators].bandersnatch)
+            epochKeys.append(devKeys[i % config.value.initialValidatorCount].bandersnatch)
         }
         state.safroleState.ticketsOrKeys = try .right(ConfigFixedSizeArray(config: config, array: epochKeys))
 
-        let ctx = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
+        let ctx = try Bandersnatch.RingContext(size: UInt(ProtocolConfig.MaxValidators.read(config: config)))
         let ring = try devKeys.map { try Bandersnatch.PublicKey(data: $0.bandersnatch) }
         let commitment = try withExtendedLifetime(ring) { try Bandersnatch.RingCommitment(ring: ring, ctx: ctx) }
         state.safroleState.ticketsVerifier = commitment.data
@@ -38,6 +38,7 @@ extension State {
             headerHash: block.hash,
             superPeak: Data32(),
             stateRoot: Data32(),
+            timeslot: block.header.timeslot,
             lookup: [Data32: Data32](),
         ))
 

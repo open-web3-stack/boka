@@ -45,7 +45,7 @@ public enum InstructionTable {
             Instructions.BranchGeSImm.self,
             Instructions.BranchGtSImm.self,
             Instructions.MoveReg.self,
-            Instructions.Sbrk.self,
+            Unlikely.self,
             Instructions.CountSetBits64.self,
             Instructions.CountSetBits32.self,
             Instructions.LeadingZeroBits64.self,

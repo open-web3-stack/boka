@@ -55,9 +55,8 @@ struct MerklizationTests {
         let index = 2
         let result = Merklization.trace(input, index: index)
         let expected: [Either<Data, Data32>] = [
-            .right(Blake2b256.hash("node", Data("node3".utf8), Data("node4".utf8))),
-            .left(Data("node1".utf8)),
-            .left(Data("node2".utf8)),
+            .right(Blake2b256.hash("node", Data("node1".utf8), Data("node2".utf8))),
+            .left(Data("node4".utf8)),
         ]
         #expect(result == expected)
     }
@@ -89,13 +88,13 @@ struct MerklizationTests {
 
         let result = Merklization.generateJustification(input, size: 1, index: 1)
         let expected: [Data32] = [
-            Blake2b256.hash("node", Blake2b256.hash("leaf", "node3"), Blake2b256.hash("leaf", "node4")),
+            Blake2b256.hash("node", Blake2b256.hash("leaf", "node1"), Blake2b256.hash("leaf", "node2")),
         ]
         #expect(result == expected)
 
         let result1 = Merklization.generateJustification(input, size: 1, index: 0)
         let expected1: [Data32] = [
-            Blake2b256.hash("node", Blake2b256.hash("leaf", "node1"), Blake2b256.hash("leaf", "node2")),
+            Blake2b256.hash("node", Blake2b256.hash("leaf", "node3"), Blake2b256.hash("leaf", "node4")),
         ]
         #expect(result1 == expected1)
 
@@ -106,15 +105,15 @@ struct MerklizationTests {
 
         let result3 = Merklization.generateJustification(input, size: 0, index: 0)
         let expected3: [Data32] = [
-            Blake2b256.hash("node", Blake2b256.hash("leaf", "node1"), Blake2b256.hash("leaf", "node2")),
-            Blake2b256.hash("leaf", "node3"),
+            Blake2b256.hash("node", Blake2b256.hash("leaf", "node3"), Blake2b256.hash("leaf", "node4")),
+            Blake2b256.hash("leaf", "node2"),
         ]
         #expect(result3 == expected3)
 
         let result4 = Merklization.generateJustification(input, size: 0, index: 2)
         let expected4: [Data32] = [
-            Blake2b256.hash("node", Blake2b256.hash("leaf", "node3"), Blake2b256.hash("leaf", "node4")),
-            Blake2b256.hash("leaf", "node1"),
+            Blake2b256.hash("node", Blake2b256.hash("leaf", "node1"), Blake2b256.hash("leaf", "node2")),
+            Blake2b256.hash("leaf", "node4"),
         ]
         #expect(result4 == expected4)
     }

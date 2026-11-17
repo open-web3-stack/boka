@@ -57,7 +57,9 @@ extension Extrinsic {
         do {
             return try JamEncoder.encode(
                 JamEncoder.encode(tickets).blake2b256hash(),
-                JamEncoder.encode(preimages).blake2b256hash(),
+                JamEncoder.encode(preimages.preimages.map { item in
+                    try JamEncoder.encode(item.serviceIndex, item.data.blake2b256hash())
+                }).blake2b256hash(),
                 JamEncoder.encode(reports.guarantees.array.map { item in
                     try JamEncoder.encode(item.workReport.hash(), item.timeslot, item.credential)
                 }).blake2b256hash(),

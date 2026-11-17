@@ -4,9 +4,7 @@ import Utils
 public protocol Accumulation: ServiceAccounts {
     var timeslot: TimeslotIndex { get }
     var privilegedServices: PrivilegedServices { get set }
-    var validatorQueue: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    > { get set }
+    var validatorQueue: ValidatorKeys { get set }
     var authorizationQueue: ConfigFixedSizeArray<
         ConfigFixedSizeArray<
             Data32,

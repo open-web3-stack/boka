@@ -11,7 +11,8 @@ public typealias DataLength = UInt32
 
 public typealias ValidatorIndex = UInt16
 public typealias CoreIndex = UInt16
-public typealias TicketIndex = UInt
+/// Ticket attempts are encoded as one octet in tickets and ticket extrinsics.
+public typealias TicketIndex = UInt8
 public typealias EpochIndex = UInt32
 
 public typealias Ed25519PublicKey = Data32

@@ -26,7 +26,6 @@ public actor ErasureCodingDataStore {
 
     private let dataStore: any DataStoreProtocol
     private let filesystemStore: FilesystemDataStore
-    private let erasureCoding: ErasureCodingService
     private let config: ProtocolConfigRef
     private let segmentCache: SegmentCache
 
@@ -64,7 +63,6 @@ public actor ErasureCodingDataStore {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
         self.config = config
-        erasureCoding = ErasureCodingService(config: config)
         // Use default cache size for now - can be made configurable later
         segmentCache = SegmentCache(maxSize: 1000)
         self.networkClient = networkClient
@@ -89,17 +87,17 @@ public actor ErasureCodingDataStore {
         reconstructionService = ReconstructionService(
             dataStore: dataStore,
             filesystemStore: filesystemStore,
-            erasureCoding: erasureCoding,
+            config: config,
         )
         auditBundleStore = AuditBundleStore(
             dataStore: dataStore,
             filesystemStore: filesystemStore,
-            erasureCoding: erasureCoding,
+            config: config,
         )
         d3lSegmentStore = D3LSegmentStore(
             dataStore: dataStore,
             filesystemStore: filesystemStore,
-            erasureCoding: erasureCoding,
+            config: config,
             pagedProofsGenerator: pagedProofsGenerator,
         )
         batchOperations = BatchOperations(
@@ -139,12 +137,18 @@ public actor ErasureCodingDataStore {
         bundle: Data,
         workPackageHash: Data32,
         segmentsRoot: Data32,
+        validatorCount: Int,
     ) async throws -> Data32 {
         try await auditBundleStore.storeBundle(
             bundle: bundle,
             workPackageHash: workPackageHash,
             segmentsRoot: segmentsRoot,
+            validatorCount: validatorCount,
         )
+    }
+
+    public func getErasureValidatorCount(erasureRoot: Data32) async throws -> Int {
+        try await dataStore.getErasureValidatorCount(erasureRoot: erasureRoot)
     }
 
     /// Retrieve audit bundle by erasure root
@@ -163,11 +167,13 @@ public actor ErasureCodingDataStore {
         segments: [Data4104],
         workPackageHash: Data32,
         segmentsRoot: Data32,
+        validatorCount: Int,
     ) async throws -> Data32 {
         try await d3lSegmentStore.storeSegments(
             segments: segments,
             workPackageHash: workPackageHash,
             segmentsRoot: segmentsRoot,
+            validatorCount: validatorCount,
         )
     }
 
@@ -566,7 +572,7 @@ public actor ErasureCodingDataStore {
         originalLengths: [Data32: Int],
         validators: [UInt16: NetAddr]? = nil,
         coreIndex: UInt16 = 0,
-        totalValidators: UInt16 = 1023,
+        validatorCounts: [Data32: UInt16] = [:],
     ) async throws -> [Data32: Data] {
         try await batchOperations.batchReconstruct(
             erasureRoots: erasureRoots,
@@ -575,7 +581,7 @@ public actor ErasureCodingDataStore {
             fetchStrategy: fetchStrategy,
             validators: validators,
             coreIndex: coreIndex,
-            totalValidators: totalValidators,
+            validatorCounts: validatorCounts,
         )
     }
 }
@@ -787,6 +793,8 @@ public enum ErasureCodingStoreError: Error {
     case tooManySegments(count: Int, max: Int)
     case insufficientShards(available: Int, required: Int)
     case metadataNotFound(erasureRoot: Data32)
+    case invalidValidatorCount(Int)
+    case conflictingValidatorCount(erasureRoot: Data32)
     case missingOriginalLength(erasureRoot: Data32)
     case reconstructionFailed(underlying: Error)
     case segmentNotFound

@@ -12,12 +12,8 @@ struct DisputesState: Equatable, Codable, Disputes {
         ProtocolConfig.TotalNumberOfCores,
     >
     var timeslot: TimeslotIndex
-    var currentValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
-    var previousValidators: ConfigFixedSizeArray<
-        ValidatorKey, ProtocolConfig.TotalNumberOfValidators,
-    >
+    var currentValidators: ValidatorKeys
+    var previousValidators: ValidatorKeys
 
     mutating func mergeWith(postState: DisputesPostState) {
         judgements = postState.judgements

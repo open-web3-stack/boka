@@ -50,7 +50,7 @@ public enum Merklization {
     )
         where T.Index == Int
     {
-        if nodes.count == 0 {
+        if nodes.count <= 1 {
             return
         }
 
@@ -71,10 +71,10 @@ public enum Merklization {
             return h
         }
 
-        let l = binaryMerklizeHelper(selectPart(left: true, nodes: nodes, index: index), hasher: hasher)
+        let l = binaryMerklizeHelper(selectPart(left: false, nodes: nodes, index: index), hasher: hasher)
         output(l)
         traceImpl(
-            selectPart(left: false, nodes: nodes, index: index),
+            selectPart(left: true, nodes: nodes, index: index),
             index: index - selectIndex(nodes: nodes, index: index),
             hasher: hasher,
             output: output,

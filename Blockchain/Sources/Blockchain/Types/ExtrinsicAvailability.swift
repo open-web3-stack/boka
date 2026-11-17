@@ -28,7 +28,7 @@ public struct ExtrinsicAvailability: Sendable, Equatable, Codable {
     public typealias AssurancesList = ConfigLimitedSizeArray<
         AssuranceItem,
         ProtocolConfig.Int0,
-        ProtocolConfig.TotalNumberOfValidators,
+        ProtocolConfig.MaxValidators,
     >
 
     public var assurances: AssurancesList
@@ -58,7 +58,7 @@ extension ExtrinsicAvailability: Validate {
             throw .assurancesNotSorted
         }
         for assurance in assurances {
-            guard assurance.validatorIndex < UInt32(config.value.totalNumberOfValidators) else {
+            guard assurance.validatorIndex < UInt32(config.value.totalNumberOfCores * 3) else {
                 throw .invalidValidatorIndex
             }
         }

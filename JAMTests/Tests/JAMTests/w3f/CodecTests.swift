@@ -105,8 +105,10 @@ struct CodecTests {
                 "anchor": json["anchor"]!["headerHash"]!,
                 "state_root": json["anchor"]!["stateRoot"]!,
                 "beefy_root": json["anchor"]!["beefyRoot"]!,
+                "anchor_slot": json["anchor"]!["timeslot"]!,
                 "lookup_anchor": json["lookupAnchor"]!["headerHash"]!,
                 "lookup_anchor_slot": json["lookupAnchor"]!["timeslot"]!,
+                "lookup_anchor_state_root": json["lookupAnchor"]!["stateRoot"]!,
                 "prerequisites": json["prerequisiteWorkPackages"] ?? .null,
             ].json
         }
@@ -185,6 +187,7 @@ struct CodecTests {
                 "hash": json["workPackageHash"]!,
                 "length": json["length"]!,
                 "erasure_root": json["erasureRoot"]!,
+                "erasure_shards": json["erasureShards"]!,
                 "exports_root": json["segmentRoot"]!,
                 "exports_count": json["segmentCount"]!,
             ].json

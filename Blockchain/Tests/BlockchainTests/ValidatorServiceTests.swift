@@ -43,7 +43,7 @@ struct ValidatorServiceTests {
 
         // Check if SafroleTicketsGenerated events were published
         let safroleEvents = events.filter { $0 is RuntimeEvents.SafroleTicketsGenerated }
-        #expect(safroleEvents.count == config.value.totalNumberOfValidators)
+        #expect(safroleEvents.count == config.value.initialValidatorCount)
 
         // Check if block author tasks were scheduled
         #expect(scheduler.taskCount > 0)

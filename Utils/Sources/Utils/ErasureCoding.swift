@@ -198,7 +198,9 @@ public enum ErasureCoding {
                 }
             }
         }
-        if ret != 0 { throw Error.encodeFailed(Int(ret)) }
+        if ret != 0 {
+            throw Error.encodeFailed(Int(ret))
+        }
 
         var result = original
         result.reserveCapacity(recoveryCount)
@@ -317,7 +319,7 @@ public enum ErasureCoding {
     /// C_k: erasure-code chunking function (eq H.4)
     /// - Parameters:
     ///   - data: the original data
-    ///   - basicSize: ≈ 2 * number of cores; W_E (erasureCodedPieceSize), 684 for full config
+    ///   - basicSize: Input-piece size in octets, twice the original-shard count
     ///   - recoveryCount: ≈ number of validators; 1023 for full config
     /// - Returns: the list of smaller data chunks
     public static func chunk(data: Data, basicSize: Int, recoveryCount: Int) throws -> [Data] {

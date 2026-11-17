@@ -66,17 +66,16 @@ enum class Opcode : uint8_t {
 
     // Register Operations
     MoveReg = 100,
-    Sbrk = 101,
-    CountSetBits64 = 102,
-    CountSetBits32 = 103,
-    LeadingZeroBits64 = 104,
-    LeadingZeroBits32 = 105,
-    TrailingZeroBits64 = 106,
-    TrailingZeroBits32 = 107,
-    SignExtend8 = 108,
-    SignExtend16 = 109,
-    ZeroExtend16 = 110,
-    ReverseBytes = 111,
+    CountSetBits64 = 101,
+    CountSetBits32 = 102,
+    LeadingZeroBits64 = 103,
+    LeadingZeroBits32 = 104,
+    TrailingZeroBits64 = 105,
+    TrailingZeroBits32 = 106,
+    SignExtend8 = 107,
+    SignExtend16 = 108,
+    ZeroExtend16 = 109,
+    ReverseBytes = 110,
 
     // Store Indirect Instructions
     StoreIndU8 = 120,

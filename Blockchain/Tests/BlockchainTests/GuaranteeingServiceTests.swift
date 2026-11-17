@@ -76,7 +76,7 @@ struct GuaranteeingServiceTests {
 
         // Test with a different validator in the first position
         let secondValidator = postState.currentValidators.array[1]
-        postState.currentValidators = try ConfigFixedSizeArray(
+        postState.currentValidators = try ValidatorKeys(
             config: services.config,
             array: [secondValidator] + postState.currentValidators.array.dropFirst().dropFirst() + [postState.currentValidators.array[0]],
         )

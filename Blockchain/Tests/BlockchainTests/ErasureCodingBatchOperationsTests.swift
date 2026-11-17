@@ -39,6 +39,7 @@ struct ErasureCodingBatchOperationsTests {
             segments: segments,
             workPackageHash: data32(20),
             segmentsRoot: segmentsRoot,
+            validatorCount: 6,
         )
         let missingRoot = data32(21)
 
@@ -61,6 +62,7 @@ struct ErasureCodingBatchOperationsTests {
             bundle: bundle,
             workPackageHash: data32(22),
             segmentsRoot: data32(23),
+            validatorCount: 6,
         )
 
         let segments = [Data4104(repeating: 9), Data4104(repeating: 10)]
@@ -72,6 +74,7 @@ struct ErasureCodingBatchOperationsTests {
             segments: segments,
             workPackageHash: data32(24),
             segmentsRoot: segmentsRoot,
+            validatorCount: 6,
         )
 
         let results = try await fixture.store.batchReconstruct(
@@ -95,6 +98,7 @@ struct ErasureCodingBatchOperationsTests {
             bundle: Data(repeating: 11, count: 512),
             workPackageHash: data32(25),
             segmentsRoot: data32(26),
+            validatorCount: 6,
         )
 
         await expectStoreError(.missingOriginalLength(erasureRoot)) {
@@ -117,12 +121,14 @@ struct ErasureCodingBatchOperationsTests {
             shardIndex: 0,
         )
 
-        await expectStoreError(.insufficientShards(available: 1, required: 342)) {
+        await expectStoreError(.insufficientShards(available: 1, required: 3)) {
             _ = try await fixture.store.batchReconstruct(
                 erasureRoots: [erasureRoot],
                 originalLengths: [erasureRoot: 684],
+                validatorCounts: [erasureRoot: 6],
             )
         }
+        #expect(try await fixture.dataStore.getErasureValidatorCount(erasureRoot: erasureRoot) == 6)
     }
 
     private enum ExpectedStoreError {

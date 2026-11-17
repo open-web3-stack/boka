@@ -15,8 +15,7 @@ struct SafroleServiceTests {
     let genesisState: StateRef
 
     init() async throws {
-        config = ProtocolConfigRef.dev.mutate { config in
-            config.ticketEntriesPerValidator = 4
+        config = ProtocolConfigRef.dev.mutate { _ in
         }
         timeProvider = MockTimeProvider(time: 1000)
 
@@ -33,7 +32,7 @@ struct SafroleServiceTests {
 
         safroleService = await SafroleService(config: config, eventBus: eventBus, keystore: keystore)
 
-        ringContext = try Bandersnatch.RingContext(size: UInt(config.value.totalNumberOfValidators))
+        ringContext = try Bandersnatch.RingContext(size: UInt(ProtocolConfig.MaxValidators.read(config: config)))
 
         await safroleService.onSyncCompleted()
 
@@ -50,7 +49,7 @@ struct SafroleServiceTests {
         for event in events {
             #expect(event is RuntimeEvents.SafroleTicketsGenerated)
             let ticketEvent = try #require(event as? RuntimeEvents.SafroleTicketsGenerated)
-            #expect(ticketEvent.items.count == config.value.ticketEntriesPerValidator)
+            #expect(ticketEvent.items.count == (2 * config.value.epochLength + genesisState.value.nextValidators.count - 1) / genesisState.value.nextValidators.count)
         }
     }
 
@@ -67,6 +66,7 @@ struct SafroleServiceTests {
                 headerHash: newBlock.hash,
                 superPeak: Data32(),
                 stateRoot: Data32(),
+                timeslot: newBlock.header.timeslot,
                 lookup: .init(),
             ))
         }
@@ -79,7 +79,7 @@ struct SafroleServiceTests {
         for event in events[1...] {
             #expect(event is RuntimeEvents.SafroleTicketsGenerated)
             let ticketEvent = try #require(event as? RuntimeEvents.SafroleTicketsGenerated)
-            #expect(ticketEvent.items.count == config.value.ticketEntriesPerValidator)
+            #expect(ticketEvent.items.count == (2 * config.value.epochLength + newState.value.nextValidators.count - 1) / newState.value.nextValidators.count)
         }
     }
 
@@ -96,6 +96,7 @@ struct SafroleServiceTests {
                 headerHash: newBlock.hash,
                 superPeak: Data32(),
                 stateRoot: Data32(),
+                timeslot: newBlock.header.timeslot,
                 lookup: .init(),
             ))
         }
