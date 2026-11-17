@@ -136,6 +136,8 @@ public actor BatchOperations {
                             // locally encoded D³L shards live in the filesystem. Reconstruction combines
                             // those sources. A shard index alone does not identify its kind: callers
                             // must not mix audit shards and segment shards for the same reconstruction.
+                            // TODO: Separate audit and D³L shard storage and apply the corresponding
+                            // retention and cleanup rules to network-fetched shards.
                             for (shardIndex, shardData) in fetchedShards {
                                 try await dataStore.storeShard(
                                     shardData: shardData,
