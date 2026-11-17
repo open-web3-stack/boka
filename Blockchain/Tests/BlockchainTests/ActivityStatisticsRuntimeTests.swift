@@ -25,6 +25,7 @@ struct ActivityStatisticsRuntimeTests {
             authorIndex: 2,
             availableReports: [report],
             accumulateStats: [7: (Gas(13), 2, 0)],
+            activeValidators: state.currentValidators,
         )
 
         #expect(stats.accumulator[2].blocks == 1)
@@ -78,6 +79,7 @@ struct ActivityStatisticsRuntimeTests {
             authorIndex: 1,
             availableReports: [],
             accumulateStats: [:],
+            activeValidators: state.currentValidators,
         )
 
         #expect(stats.previous[1].blocks == 9)

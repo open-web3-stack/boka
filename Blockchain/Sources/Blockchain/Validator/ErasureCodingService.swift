@@ -9,16 +9,18 @@ private let logger = Logger(label: "ErasureCodingService")
 ///
 /// Uses GF(2¹⁶), with the coding rate derived from the assuring validator count.
 public actor ErasureCodingService {
-    private let config: ProtocolConfigRef
-
     // Coding dimensions for this assurer set.
     private let originalShardCount: Int
     private let totalShardCount: Int
     private let pieceSize: Int
 
-    public init(config: ProtocolConfigRef, validatorCount: Int? = nil) {
-        self.config = config
-        totalShardCount = validatorCount ?? config.value.initialValidatorCount
+    public init(config: ProtocolConfigRef, validatorCount: Int) throws {
+        guard validatorCount >= 6, validatorCount <= ProtocolConfig.MaxValidators.read(config: config),
+              validatorCount.isMultiple(of: 3)
+        else {
+            throw ErasureCodingStoreError.invalidValidatorCount(validatorCount)
+        }
+        totalShardCount = validatorCount
         originalShardCount = Self.originalShards(validators: totalShardCount)
         pieceSize = 2 * originalShardCount
     }
@@ -26,13 +28,6 @@ public actor ErasureCodingService {
     public nonisolated static func originalShards(validators: Int) -> Int {
         precondition(validators >= 6 && validators.isMultiple(of: 3))
         return stride(from: validators / 3 + 1, through: 1, by: -1).first { 4104 % (2 * $0) == 0 }!
-    }
-
-    public func forValidators(_ count: Int?) -> ErasureCodingService {
-        guard let count else {
-            return self
-        }
-        return ErasureCodingService(config: config, validatorCount: count)
     }
 
     public var inputPieceSize: Int {

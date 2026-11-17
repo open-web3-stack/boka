@@ -317,7 +317,7 @@ public final class Runtime {
     }
 
     /// returns available reports
-    public func updateAssurances(block: BlockRef, state newState: inout State, priorValidatorCount: Int? = nil) async throws -> [WorkReport] {
+    public func updateAssurances(block: BlockRef, state newState: inout State, priorValidatorCount: Int) async throws -> [WorkReport] {
         let (
             newAvailabilityAssignments: newAvailabilityAssignments, availableReports: availableReports,
         ) = try newState.update(

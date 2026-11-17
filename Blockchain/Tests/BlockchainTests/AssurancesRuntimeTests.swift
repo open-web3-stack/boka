@@ -6,6 +6,38 @@ import Utils
 struct AssurancesRuntimeTests {
     private let config = ProtocolConfigRef.tiny
 
+    @Test(arguments: [false, true])
+    func resizedValidatorSetUsesPriorThreshold(growing: Bool) throws {
+        let config = config.mutate { $0.totalNumberOfCores = 3 }
+        let priorCount = growing ? 6 : 9
+        let posteriorCount = growing ? 9 : 6
+        let requiredAssurances = growing ? 5 : 7
+        let report = makeReport(coreIndex: 0, timeslot: 6)
+        let state = try AssuranceState(
+            availabilityAssignments: .init(config: config, array: [report, nil, nil]),
+            currentValidators: .init(config: config, array: Array(repeating: ValidatorKey(), count: posteriorCount)),
+        )
+
+        var bitfield = ConfigSizeBitString<ProtocolConfig.TotalNumberOfCores>(config: config)
+        try bitfield.set(0, to: true)
+        for count in [0, requiredAssurances - 1, requiredAssurances] {
+            let assurances = (0 ..< count).map {
+                ExtrinsicAvailability.AssuranceItem(
+                    parentHash: data32(1), assurance: bitfield,
+                    validatorIndex: ValidatorIndex($0), signature: data64(2),
+                )
+            }
+            let result = try state.update(
+                config: config, timeslot: 7,
+                extrinsic: ExtrinsicAvailability(assurances: .init(config: config, array: assurances)),
+                priorValidatorCount: priorCount,
+            )
+            // Resizing clears pending assignments, even without assurances or a timeout.
+            #expect(result.newAvailabilityAssignments.allSatisfy { $0 == nil })
+            #expect(result.availableReports == (count == requiredAssurances ? [report.workReport] : []))
+        }
+    }
+
     @Test
     func updatePrunesReportsOlderThanPreimageReplacementPeriod() throws {
         let staleReport = makeReport(coreIndex: 0, timeslot: 5)
@@ -19,6 +51,7 @@ struct AssurancesRuntimeTests {
             config: config,
             timeslot: 10,
             extrinsic: ExtrinsicAvailability.dummy(config: config),
+            priorValidatorCount: state.currentValidators.count,
         )
 
         #expect(result.newAvailabilityAssignments[0] == nil)
@@ -42,6 +75,7 @@ struct AssurancesRuntimeTests {
             config: config,
             timeslot: 7,
             extrinsic: makeAvailability(assurances),
+            priorValidatorCount: state.currentValidators.count,
         )
 
         #expect(result.availableReports == [report.workReport])
@@ -62,6 +96,7 @@ struct AssurancesRuntimeTests {
                 config: config,
                 timeslot: 7,
                 extrinsic: makeAvailability([makeAssurance(coreIndex: 1, validatorIndex: 0)]),
+                priorValidatorCount: state.currentValidators.count,
             )
         }
     }

@@ -16,14 +16,14 @@ extension ActivityStatistics {
         authorIndex: ValidatorIndex,
         availableReports: [WorkReport],
         accumulateStats: AccumulationStats,
-        activeValidators: ValidatorKeys? = nil,
+        activeValidators: ValidatorKeys,
     ) throws -> Statistics {
         let epochLength = UInt32(config.value.epochLength)
         let currentEpoch = timeslot / epochLength
         let newEpoch = newTimeslot / epochLength
         let isEpochChange = currentEpoch != newEpoch
 
-        let validators = activeValidators ?? currentValidators
+        let validators = activeValidators
         var priorAccumulator = activityStatistics.accumulator
         for assurance in extrinsic.availability.assurances {
             priorAccumulator[assurance.validatorIndex].assurances += 1

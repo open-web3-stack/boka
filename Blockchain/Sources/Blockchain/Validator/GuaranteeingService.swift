@@ -419,6 +419,7 @@ public final class GuaranteeingService: ServiceBase2, @unchecked Sendable, OnBef
             config: config,
             randomness: state.value.entropyPool.t2,
             timeslot: timeslot,
+            validatorCount: state.value.currentValidators.count,
         )
 
         coreAssignments.value = (newCoreAssignment, timeslot)

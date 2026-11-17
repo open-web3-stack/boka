@@ -223,7 +223,7 @@ extension Accumulation {
             currentState.manager = managerResult.state.manager
             // z' - alwaysAcc always writes
             currentState.alwaysAcc = managerResult.state.alwaysAcc
-            // The manager overrides only the core assignments it changed.
+            // a'[c] - if manager changed assigner for core c from initial, use manager's value
             for index in initialAssigners.indices where initialAssigners[index] != managerResult.state.assigners[index] {
                 currentState.assigners[index] = managerResult.state.assigners[index]
             }

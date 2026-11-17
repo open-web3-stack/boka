@@ -14,13 +14,13 @@ All paths below are relative to `JAMTests/`.
 | `jamduna/` | Jamduna traces | `Tests/JAMTests/jamtestnet/JamdunaTests.swift` |
 | `fuzz/crypto/ed25519/` | Crypto edge cases | `Tests/JAMTests/crypto/Ed25519Tests.swift` |
 
-`jamtestvectors/traces/` comes from **jam-conformance/jam-test-vectors**, including its `fuzzy` suites. `fuzz/` contains separate cases copied from **jam-conformance/jam-fuzzing** or local fuzz runs. Updating the submodule does not update `fuzz/`.
+`jamtestvectors/traces/` comes from **davxy/jam-test-vectors**, including its `fuzzy` suites. `fuzz/` contains separate cases copied from **jam-conformance/jam-fuzzing** or local fuzz runs. Updating the submodule does not update `fuzz/`.
 
 The Swift loader uses `.w3f` for `jamtestvectors/` and `.fuzz` for `fuzz/`.
 
 ## Update released vectors
 
-Source: [jam-conformance/jam-test-vectors](https://github.com/jam-conformance/jam-test-vectors).
+Source configured in `.gitmodules`: [davxy/jam-test-vectors](https://github.com/davxy/jam-test-vectors).
 
 Run from the boka root:
 

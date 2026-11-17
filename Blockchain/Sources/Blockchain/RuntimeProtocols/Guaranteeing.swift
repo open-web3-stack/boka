@@ -75,17 +75,16 @@ extension Guaranteeing {
         source.map { CoreIndex(($0 + n) % max) }
     }
 
-    public func getCoreAssignment(config: ProtocolConfigRef, randomness: Data32, timeslot: TimeslotIndex, validatorCount: Int? = nil) -> [CoreIndex] {
-        let count = validatorCount ?? currentValidators.count
-        var source = Array(repeating: UInt32(0), count: count)
-        for i in 0 ..< count {
+    public func getCoreAssignment(config: ProtocolConfigRef, randomness: Data32, timeslot: TimeslotIndex, validatorCount: Int) -> [CoreIndex] {
+        var source = Array(repeating: UInt32(0), count: validatorCount)
+        for i in 0 ..< validatorCount {
             source[i] = UInt32(i / 3)
         }
         source.shuffle(randomness: randomness)
 
         let n = timeslot % UInt32(config.value.epochLength) / UInt32(config.value.coreAssignmentRotationPeriod)
 
-        return toCoreAssignment(source, n: n, max: UInt32(count / 3))
+        return toCoreAssignment(source, n: n, max: UInt32(validatorCount / 3))
     }
 
     public func requiredStorageKeys(extrinsic: ExtrinsicGuarantees) -> [any StateKey] {
@@ -229,7 +228,9 @@ extension Guaranteeing {
     ) {
         let coreAssignmentRotationPeriod = UInt32(config.value.coreAssignmentRotationPeriod)
 
-        let currentCoreAssignment = getCoreAssignment(config: config, randomness: entropyPool.t2, timeslot: timeslot)
+        let currentCoreAssignment = getCoreAssignment(
+            config: config, randomness: entropyPool.t2, timeslot: timeslot, validatorCount: currentValidators.count,
+        )
         let currentCoreKeys = withoutOffenders(keys: currentValidators.map(\.ed25519))
 
         let isEpochChanging = (timeslot % UInt32(config.value.epochLength)) < coreAssignmentRotationPeriod

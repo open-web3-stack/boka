@@ -252,12 +252,12 @@ public final class DataAvailabilityService: ServiceBase2, @unchecked Sendable, O
     }
 
     /// Export segments to import store
-    public func exportSegments(data: [Data4104], erasureRoot: Data32, validatorCount: Int? = nil) async throws -> Data32 {
+    public func exportSegments(data: [Data4104], erasureRoot: Data32, validatorCount: Int) async throws -> Data32 {
         try await workReportProcessor.exportSegments(data: data, erasureRoot: erasureRoot, validatorCount: validatorCount)
     }
 
     /// Export a work package bundle to audit store
-    public func exportWorkpackageBundle(bundle: WorkPackageBundle, validatorCount: Int? = nil) async throws -> (erasureRoot: Data32, length: DataLength) {
+    public func exportWorkpackageBundle(bundle: WorkPackageBundle, validatorCount: Int) async throws -> (erasureRoot: Data32, length: DataLength) {
         try await workReportProcessor.exportWorkpackageBundle(bundle: bundle, validatorCount: validatorCount)
     }
 

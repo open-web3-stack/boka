@@ -14,18 +14,15 @@ private let logger = Logger(label: "AuditBundleStore")
 public actor AuditBundleStore {
     private let dataStore: any DataStoreProtocol
     private let filesystemStore: FilesystemDataStore
-    private let erasureCoding: ErasureCodingService
     private let config: ProtocolConfigRef
 
     public init(
         dataStore: any DataStoreProtocol,
         filesystemStore: FilesystemDataStore,
-        erasureCoding: ErasureCodingService,
         config: ProtocolConfigRef,
     ) {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
-        self.erasureCoding = erasureCoding
         self.config = config
     }
 
@@ -40,9 +37,9 @@ public actor AuditBundleStore {
         bundle: Data,
         workPackageHash: Data32,
         segmentsRoot: Data32,
-        validatorCount: Int? = nil,
+        validatorCount: Int,
     ) async throws -> Data32 {
-        let erasureCoding = await erasureCoding.forValidators(validatorCount)
+        let erasureCoding = try ErasureCodingService(config: config, validatorCount: validatorCount)
         logger.debug("Storing audit bundle: workPackageHash=\(workPackageHash.toHexString()), size=\(bundle.count)")
 
         // Encoded bundle limit, including framing and references.
@@ -110,7 +107,7 @@ public actor AuditBundleStore {
 
         // Fallback to reconstruction from shards
         let count = try await dataStore.getErasureValidatorCount(erasureRoot: erasureRoot)
-        let erasureCoding = await erasureCoding.forValidators(count)
+        let erasureCoding = try ErasureCodingService(config: config, validatorCount: count)
         let requiredShardCount = await erasureCoding.requiredShardCount
         let indices = try await dataStore.getAvailableShardIndices(erasureRoot: erasureRoot)
         guard indices.count >= requiredShardCount else {

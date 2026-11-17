@@ -7,16 +7,16 @@ import Utils
 public actor ReconstructionService {
     private let dataStore: any DataStoreProtocol
     private let filesystemStore: FilesystemDataStore
-    private let erasureCoding: ErasureCodingService
+    private let config: ProtocolConfigRef
 
     public init(
         dataStore: any DataStoreProtocol,
         filesystemStore: FilesystemDataStore,
-        erasureCoding: ErasureCodingService,
+        config: ProtocolConfigRef,
     ) {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
-        self.erasureCoding = erasureCoding
+        self.config = config
     }
 
     /// Check if we can reconstruct data from local shards
@@ -101,7 +101,7 @@ public actor ReconstructionService {
             )
         }
 
-        let coding = await erasureCoding.forValidators(count)
+        let coding = try ErasureCodingService(config: config, validatorCount: count)
         return try await coding.reconstruct(shards: shards, originalLength: originalLength)
     }
 

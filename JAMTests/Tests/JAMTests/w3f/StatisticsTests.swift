@@ -66,6 +66,7 @@ struct StatisticsTests {
             authorIndex: testcase.input.author,
             availableReports: [],
             accumulateStats: [:],
+            activeValidators: testStatsState.currentValidators,
         )
         testStatsState.current = result.accumulator
         testStatsState.previous = result.previous

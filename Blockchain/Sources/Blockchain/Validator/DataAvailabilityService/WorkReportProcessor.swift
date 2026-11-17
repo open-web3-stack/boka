@@ -13,7 +13,6 @@ private let logger = Logger(label: "WorkReportProcessor")
 public actor WorkReportProcessor {
     private let dataStore: DataStore
     private let erasureCodingDataStore: ErasureCodingDataStore?
-    private let erasureCodingService: ErasureCodingService
     private let config: ProtocolConfigRef
 
     public init(
@@ -24,7 +23,6 @@ public actor WorkReportProcessor {
         self.dataStore = dataStore
         self.erasureCodingDataStore = erasureCodingDataStore
         self.config = config
-        erasureCodingService = ErasureCodingService(config: config)
     }
 
     // MARK: - Segment Operations
@@ -44,7 +42,7 @@ public actor WorkReportProcessor {
     ///   - data: The segments to export
     ///   - erasureRoot: The erasure root to associate with the segments
     /// - Returns: The segments root
-    public func exportSegments(data: [Data4104], erasureRoot: Data32, validatorCount: Int? = nil) async throws -> Data32 {
+    public func exportSegments(data: [Data4104], erasureRoot: Data32, validatorCount: Int) async throws -> Data32 {
         // Use ErasureCodingDataStore if available for automatic erasure coding
         if let ecStore = erasureCodingDataStore {
             // For D³L store, we need to track work package hash
@@ -113,7 +111,7 @@ public actor WorkReportProcessor {
     /// Export a work package bundle to audit store with erasure coding
     /// - Parameter bundle: The bundle to export
     /// - Returns: The erasure root and length of the bundle
-    public func exportWorkpackageBundle(bundle: WorkPackageBundle, validatorCount: Int? = nil) async throws -> (erasureRoot: Data32, length: DataLength) {
+    public func exportWorkpackageBundle(bundle: WorkPackageBundle, validatorCount: Int) async throws -> (erasureRoot: Data32, length: DataLength) {
         // Serialize the bundle
         let serializedData = try JamEncoder.encode(bundle)
         let dataLength = DataLength(UInt32(serializedData.count))

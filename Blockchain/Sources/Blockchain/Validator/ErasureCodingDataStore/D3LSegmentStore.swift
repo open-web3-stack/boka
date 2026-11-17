@@ -15,18 +15,18 @@ private let logger = Logger(label: "D3LSegmentStore")
 public actor D3LSegmentStore {
     private let dataStore: any DataStoreProtocol
     private let filesystemStore: FilesystemDataStore
-    private let erasureCoding: ErasureCodingService
+    private let config: ProtocolConfigRef
     private let pagedProofsGenerator: PagedProofsGenerator
 
     public init(
         dataStore: any DataStoreProtocol,
         filesystemStore: FilesystemDataStore,
-        erasureCoding: ErasureCodingService,
+        config: ProtocolConfigRef,
         pagedProofsGenerator: PagedProofsGenerator,
     ) {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
-        self.erasureCoding = erasureCoding
+        self.config = config
         self.pagedProofsGenerator = pagedProofsGenerator
     }
 
@@ -41,9 +41,9 @@ public actor D3LSegmentStore {
         segments: [Data4104],
         workPackageHash: Data32,
         segmentsRoot: Data32,
-        validatorCount: Int? = nil,
+        validatorCount: Int,
     ) async throws -> Data32 {
-        let erasureCoding = await erasureCoding.forValidators(validatorCount)
+        let erasureCoding = try ErasureCodingService(config: config, validatorCount: validatorCount)
         guard !segments.isEmpty else {
             throw ErasureCodingStoreError.noSegmentsToStore
         }
@@ -123,7 +123,7 @@ public actor D3LSegmentStore {
     /// - Returns: Array of retrieved segments
     public func getSegments(erasureRoot: Data32, indices: [Int]) async throws -> [Data4104] {
         let count = try await dataStore.getErasureValidatorCount(erasureRoot: erasureRoot)
-        let erasureCoding = await erasureCoding.forValidators(count)
+        let erasureCoding = try ErasureCodingService(config: config, validatorCount: count)
         let requiredShardCount = await erasureCoding.requiredShardCount
         guard !indices.isEmpty else {
             return []

@@ -26,7 +26,6 @@ public actor ErasureCodingDataStore {
 
     private let dataStore: any DataStoreProtocol
     private let filesystemStore: FilesystemDataStore
-    private let erasureCoding: ErasureCodingService
     private let config: ProtocolConfigRef
     private let segmentCache: SegmentCache
 
@@ -64,7 +63,6 @@ public actor ErasureCodingDataStore {
         self.dataStore = dataStore
         self.filesystemStore = filesystemStore
         self.config = config
-        erasureCoding = ErasureCodingService(config: config)
         // Use default cache size for now - can be made configurable later
         segmentCache = SegmentCache(maxSize: 1000)
         self.networkClient = networkClient
@@ -89,18 +87,17 @@ public actor ErasureCodingDataStore {
         reconstructionService = ReconstructionService(
             dataStore: dataStore,
             filesystemStore: filesystemStore,
-            erasureCoding: erasureCoding,
+            config: config,
         )
         auditBundleStore = AuditBundleStore(
             dataStore: dataStore,
             filesystemStore: filesystemStore,
-            erasureCoding: erasureCoding,
             config: config,
         )
         d3lSegmentStore = D3LSegmentStore(
             dataStore: dataStore,
             filesystemStore: filesystemStore,
-            erasureCoding: erasureCoding,
+            config: config,
             pagedProofsGenerator: pagedProofsGenerator,
         )
         batchOperations = BatchOperations(
@@ -140,7 +137,7 @@ public actor ErasureCodingDataStore {
         bundle: Data,
         workPackageHash: Data32,
         segmentsRoot: Data32,
-        validatorCount: Int? = nil,
+        validatorCount: Int,
     ) async throws -> Data32 {
         try await auditBundleStore.storeBundle(
             bundle: bundle,
@@ -170,7 +167,7 @@ public actor ErasureCodingDataStore {
         segments: [Data4104],
         workPackageHash: Data32,
         segmentsRoot: Data32,
-        validatorCount: Int? = nil,
+        validatorCount: Int,
     ) async throws -> Data32 {
         try await d3lSegmentStore.storeSegments(
             segments: segments,

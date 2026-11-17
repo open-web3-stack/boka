@@ -41,7 +41,7 @@ extension Assurances {
         config: ProtocolConfigRef,
         timeslot: TimeslotIndex,
         extrinsic: ExtrinsicAvailability,
-        priorValidatorCount: Int? = nil,
+        priorValidatorCount: Int,
     ) throws -> (
         newAvailabilityAssignments: ConfigFixedSizeArray<
             ReportItem?,
@@ -54,7 +54,7 @@ extension Assurances {
         for i in 0 ..< newAvailabilityAssignments.count {
             if let report = newAvailabilityAssignments[i] {
                 if UInt64(report.timeslot) + UInt64(config.value.preimageReplacementPeriod) <= UInt64(timeslot)
-                    || (priorValidatorCount ?? currentValidators.count) != currentValidators.count
+                    || priorValidatorCount != currentValidators.count
                 {
                     newAvailabilityAssignments[i] = nil
                 }
@@ -75,7 +75,7 @@ extension Assurances {
             guard let report = availabilityAssignments[idx] else {
                 throw AssurancesError.assuranceForEmptyCore
             }
-            if count > (priorValidatorCount ?? currentValidators.count) * 2 / 3 {
+            if count > priorValidatorCount * 2 / 3 {
                 availableReports.append(report.workReport)
                 newAvailabilityAssignments[idx] = nil // remove available report from pending assignments
             }

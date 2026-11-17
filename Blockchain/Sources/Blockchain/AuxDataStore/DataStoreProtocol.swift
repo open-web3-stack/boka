@@ -65,7 +65,7 @@ public protocol DataStoreProtocol: Sendable {
     func setMetadataIfAbsent(key: Data, value: Data) async throws -> Bool
 }
 
-// MARK: - Supporting Types
+// MARK: - Erasure Coding Metadata
 
 extension DataStoreProtocol {
     /// Retain coding dimensions while either availability store still references the root.
@@ -104,6 +104,8 @@ extension DataStoreProtocol {
         return count
     }
 }
+
+// MARK: - Supporting Types
 
 public struct AuditEntry: Sendable, Codable {
     public var workPackageHash: Data32

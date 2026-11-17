@@ -57,9 +57,9 @@ struct ErasureCodingDataStoreFacadeTests {
         }
         let store = ErasureCodingDataStore(dataStore: fixture.dataStore, filesystemStore: fixture.filesystemStore, config: config)
         await #expect(throws: ErasureCodingStoreError.self) {
-            try await store.storeAuditBundle(bundle: Data(count: config.value.maxWorkBundleSize + 1), workPackageHash: data32(92), segmentsRoot: data32(93))
+            try await store.storeAuditBundle(bundle: Data(count: config.value.maxWorkBundleSize + 1), workPackageHash: data32(92), segmentsRoot: data32(93), validatorCount: 6)
         }
-        _ = try await store.storeAuditBundle(bundle: Data(count: config.value.maxWorkBundleSize), workPackageHash: data32(92), segmentsRoot: data32(93))
+        _ = try await store.storeAuditBundle(bundle: Data(count: config.value.maxWorkBundleSize), workPackageHash: data32(92), segmentsRoot: data32(93), validatorCount: 6)
     }
 
     @Test(arguments: [false, true])
@@ -130,6 +130,7 @@ struct ErasureCodingDataStoreFacadeTests {
             bundle: bundle,
             workPackageHash: workPackageHash,
             segmentsRoot: segmentsRoot,
+            validatorCount: 6,
         )
 
         let entry = try #require(try await fixture.store.getAuditEntry(erasureRoot: erasureRoot))
@@ -164,6 +165,7 @@ struct ErasureCodingDataStoreFacadeTests {
             segments: segments,
             workPackageHash: workPackageHash,
             segmentsRoot: segmentsRoot,
+            validatorCount: 6,
         )
 
         let d3lEntry = try #require(try await fixture.store.getD3LEntry(erasureRoot: erasureRoot))
@@ -216,6 +218,7 @@ struct ErasureCodingDataStoreFacadeTests {
                 segments: [],
                 workPackageHash: data32(4),
                 segmentsRoot: data32(5),
+                validatorCount: 6,
             )
         }
 
@@ -224,6 +227,7 @@ struct ErasureCodingDataStoreFacadeTests {
                 segments: [Data4104(repeating: 6)],
                 workPackageHash: data32(7),
                 segmentsRoot: data32(8),
+                validatorCount: 6,
             )
         }
     }

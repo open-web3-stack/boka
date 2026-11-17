@@ -13,7 +13,7 @@ public actor ShardDistributionManager {
     private let dataProvider: BlockchainDataProvider
     private let dataStore: DataStore
     private let erasureCodingDataStore: ErasureCodingDataStore?
-    private let erasureCodingService: ErasureCodingService
+    private let config: ProtocolConfigRef
 
     public init(
         dataProvider: BlockchainDataProvider,
@@ -24,7 +24,7 @@ public actor ShardDistributionManager {
         self.dataProvider = dataProvider
         self.dataStore = dataStore
         self.erasureCodingDataStore = erasureCodingDataStore
-        erasureCodingService = ErasureCodingService(config: config)
+        self.config = config
     }
 
     // MARK: - Work Report Distribution (CE 135)
@@ -211,7 +211,7 @@ public actor ShardDistributionManager {
         // Generate justification T(s, i, H) using ErasureCodingService
         // Get all shard hashes for justification generation using batch operation
         let validatorCount = try await ecStore.getErasureValidatorCount(erasureRoot: erasureRoot)
-        let coding = await erasureCodingService.forValidators(validatorCount)
+        let coding = try ErasureCodingService(config: config, validatorCount: validatorCount)
         let allShardIndices = Array(0 ..< UInt16(validatorCount))
         let allShards = try await ecStore.getShards(
             erasureRoot: erasureRoot,
@@ -384,7 +384,7 @@ public actor ShardDistributionManager {
         }
 
         let validatorCount = try await ecStore.getErasureValidatorCount(erasureRoot: erasureRoot)
-        let coding = await erasureCodingService.forValidators(validatorCount)
+        let coding = try ErasureCodingService(config: config, validatorCount: validatorCount)
         for segmentIndex in segmentIndices {
             // Find the segment shard for this segment index
             guard Int(segmentIndex) < segmentShards.count else {

@@ -5,15 +5,33 @@ import TracingUtils
 import Utils
 
 struct ErasureCodingServiceTests {
-    func makeService() -> ErasureCodingService {
-        ErasureCodingService(config: .mainnet)
+    func makeService() throws -> ErasureCodingService {
+        try ErasureCodingService(config: .mainnet, validatorCount: 1023)
     }
 
     // MARK: - Encoding Tests
 
+    @Test(arguments: [0, 5, 7, 9])
+    func rejectsInvalidValidatorCounts(count: Int) {
+        #expect(throws: ErasureCodingStoreError.self) {
+            try ErasureCodingService(config: .tiny, validatorCount: count)
+        }
+    }
+
+    @Test(arguments: [6, 9])
+    func encodingUsesExplicitCountInsteadOfGenesisCount(count: Int) async throws {
+        let service = try ErasureCodingService(config: .mainnet, validatorCount: count)
+        let segment = Data4104(repeating: 42)
+        let shards = try await service.encodeSegments([segment])
+        #expect(shards.count == count)
+        let required = await service.requiredShardCount
+        let recovery = (count - required ..< count).map { (index: UInt16($0), data: shards[$0]) }
+        #expect(try await service.reconstruct(shards: recovery, originalLength: 4104) == segment.data)
+    }
+
     @Test
     func encodeSingleSegment() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Create a test segment (4,104 bytes = 6 × 684 bytes)
         var segmentData = Data(count: 4104)
@@ -41,7 +59,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func encodeMultipleSegments() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Create 3 test segments
         var segments: [Data4104] = []
@@ -62,7 +80,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func encodeBlob() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Create a test blob (must be multiple of 684 bytes)
         let blobSize = 684 * 10 // 10 pieces
@@ -80,7 +98,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func encodeEmptyInputThrowsError() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Try to encode empty array
         await #expect(throws: ErasureCodingError.self) {
@@ -94,7 +112,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func encodeInvalidLengthThrowsError() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Try to encode data that's not a multiple of 684 bytes
         let invalidData = Data(count: 100) // Not divisible by 684
@@ -108,7 +126,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func reconstructFromAllShards() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Create and encode test data
         let originalData = Data(count: 684 * 10)
@@ -130,7 +148,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func reconstructFrom342Shards() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Create and encode test data
         let originalData = Data(count: 684 * 10)
@@ -153,7 +171,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func reconstructFrom500Shards() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Create and encode test data
         let originalData = Data(count: 684 * 20)
@@ -178,7 +196,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func reconstructFromInsufficientShardsThrowsError() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Create and encode test data
         let originalData = Data(count: 684 * 10)
@@ -200,7 +218,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func reconstructSegments() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Create test segments
         var segments: [Data4104] = []
@@ -235,7 +253,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func calculateErasureRoot() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         // Create test data
         let originalData = Data(count: 684 * 10)
@@ -261,7 +279,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func calculateErasureRootDifferentSegmentsRoot() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         let originalData = Data(count: 684 * 10)
         let shards = try await service.encodeBlob(originalData)
@@ -284,7 +302,7 @@ struct ErasureCodingServiceTests {
 
     @Test
     func calculateErasureRootInvalidShardCount() async throws {
-        let service = makeService()
+        let service = try makeService()
 
         let segmentsRoot = Data32.random()
         let invalidShards = Array(repeating: Data(count: 100), count: 100)
